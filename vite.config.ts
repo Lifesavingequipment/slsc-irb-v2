@@ -28,9 +28,10 @@ export default defineConfig({
       ],
     },
   },
+  // Force nitro to run with the Vercel preset so the build produces
+  // .vercel/output/ (functions + static) rather than a plain SPA bundle.
+  nitro: { preset: "vercel" },
   tanstackStart: {
-    // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-    // nitro/vite builds from this
     server: { entry: "server" },
   },
 });
