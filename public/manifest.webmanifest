@@ -1,11 +1,12 @@
 {
-  "name": "IRB Coaching",
-  "short_name": "IRB Coaching",
-  "description": "Surf lifesaving team management for clubs, coaches and members.",
-  "start_url": "/",
+  "name": "IRB Training",
+  "short_name": "IRB",
+  "description": "IRB Training Management for Surf Life Saving Clubs",
+  "theme_color": "#E63329",
+  "background_color": "#ffffff",
   "display": "standalone",
-  "background_color": "#1a2540",
-  "theme_color": "#1a2540",
+  "orientation": "portrait",
+  "start_url": "/",
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -15,7 +16,8 @@
     {
       "src": "/icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }

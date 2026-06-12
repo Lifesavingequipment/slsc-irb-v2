@@ -62,9 +62,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { name: "theme-color", content: "#1a2540" },
-      { title: "IRB Coaching" },
-      { name: "description", content: "Surf lifesaving team management for clubs, coaches and members." },
+      { name: "theme-color", content: "#E63329" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-title", content: "IRB Training" },
+      { title: "IRB Training" },
+      { name: "description", content: "IRB Training Management for Surf Life Saving Clubs" },
       { property: "og:title", content: "IRB Coaching" },
       { name: "twitter:title", content: "IRB Coaching" },
       { property: "og:description", content: "Surf lifesaving team management for clubs, coaches and members." },
@@ -96,6 +99,11 @@ function RootShell({ children }: { children: ReactNode }) {
       <body>
         {children}
         <Scripts />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/sw.js'); }`,
+          }}
+        />
       </body>
     </html>
   );
