@@ -25,3 +25,5 @@ IRB Training management app for Surf Life Saving clubs in Australia and New Zeal
 
 ## Deploy
 Push to `master` branch triggers auto-deploy on Vercel via GitHub connection.
+
+<!-- Last updated: 2026-06-12 -->
