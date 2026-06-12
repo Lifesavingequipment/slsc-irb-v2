@@ -290,7 +290,7 @@ function MembersPageInner({
           className="block mb-3 rounded-lg border bg-card p-3 active:bg-muted/40 transition-colors"
         >
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-accent/15 flex items-center justify-center text-accent">
+            <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center text-accent">
               <TrendingUp className="h-4 w-4" />
             </div>
             <div className="flex-1 min-w-0">
@@ -676,8 +676,8 @@ function MemberRow({ row, displayName, partnerName, roles, canManage, canRemove,
               <Button
                 key={role}
                 size="sm"
-                variant={active ? "default" : "outline"}
-                className="flex-1 h-8 text-xs"
+                variant="outline"
+                className={`flex-1 h-8 text-xs ${active ? "border-red-500 text-red-600 bg-red-50 hover:bg-red-100" : ""}`}
                 disabled={saving}
                 onClick={() => toggle(role)}
               >
