@@ -57,7 +57,7 @@ type Attendance = {
   id: string; user_id: string; status: AttStatus; note: string | null;
 };
 
-type Member = { user_id: string; display_name: string; driver_flag: boolean; crew_flag: boolean };
+type Member = { id: string; auth_user_id: string | null; user_id: string; display_name: string; driver_flag: boolean; crew_flag: boolean };
 
 const STATUS_LABELS: Record<RsvpStatus, string> = {
   going: "Going", maybe: "Maybe", not_going: "Can't go",
@@ -125,6 +125,8 @@ function SessionDetail() {
         .eq("membership_status", "active")
         .order("first_name");
       const list: Member[] = (memData ?? []).map((m) => ({
+        id: m.id,
+        auth_user_id: m.auth_user_id ?? null,
         user_id: m.auth_user_id ?? m.id,
         display_name: memberFullName(m, "Member"),
         driver_flag: m.driver_flag ?? false,
@@ -241,8 +243,8 @@ function SessionDetail() {
       ];
     });
     const { data, error } = await supabase.from("session_rsvps").upsert(
-      { session_id: sessionId, user_id: userId, status },
-      { onConflict: "session_id,user_id" },
+      { session_id: sessionId, member_id: member?.id ?? userId, user_id: member?.auth_user_id ?? null, status },
+      { onConflict: "session_id,member_id" },
     ).select("id, user_id, status").maybeSingle();
     if (error) {
       setRsvps(prev);
