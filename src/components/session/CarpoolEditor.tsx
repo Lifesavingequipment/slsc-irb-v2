@@ -57,20 +57,17 @@ export function CarpoolEditor({
     if (!clubId || !canPickAnyDriver) return;
     let cancelled = false;
     (async () => {
-      const { data: mems } = await supabase
-        .from("club_memberships")
-        .select("user_id")
-        .eq("club_id", clubId)
-        .eq("status", "approved");
-      const ids = (mems ?? []).map((m) => m.user_id);
-      if (cancelled || ids.length === 0) { setMembers([]); return; }
       const { data: memData } = await supabase
         .from("members")
-        .select("auth_user_id, first_name, last_name, preferred_name")
-        .in("auth_user_id", ids)
-        .eq("club_id", clubId!);
+        .select("id, auth_user_id, first_name, last_name, preferred_name")
+        .eq("club_id", clubId)
+        .eq("membership_status", "active")
+        .order("first_name");
       if (cancelled) return;
-      const rows: Member[] = (memData ?? []).map((m) => ({ user_id: m.auth_user_id, display_name: memberFullName(m, "Member") }));
+      const rows: Member[] = (memData ?? []).map((m) => ({
+        user_id: m.auth_user_id ?? m.id,
+        display_name: memberFullName(m, "Member"),
+      }));
       rows.sort((a, b) => a.display_name.localeCompare(b.display_name));
       setMembers(rows);
     })();

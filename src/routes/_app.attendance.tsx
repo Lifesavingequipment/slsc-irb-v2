@@ -62,23 +62,14 @@ function AttendancePage() {
       setAtt([]);
     }
 
-    const { data: mRows } = await supabase.from("club_memberships")
-      .select("user_id")
-      .eq("club_id", clubId).eq("status", "approved");
-    const memberUserIds = (mRows ?? []).map((m) => m.user_id);
-    let memberNameMap: Record<string, string> = {};
-    if (memberUserIds.length) {
-      const { data: memData } = await supabase.from("members")
-        .select("auth_user_id, first_name, last_name, preferred_name")
-        .in("auth_user_id", memberUserIds)
-        .eq("club_id", clubId);
-      (memData ?? []).forEach((m) => {
-        memberNameMap[m.auth_user_id] = memberFullName(m, "Unnamed");
-      });
-    }
-    setMembers(memberUserIds.map((uid) => ({
-      user_id: uid,
-      name: memberNameMap[uid] || "Unnamed",
+    const { data: memData } = await supabase.from("members")
+      .select("id, auth_user_id, first_name, last_name, preferred_name")
+      .eq("club_id", clubId)
+      .eq("membership_status", "active")
+      .order("first_name");
+    setMembers((memData ?? []).map((m) => ({
+      user_id: m.auth_user_id ?? m.id,
+      name: memberFullName(m, "Unnamed"),
     })));
     setLoading(false);
   }, [clubId, range]);

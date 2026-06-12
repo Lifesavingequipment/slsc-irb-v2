@@ -124,28 +124,18 @@ function SessionDetail() {
   useEffect(() => {
     if (!session?.club_id) return;
     (async () => {
-      const { data: mems } = await supabase
-        .from("club_memberships")
-        .select("user_id")
-        .eq("club_id", session.club_id)
-        .eq("status", "approved");
-      const ids = (mems ?? []).map((m) => m.user_id);
-      if (ids.length === 0) { setMembers([]); return; }
       const { data: memData } = await supabase
         .from("members")
-        .select("auth_user_id, first_name, last_name, preferred_name, driver_flag, crew_flag")
-        .in("auth_user_id", ids)
-        .eq("club_id", session.club_id);
-      const memMap = new Map((memData ?? []).map((m) => [m.auth_user_id, m]));
-      const list: Member[] = ids.map((uid) => {
-        const m = memMap.get(uid);
-        return {
-          user_id: uid,
-          display_name: memberFullName(m, "Member"),
-          driver_flag: m?.driver_flag ?? false,
-          crew_flag: m?.crew_flag ?? false,
-        };
-      });
+        .select("id, auth_user_id, first_name, last_name, preferred_name, driver_flag, crew_flag")
+        .eq("club_id", session.club_id)
+        .eq("membership_status", "active")
+        .order("first_name");
+      const list: Member[] = (memData ?? []).map((m) => ({
+        user_id: m.auth_user_id ?? m.id,
+        display_name: memberFullName(m, "Member"),
+        driver_flag: m.driver_flag ?? false,
+        crew_flag: m.crew_flag ?? false,
+      }));
       list.sort((a, b) => a.display_name.localeCompare(b.display_name));
       setMembers(list);
     })();

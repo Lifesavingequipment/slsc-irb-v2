@@ -61,32 +61,30 @@ function RolesPageInner({ clubId }: { clubId: string }) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: mems } = await supabase
-      .from("club_memberships")
-      .select("user_id")
+    const { data: memberData } = await supabase
+      .from("members")
+      .select("id, auth_user_id, first_name, last_name, preferred_name, phone")
       .eq("club_id", clubId)
-      .eq("status", "approved");
-    const ids = (mems ?? []).map((m) => m.user_id);
-    if (ids.length === 0) { setRows([]); setLoading(false); return; }
-    const [{ data: memberData }, { data: r }] = await Promise.all([
-      supabase.from("members").select("auth_user_id, first_name, last_name, preferred_name, phone").in("auth_user_id", ids).eq("club_id", clubId),
-      supabase.from("user_roles").select("user_id, role").eq("club_id", clubId).in("user_id", ids),
-    ]);
+      .eq("membership_status", "active")
+      .order("first_name");
+    const authIds = (memberData ?? []).map((m) => m.auth_user_id).filter(Boolean) as string[];
+    const { data: r } = authIds.length
+      ? await supabase.from("user_roles").select("user_id, role").eq("club_id", clubId).in("user_id", authIds)
+      : { data: [] as { user_id: string; role: string }[] };
     const roleMap: Record<string, string[]> = {};
     (r ?? []).forEach((x) => {
       roleMap[x.user_id] = [...(roleMap[x.user_id] ?? []), x.role];
     });
-    const pmap = new Map((memberData ?? []).map((m) => [m.auth_user_id, m]));
     setRows(
-      ids.map((id) => {
-        const m = pmap.get(id);
+      (memberData ?? []).map((m) => {
+        const key = m.auth_user_id ?? m.id;
         return {
-          user_id: id,
-          first_name: m?.first_name ?? null,
-          last_name: m?.last_name ?? null,
-          preferred_name: m?.preferred_name ?? null,
-          phone: m?.phone ?? null,
-          roles: roleMap[id] ?? [],
+          user_id: key,
+          first_name: m.first_name ?? null,
+          last_name: m.last_name ?? null,
+          preferred_name: m.preferred_name ?? null,
+          phone: m.phone ?? null,
+          roles: roleMap[key] ?? [],
         };
       }),
     );
