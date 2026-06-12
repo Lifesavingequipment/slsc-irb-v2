@@ -29,7 +29,7 @@ type Team = {
   notes: string | null;
 };
 type Partner = { driver_id: string; crew_id: string };
-type Member = { id: string; display_name: string };
+type Member = { id: string; display_name: string; auth_user_id: string | null };
 type Cfg = { waves_count: number; lanes_count: number };
 
 const MAX_W = 4;
@@ -70,14 +70,14 @@ export function WavePanel({
       supabase.from("member_partners").select("driver_id, crew_id").eq("club_id", clubId),
       supabase.from("session_draw_configs").select("waves_count, lanes_count").eq("session_id", sessionId).maybeSingle(),
       goingIds.length
-        ? supabase.from("members").select("auth_user_id, first_name, last_name, preferred_name").in("auth_user_id", goingIds).eq("club_id", clubId)
-        : Promise.resolve({ data: [] as { auth_user_id: string; first_name: string | null; last_name: string | null; preferred_name: string | null }[] }),
+        ? supabase.from("members").select("id, auth_user_id, first_name, last_name, preferred_name").in("id", goingIds).eq("club_id", clubId)
+        : Promise.resolve({ data: [] as { id: string; auth_user_id: string | null; first_name: string | null; last_name: string | null; preferred_name: string | null }[] }),
     ]);
     setTeams((t ?? []) as Team[]);
     setPartners((p ?? []) as Partner[]);
     setCfg((c as Cfg | null) ?? null);
     const map: Record<string, Member> = {};
-    (profs ?? []).forEach((m) => { map[m.auth_user_id] = { id: m.auth_user_id, display_name: memberFullName(m, "Member") }; });
+    (profs ?? []).forEach((m) => { map[m.id] = { id: m.id, auth_user_id: m.auth_user_id ?? null, display_name: memberFullName(m, "Member") }; });
     setMembers(map);
   }, [sessionId, clubId, goingIds]);
 
@@ -104,6 +104,13 @@ export function WavePanel({
   }, [teams]);
 
   const goingSet = useMemo(() => new Set(goingIds), [goingIds]);
+
+  // Translate auth_user_id → members.id for partner matching (member_partners stores auth_user_id)
+  const authToMemberId = useMemo(() => {
+    const m: Record<string, string> = {};
+    Object.values(members).forEach((mem) => { if (mem.auth_user_id) m[mem.auth_user_id] = mem.id; });
+    return m;
+  }, [members]);
   const unpartnered = useMemo(
     () => goingIds
       .filter((id) => !inTeamIds.has(id))
@@ -130,11 +137,13 @@ export function WavePanel({
     const toInsert: { session_id: string; driver_id: string; crew_id: string }[] = [];
     const used = new Set<string>(inTeamIds);
     for (const p of partners) {
-      if (used.has(p.driver_id) || used.has(p.crew_id)) continue;
-      if (!goingSet.has(p.driver_id) || !goingSet.has(p.crew_id)) continue;
-      toInsert.push({ session_id: sessionId, driver_id: p.driver_id, crew_id: p.crew_id });
-      used.add(p.driver_id);
-      used.add(p.crew_id);
+      const driverId = authToMemberId[p.driver_id] ?? p.driver_id;
+      const crewId = authToMemberId[p.crew_id] ?? p.crew_id;
+      if (used.has(driverId) || used.has(crewId)) continue;
+      if (!goingSet.has(driverId) || !goingSet.has(crewId)) continue;
+      toInsert.push({ session_id: sessionId, driver_id: driverId, crew_id: crewId });
+      used.add(driverId);
+      used.add(crewId);
     }
     if (toInsert.length === 0) {
       setBusy(false);
@@ -156,11 +165,13 @@ export function WavePanel({
 
     // 1) Confirmed partner pairs where both are Going
     for (const p of partners) {
-      if (used.has(p.driver_id) || used.has(p.crew_id)) continue;
-      if (!goingSet.has(p.driver_id) || !goingSet.has(p.crew_id)) continue;
-      inserts.push({ session_id: sessionId, driver_id: p.driver_id, crew_id: p.crew_id });
-      used.add(p.driver_id);
-      used.add(p.crew_id);
+      const driverId = authToMemberId[p.driver_id] ?? p.driver_id;
+      const crewId = authToMemberId[p.crew_id] ?? p.crew_id;
+      if (used.has(driverId) || used.has(crewId)) continue;
+      if (!goingSet.has(driverId) || !goingSet.has(crewId)) continue;
+      inserts.push({ session_id: sessionId, driver_id: driverId, crew_id: crewId });
+      used.add(driverId);
+      used.add(crewId);
     }
 
     // 2) Pair whoever's still unpartnered

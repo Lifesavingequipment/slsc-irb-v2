@@ -42,7 +42,7 @@ type RsvpStatus = "going" | "maybe" | "not_going";
 type AttStatus = "present" | "absent" | "excused" | "injured";
 
 type Rsvp = {
-  id: string; user_id: string; status: RsvpStatus;
+  id: string; user_id: string; member_id: string | null; status: RsvpStatus;
   profile: { display_name: string } | null;
 };
 
@@ -90,20 +90,35 @@ function SessionDetail() {
     setSession(s as Session | null);
     const { data: r } = await supabase
       .from("session_rsvps")
-      .select("id, user_id, status")
+      .select("id, user_id, member_id, status")
       .eq("session_id", sessionId);
-    const rsvpRows = (r ?? []) as { id: string; user_id: string; status: RsvpStatus }[];
-    const rsvpUserIds = rsvpRows.map((x) => x.user_id);
-    let profMap = new Map<string, { display_name: string }>();
-    if (rsvpUserIds.length > 0 && s?.club_id) {
+    const rsvpRows = (r ?? []) as { id: string; user_id: string | null; member_id: string | null; status: RsvpStatus }[];
+    const rsvpUserIds = rsvpRows.map((x) => x.user_id).filter(Boolean) as string[];
+    const rsvpMemberIds = rsvpRows.map((x) => x.member_id).filter(Boolean) as string[];
+    let profByAuthId = new Map<string, { display_name: string }>();
+    let profByMemberId = new Map<string, { display_name: string }>();
+    if (s?.club_id && (rsvpUserIds.length > 0 || rsvpMemberIds.length > 0)) {
+      const orFilters: string[] = [];
+      if (rsvpUserIds.length > 0) orFilters.push(`auth_user_id.in.(${rsvpUserIds.join(",")})`);
+      if (rsvpMemberIds.length > 0) orFilters.push(`id.in.(${rsvpMemberIds.join(",")})`);
       const { data: memData } = await supabase
         .from("members")
-        .select("auth_user_id, first_name, last_name, preferred_name")
-        .in("auth_user_id", rsvpUserIds)
+        .select("id, auth_user_id, first_name, last_name, preferred_name")
+        .or(orFilters.join(","))
         .eq("club_id", s.club_id);
-      profMap = new Map((memData ?? []).map((m) => [m.auth_user_id, { display_name: memberFullName(m, "Member") }]));
+      for (const m of memData ?? []) {
+        const name = { display_name: memberFullName(m, "Member") };
+        if (m.auth_user_id) profByAuthId.set(m.auth_user_id, name);
+        profByMemberId.set(m.id, name);
+      }
     }
-    setRsvps(rsvpRows.map((x) => ({ id: x.id, user_id: x.user_id, status: x.status, profile: profMap.get(x.user_id) ?? null })));
+    setRsvps(rsvpRows.map((x) => ({
+      id: x.id,
+      user_id: x.user_id ?? x.member_id ?? x.id,
+      member_id: x.member_id ?? null,
+      status: x.status,
+      profile: (x.user_id ? profByAuthId.get(x.user_id) : null) ?? (x.member_id ? profByMemberId.get(x.member_id) : null) ?? null,
+    })));
     const { data: t } = await supabase.from("session_teams").select("*")
       .eq("session_id", sessionId).order("wave").order("lane");
     setTeams((t ?? []) as Team[]);
@@ -496,7 +511,12 @@ function SessionDetail() {
             clubId={session.club_id}
             sessionTitle={session.title}
             sessionStartsAt={session.starts_at}
-            goingIds={going.map((g) => g.user_id)}
+            goingIds={going
+              .map((g) => {
+                if (g.member_id) return g.member_id;
+                return members.find((m) => m.auth_user_id === g.user_id)?.id ?? null;
+              })
+              .filter(Boolean) as string[]}
             canManage={canManage}
           />
         </TabsContent>
