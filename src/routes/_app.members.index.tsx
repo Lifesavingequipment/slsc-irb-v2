@@ -44,8 +44,9 @@ const membersCache = new Map<
 
 
 type Row = {
-  id: string;
-  user_id: string;
+  id: string;                   // members.id
+  membership_id: string | null; // club_memberships.id (null for members without auth accounts)
+  user_id: string;              // auth_user_id if present, else members.id as fallback key
   status: "pending" | "approved" | "rejected";
   profile: {
     first_name: string | null;
@@ -78,56 +79,60 @@ function MembersPage() {
 
   const load = useCallback(async () => {
     if (!activeClub) return;
+
+    // Load all members for this club directly (includes test members without auth accounts)
+    const { data: memberData } = await supabase
+      .from("members")
+      .select("id, auth_user_id, first_name, last_name, preferred_name, phone, driver_flag, crew_flag, patient_flag")
+      .eq("club_id", activeClub.club_id);
+
+    // Load club_memberships for status (pending/approved/rejected) keyed by auth user id
     const { data: mems } = await supabase
       .from("club_memberships")
       .select("id, user_id, status")
-      .eq("club_id", activeClub.club_id)
-      .order("status");
+      .eq("club_id", activeClub.club_id);
+    const membershipByUserId = new Map((mems ?? []).map((m) => [m.user_id, m]));
 
-    const memRows = (mems ?? []).slice();
+    const nextRows: Row[] = (memberData ?? []).map((m) => {
+      const membership = m.auth_user_id ? membershipByUserId.get(m.auth_user_id) : undefined;
+      return {
+        id: m.id,
+        membership_id: membership?.id ?? null,
+        user_id: m.auth_user_id ?? m.id,
+        status: (membership?.status as Row["status"]) ?? "approved",
+        profile: {
+          first_name: m.first_name,
+          last_name: m.last_name,
+          preferred_name: m.preferred_name,
+          phone: m.phone,
+          driver_flag: m.driver_flag ?? false,
+          crew_flag: m.crew_flag ?? false,
+          patient_flag: m.patient_flag ?? false,
+        },
+      };
+    });
 
-    // Fallback: always ensure the current user is represented in the list,
-    // even if a transient RLS/race condition hid them from the bulk fetch.
+    // Fallback: ensure the current auth user is represented even if their members row is missing
     const { data: meAuth } = await supabase.auth.getUser();
     const meId = meAuth.user?.id ?? null;
-    if (meId && !memRows.some((m) => m.user_id === meId)) {
+    if (meId && !nextRows.some((r) => r.user_id === meId)) {
       const { data: selfMem } = await supabase
         .from("club_memberships")
         .select("id, user_id, status")
         .eq("club_id", activeClub.club_id)
         .eq("user_id", meId)
         .maybeSingle();
-      if (selfMem) memRows.push(selfMem);
+      if (selfMem) {
+        nextRows.push({
+          id: selfMem.id,
+          membership_id: selfMem.id,
+          user_id: meId,
+          status: selfMem.status as Row["status"],
+          profile: null,
+        });
+      }
     }
 
-    const userIds = memRows.map((m) => m.user_id);
-    const { data: memberData } = userIds.length
-      ? await supabase.from("members")
-          .select("auth_user_id, first_name, last_name, preferred_name, phone, driver_flag, crew_flag, patient_flag")
-          .in("auth_user_id", userIds)
-          .eq("club_id", activeClub.club_id)
-      : { data: [] as { auth_user_id: string; first_name: string | null; last_name: string | null; preferred_name: string | null; phone: string | null; driver_flag: boolean; crew_flag: boolean; patient_flag: boolean }[] };
-    const pmap = new Map((memberData ?? []).map((m) => [m.auth_user_id, m]));
-
-    const nextRows: Row[] = memRows.map((m) => {
-      const pr = pmap.get(m.user_id);
-      return {
-        id: m.id,
-        user_id: m.user_id,
-        status: m.status as Row["status"],
-        profile: pr
-          ? {
-              first_name: pr.first_name,
-              last_name: pr.last_name,
-              preferred_name: pr.preferred_name,
-              phone: pr.phone,
-              driver_flag: pr.driver_flag ?? false,
-              crew_flag: pr.crew_flag ?? false,
-              patient_flag: pr.patient_flag ?? false,
-            }
-          : null,
-      };
-    });
     setRows(nextRows);
 
     const { data: r } = await supabase
@@ -158,16 +163,20 @@ function MembersPage() {
   useEffect(() => { load(); }, [load]);
   useRefetchOnFocus(load);
 
-  const setStatus = async (id: string, status: Row["status"]) => {
-    const { error } = await supabase.from("club_memberships").update({ status }).eq("id", id);
+  const setStatus = async (membershipId: string, status: Row["status"]) => {
+    if (!membershipId) return;
+    const { error } = await supabase.from("club_memberships").update({ status }).eq("id", membershipId);
     if (error) { toast.error(error.message); return; }
     toast.success(status === "approved" ? "Member approved" : "Updated");
     load();
   };
 
-  const removeMember = async (membershipId: string, userId: string) => {
-    await supabase.from("user_roles").delete().eq("club_id", activeClub!.club_id).eq("user_id", userId);
-    const { error } = await supabase.from("club_memberships").delete().eq("id", membershipId);
+  const removeMember = async (memberId: string, membershipId: string | null, userId: string) => {
+    if (membershipId) {
+      await supabase.from("user_roles").delete().eq("club_id", activeClub!.club_id).eq("user_id", userId);
+      await supabase.from("club_memberships").delete().eq("id", membershipId);
+    }
+    const { error } = await supabase.from("members").delete().eq("id", memberId);
     if (error) { toast.error(error.message); return; }
     toast.success("Member removed");
     load();
@@ -226,8 +235,8 @@ function MembersPageInner({
   currentUserId: string | null;
   canManage: boolean;
   isAdmin: boolean;
-  setStatus: (id: string, status: Row["status"]) => void;
-  removeMember: (membershipId: string, userId: string) => void;
+  setStatus: (membershipId: string, status: Row["status"]) => void;
+  removeMember: (memberId: string, membershipId: string | null, userId: string) => void;
   load: () => void;
   initialTab?: "approved" | "pending" | "partners";
 }) {
@@ -350,7 +359,7 @@ function MembersPageInner({
               isAdmin={isAdmin}
               isSelf={m.user_id === currentUserId}
               activeClubId={activeClubId}
-              onRemove={() => removeMember(m.id, m.user_id)}
+              onRemove={() => removeMember(m.id, m.membership_id, m.user_id)}
               onChange={load}
             />
           ))}
@@ -375,8 +384,8 @@ function MembersPageInner({
               </div>
               {isAdmin && (
                 <div className="mt-3 grid grid-cols-2 gap-2">
-                  <Button size="sm" onClick={() => setStatus(m.id, "approved")}>Approve</Button>
-                  <Button size="sm" variant="outline" onClick={() => setStatus(m.id, "rejected")}>Reject</Button>
+                  <Button size="sm" onClick={() => setStatus(m.membership_id ?? "", "approved")}>Approve</Button>
+                  <Button size="sm" variant="outline" onClick={() => setStatus(m.membership_id ?? "", "rejected")}>Reject</Button>
                 </div>
               )}
             </Card>
@@ -592,8 +601,7 @@ function MemberRow({ row, displayName, partnerName, roles, canManage, canRemove,
     const flagKey = `${role.toLowerCase()}_flag` as "driver_flag" | "crew_flag" | "patient_flag";
     const { error } = await supabase.from("members")
       .update({ [flagKey]: !wasActive })
-      .eq("auth_user_id", row.user_id)
-      .eq("club_id", activeClubId!);
+      .eq("id", row.id);
     setSaving(false);
     if (error) {
       setOptimistic(serverPr);

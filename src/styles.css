@@ -60,11 +60,11 @@
   --popover-foreground: oklch(0.18 0.04 250);
 
   /* Primary red #E63329 */
-  --primary: oklch(0.52 0.22 25);
+  --primary: #E63329;
   --primary-foreground: oklch(0.99 0 0);
 
   --secondary: oklch(0.96 0.01 25);
-  --secondary-foreground: oklch(0.52 0.22 25);
+  --secondary-foreground: #E63329;
 
   --muted: oklch(0.96 0.01 240);
   --muted-foreground: oklch(0.5 0.03 250);
@@ -84,11 +84,11 @@
 
   --border: oklch(0.91 0.015 240);
   --input: oklch(0.91 0.015 240);
-  --ring: oklch(0.52 0.22 25);
+  --ring: #E63329;
 
   /* Brand — dark navy to red gradient */
   --surf-deep: oklch(0.22 0.04 250);
-  --surf-mid: oklch(0.52 0.22 25);
+  --surf-mid: #E63329;
   --surf-foam: oklch(0.96 0.02 220);
   --sand: oklch(0.96 0.025 85);
 }
