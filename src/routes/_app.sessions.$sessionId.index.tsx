@@ -14,13 +14,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
-} from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Calendar, MapPin, ChevronLeft, Users, Trash2, Clock, Plus, Share2, Lock, Pencil, RotateCw, ChevronsUpDown,
+  Calendar, MapPin, ChevronLeft, Users, Trash2, Clock, Plus, Share2, Lock, Pencil, RotateCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { WavePanel } from "@/components/session/WavePanel";
@@ -48,7 +43,6 @@ type AttStatus = "present" | "absent" | "excused" | "injured";
 
 type Rsvp = {
   id: string; user_id: string; status: RsvpStatus;
-  driver: boolean | null; crew: boolean | null; patient: boolean | null;
   profile: { display_name: string } | null;
 };
 
@@ -96,9 +90,9 @@ function SessionDetail() {
     setSession(s as Session | null);
     const { data: r } = await supabase
       .from("session_rsvps")
-      .select("id, user_id, status, driver, crew, patient")
+      .select("id, user_id, status")
       .eq("session_id", sessionId);
-    const rsvpRows = (r ?? []) as { id: string; user_id: string; status: RsvpStatus; driver: boolean | null; crew: boolean | null; patient: boolean | null }[];
+    const rsvpRows = (r ?? []) as { id: string; user_id: string; status: RsvpStatus }[];
     const rsvpUserIds = rsvpRows.map((x) => x.user_id);
     let profMap = new Map<string, { display_name: string }>();
     if (rsvpUserIds.length > 0 && s?.club_id) {
@@ -109,7 +103,7 @@ function SessionDetail() {
         .eq("club_id", s.club_id);
       profMap = new Map((memData ?? []).map((m) => [m.auth_user_id, { display_name: memberFullName(m, "Member") }]));
     }
-    setRsvps(rsvpRows.map((x) => ({ ...x, profile: profMap.get(x.user_id) ?? null })));
+    setRsvps(rsvpRows.map((x) => ({ id: x.id, user_id: x.user_id, status: x.status, profile: profMap.get(x.user_id) ?? null })));
     const { data: t } = await supabase.from("session_teams").select("*")
       .eq("session_id", sessionId).order("wave").order("lane");
     setTeams((t ?? []) as Team[]);
@@ -161,9 +155,6 @@ function SessionDetail() {
           id: existing?.id ?? `optimistic-${user.id}`,
           user_id: user.id,
           status,
-          driver: existing?.driver ?? null,
-          crew: existing?.crew ?? null,
-          patient: existing?.patient ?? null,
           profile: existing?.profile ?? null,
         },
       ];
@@ -171,7 +162,7 @@ function SessionDetail() {
     const { data, error } = await supabase.from("session_rsvps").upsert(
       { session_id: sessionId, user_id: user.id, status },
       { onConflict: "session_id,user_id" },
-    ).select("id, user_id, status, driver, crew, patient").maybeSingle();
+    ).select("id, user_id, status").maybeSingle();
     if (error) {
       setRsvps(prev);
       toast.error(error.message);
@@ -181,7 +172,7 @@ function SessionDetail() {
       setRsvps((cur) =>
         cur.map((r) =>
           r.user_id === user.id
-            ? { ...r, id: data.id, status: data.status as RsvpStatus, driver: data.driver, crew: data.crew, patient: data.patient }
+            ? { ...r, id: data.id, status: data.status as RsvpStatus }
             : r,
         ),
       );
@@ -200,9 +191,6 @@ function SessionDetail() {
           id: existing?.id ?? `optimistic-${userId}`,
           user_id: userId,
           status,
-          driver: existing?.driver ?? null,
-          crew: existing?.crew ?? null,
-          patient: existing?.patient ?? null,
           profile: existing?.profile ?? null,
         },
       ];
@@ -220,7 +208,7 @@ function SessionDetail() {
     const { data, error } = await supabase.from("session_rsvps").upsert(
       { session_id: sessionId, user_id: userId, status },
       { onConflict: "session_id,user_id" },
-    ).select("id, user_id, status, driver, crew, patient").maybeSingle();
+    ).select("id, user_id, status").maybeSingle();
     if (error) {
       setRsvps(prev);
       toast.error(error.message);
@@ -230,18 +218,14 @@ function SessionDetail() {
       setRsvps((cur) =>
         cur.map((r) =>
           r.user_id === userId
-            ? { ...r, id: data.id, status: data.status as RsvpStatus, driver: data.driver, crew: data.crew, patient: data.patient }
+            ? { ...r, id: data.id, status: data.status as RsvpStatus }
             : r,
         ),
       );
     }
   };
 
-  const markForMember = async (
-    userId: string,
-    status: RsvpStatus,
-    role: { driver: boolean; crew: boolean; patient: boolean },
-  ) => {
+  const markForMember = async (userId: string, status: RsvpStatus) => {
     const prev = rsvps;
     const member = members.find((m) => m.user_id === userId);
     setRsvps((cur) => {
@@ -252,17 +236,14 @@ function SessionDetail() {
           id: `optimistic-${userId}`,
           user_id: userId,
           status,
-          driver: role.driver,
-          crew: role.crew,
-          patient: role.patient,
           profile: member ? { display_name: member.display_name } : null,
         },
       ];
     });
     const { data, error } = await supabase.from("session_rsvps").upsert(
-      { session_id: sessionId, user_id: userId, status, ...role },
+      { session_id: sessionId, user_id: userId, status },
       { onConflict: "session_id,user_id" },
-    ).select("id, user_id, status, driver, crew, patient").maybeSingle();
+    ).select("id, user_id, status").maybeSingle();
     if (error) {
       setRsvps(prev);
       toast.error(error.message);
@@ -272,7 +253,7 @@ function SessionDetail() {
       setRsvps((cur) =>
         cur.map((r) =>
           r.user_id === userId
-            ? { ...r, id: data.id, status: data.status as RsvpStatus, driver: data.driver, crew: data.crew, patient: data.patient }
+            ? { ...r, id: data.id, status: data.status as RsvpStatus }
             : r,
         ),
       );
@@ -450,7 +431,6 @@ function SessionDetail() {
           {canManage && (
             <MarkAttendingPanel
               notResponded={notResponded}
-              busy={busy}
               onMark={markForMember}
             />
           )}
@@ -538,13 +518,6 @@ function SessionDetail() {
   );
 }
 
-function roleBadge(r: Rsvp) {
-  if (r.driver) return "Driver";
-  if (r.crew) return "Crew";
-  if (r.patient) return "Patient";
-  return null;
-}
-
 function RsvpList({ title, rows, tone, canManage, busy, onSetStatus, nameOf }: {
   title: string; rows: Rsvp[]; tone: "success" | "warning" | "muted";
   canManage?: boolean; busy?: boolean;
@@ -565,14 +538,10 @@ function RsvpList({ title, rows, tone, canManage, busy, onSetStatus, nameOf }: {
       </div>
       <div className="space-y-1">
         {rows.map((r) => {
-          const role = roleBadge(r);
           return (
             <div key={r.id} className={`flex items-center justify-between gap-2 py-1 pl-2 rounded ${borderClass}`}>
               <div className="flex items-center gap-1.5 flex-1 min-w-0">
                 <span className="text-sm truncate">{nameOf(r.user_id)}</span>
-                {role && (
-                  <Badge variant="outline" className="text-[10px] shrink-0">{role}</Badge>
-                )}
               </div>
               {canManage && onSetStatus && (
                 <Select
@@ -600,92 +569,117 @@ function RsvpList({ title, rows, tone, canManage, busy, onSetStatus, nameOf }: {
 
 /* --------------------------- Mark Attending --------------------------- */
 
-function preferredRole(member: Member): { driver: boolean; crew: boolean; patient: boolean } {
-  const { driver_flag, crew_flag } = member;
-  if (driver_flag && !crew_flag) return { driver: true, crew: false, patient: false };
-  if (!driver_flag && crew_flag) return { driver: false, crew: true, patient: false };
-  if (driver_flag && crew_flag) return { driver: true, crew: true, patient: false };
-  return { driver: false, crew: false, patient: true };
-}
-
 function MarkAttendingPanel({
   notResponded,
-  busy,
   onMark,
 }: {
   notResponded: Member[];
-  busy: boolean;
-  onMark: (userId: string, status: RsvpStatus, role: { driver: boolean; crew: boolean; patient: boolean }) => void;
+  onMark: (userId: string, status: RsvpStatus) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
 
-  const selected = notResponded.find((m) => m.user_id === selectedId) ?? null;
+  const filtered = notResponded.filter((m) =>
+    m.display_name.toLowerCase().includes(search.toLowerCase()),
+  );
 
-  const handleMark = (status: RsvpStatus) => {
-    if (!selected) return;
-    const role = status === "going" ? preferredRole(selected) : { driver: false, crew: false, patient: false };
-    onMark(selected.user_id, status, role);
-    setSelectedId(null);
+  const toggle = (userId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId); else next.add(userId);
+      return next;
+    });
   };
+
+  const remove = (userId: string) => {
+    setSelectedIds((prev) => { const next = new Set(prev); next.delete(userId); return next; });
+  };
+
+  const handleMark = async (status: RsvpStatus) => {
+    if (selectedIds.size === 0) return;
+    setBusy(true);
+    for (const userId of selectedIds) {
+      await onMark(userId, status);
+    }
+    setSelectedIds(new Set());
+    setBusy(false);
+  };
+
+  const selectedMembers = notResponded.filter((m) => selectedIds.has(m.user_id));
 
   return (
     <Card className="p-4">
       <div className="text-sm font-semibold mb-3">Mark Attending</div>
-      <div className="flex flex-wrap gap-2">
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              aria-expanded={open}
-              className="flex-1 min-w-[180px] justify-between"
-            >
-              <span className="truncate">{selected ? selected.display_name : "Search member…"}</span>
-              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[280px] p-0" align="start">
-            <Command>
-              <CommandInput placeholder="Search members…" />
-              <CommandEmpty>No members found.</CommandEmpty>
-              <CommandList>
-                <CommandGroup>
-                  {notResponded.map((m) => (
-                    <CommandItem
-                      key={m.user_id}
-                      value={m.display_name}
-                      onSelect={() => {
-                        setSelectedId(m.user_id);
-                        setOpen(false);
-                      }}
-                    >
-                      {m.display_name}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
+      {notResponded.length === 0 ? (
+        <p className="text-xs text-muted-foreground">All members have responded.</p>
+      ) : (
+        <div className="space-y-3">
+          {selectedMembers.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {selectedMembers.map((m) => (
+                <Badge key={m.user_id} variant="secondary" className="gap-1 pr-1">
+                  {m.display_name}
+                  <button
+                    type="button"
+                    onClick={() => remove(m.user_id)}
+                    className="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5"
+                    aria-label={`Remove ${m.display_name}`}
+                  >
+                    ×
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
 
-        <Button
-          disabled={!selected || busy}
-          className="bg-green-600 hover:bg-green-700 text-white"
-          onClick={() => handleMark("going")}
-        >
-          Going
-        </Button>
-        <Button
-          variant="secondary"
-          disabled={!selected || busy}
-          onClick={() => handleMark("not_going")}
-        >
-          Can't go
-        </Button>
-      </div>
-      {notResponded.length === 0 && (
-        <p className="mt-2 text-xs text-muted-foreground">All members have responded.</p>
+          <Input
+            placeholder="Search members…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-8 text-sm"
+          />
+
+          <div className="max-h-48 overflow-y-auto rounded border divide-y">
+            {filtered.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-muted-foreground">No members found.</div>
+            ) : filtered.map((m) => (
+              <button
+                key={m.user_id}
+                type="button"
+                onClick={() => toggle(m.user_id)}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-muted transition-colors ${
+                  selectedIds.has(m.user_id) ? "bg-muted font-medium" : ""
+                }`}
+              >
+                <span className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 text-xs ${
+                  selectedIds.has(m.user_id) ? "bg-primary border-primary text-primary-foreground" : "border-muted-foreground/40"
+                }`}>
+                  {selectedIds.has(m.user_id) ? "✓" : ""}
+                </span>
+                {m.display_name}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              disabled={selectedIds.size === 0 || busy}
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => handleMark("going")}
+            >
+              Going{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={selectedIds.size === 0 || busy}
+              className="flex-1"
+              onClick={() => handleMark("not_going")}
+            >
+              Can't go{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}
+            </Button>
+          </div>
+        </div>
       )}
     </Card>
   );
