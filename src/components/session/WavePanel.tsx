@@ -29,7 +29,7 @@ type Team = {
   notes: string | null;
 };
 type Partner = { driver_id: string; crew_id: string };
-type Member = { id: string; display_name: string; auth_user_id: string | null };
+type Member = { id: string; display_name: string; auth_user_id: string | null; driver_flag: boolean; crew_flag: boolean; patient_flag: boolean };
 type Cfg = { waves_count: number; lanes_count: number };
 
 const MAX_W = 10;
@@ -54,14 +54,14 @@ export function WavePanel({
       supabase.from("member_partners").select("driver_id, crew_id").eq("club_id", clubId),
       supabase.from("session_draw_configs").select("waves_count, lanes_count").eq("session_id", sessionId).maybeSingle(),
       goingIds.length
-        ? supabase.from("members").select("id, auth_user_id, first_name, last_name, preferred_name").in("id", goingIds).eq("club_id", clubId)
-        : Promise.resolve({ data: [] as { id: string; auth_user_id: string | null; first_name: string | null; last_name: string | null; preferred_name: string | null }[] }),
+        ? supabase.from("members").select("id, auth_user_id, first_name, last_name, preferred_name, driver_flag, crew_flag, patient_flag").in("id", goingIds).eq("club_id", clubId)
+        : Promise.resolve({ data: [] as { id: string; auth_user_id: string | null; first_name: string | null; last_name: string | null; preferred_name: string | null; driver_flag: boolean | null; crew_flag: boolean | null; patient_flag: boolean | null }[] }),
     ]);
     setTeams((t ?? []) as Team[]);
     setPartners((p ?? []) as Partner[]);
     setCfg((c as Cfg | null) ?? null);
     const map: Record<string, Member> = {};
-    (profs ?? []).forEach((m) => { map[m.id] = { id: m.id, auth_user_id: m.auth_user_id ?? null, display_name: memberFullName(m, "Member") }; });
+    (profs ?? []).forEach((m) => { map[m.id] = { id: m.id, auth_user_id: m.auth_user_id ?? null, display_name: memberFullName(m, "Member"), driver_flag: m.driver_flag ?? false, crew_flag: m.crew_flag ?? false, patient_flag: m.patient_flag ?? false }; });
     setMembers(map);
   }, [sessionId, clubId, goingIds]);
 
@@ -158,6 +158,7 @@ export function WavePanel({
     const used = new Set<string>(inTeamIds);
     const inserts: { session_id: string; driver_id: string | null; crew_id: string | null }[] = [];
 
+    // First: apply any confirmed partner pairs
     for (const p of partners) {
       const driverId = authToMemberId[p.driver_id] ?? p.driver_id;
       const crewId = authToMemberId[p.crew_id] ?? p.crew_id;
@@ -168,12 +169,54 @@ export function WavePanel({
       used.add(crewId);
     }
 
-    const pool = goingIds.filter((id) => !used.has(id));
-    for (let i = 0; i + 1 < pool.length; i += 2) {
-      inserts.push({ session_id: sessionId, driver_id: pool[i], crew_id: pool[i + 1] });
+    // Remaining unpaired members — split by role flags
+    const remaining = goingIds.filter((id) => !used.has(id));
+    const bothFlags = remaining.filter((id) => members[id]?.driver_flag && members[id]?.crew_flag);
+    const driversOnly = remaining.filter((id) => members[id]?.driver_flag && !members[id]?.crew_flag);
+    const crewOnly = remaining.filter((id) => !members[id]?.driver_flag && members[id]?.crew_flag);
+    const neither = remaining.filter((id) => !members[id]?.driver_flag && !members[id]?.crew_flag);
+
+    // Build driver pool: drivers-only first, then dual-role
+    const driverPool = [...driversOnly, ...bothFlags];
+    // Build crew pool: crew-only first, then dual-role (those not used as driver)
+    const usedAsDual = new Set<string>();
+
+    const availableCrew = () => [
+      ...crewOnly.filter((id) => !used.has(id)),
+      ...bothFlags.filter((id) => !used.has(id) && !usedAsDual.has(id)),
+    ];
+
+    for (const driverId of driverPool) {
+      if (used.has(driverId)) continue;
+      const crewList = availableCrew();
+      if (crewList.length === 0) {
+        // No crew available — add driver solo
+        inserts.push({ session_id: sessionId, driver_id: driverId, crew_id: null });
+        used.add(driverId);
+        if (bothFlags.includes(driverId)) usedAsDual.add(driverId);
+        continue;
+      }
+      const crewId = crewList[0];
+      inserts.push({ session_id: sessionId, driver_id: driverId, crew_id: crewId });
+      used.add(driverId);
+      used.add(crewId);
+      if (bothFlags.includes(driverId)) usedAsDual.add(driverId);
     }
-    if (pool.length % 2 === 1) {
-      inserts.push({ session_id: sessionId, driver_id: pool[pool.length - 1], crew_id: null });
+
+    // Remaining crew-only with no driver — add solo
+    for (const crewId of crewOnly) {
+      if (used.has(crewId)) continue;
+      inserts.push({ session_id: sessionId, driver_id: null, crew_id: crewId });
+      used.add(crewId);
+    }
+
+    // Members with no role flags — pair them together
+    const neitherPool = neither.filter((id) => !used.has(id));
+    for (let i = 0; i + 1 < neitherPool.length; i += 2) {
+      inserts.push({ session_id: sessionId, driver_id: neitherPool[i], crew_id: neitherPool[i + 1] });
+    }
+    if (neitherPool.length % 2 === 1) {
+      inserts.push({ session_id: sessionId, driver_id: neitherPool[neitherPool.length - 1], crew_id: null });
     }
 
     if (!inserts.length) { setBusy(false); toast.info("Nothing to pair."); return; }
