@@ -1,12 +1,20 @@
 // Centralized color classes for member role badges.
-// Uses semantic tokens from src/styles.css.
 export function roleBadgeClass(role: string): string {
   const r = role.toLowerCase();
   if (r === "owner" || r === "club_admin" || r === "admin") {
-    return "bg-primary text-primary-foreground hover:bg-primary/90";
+    return "bg-[#E63329] text-white hover:bg-[#c0392b]";
   }
   if (r === "coach") {
-    return "bg-accent text-accent-foreground hover:bg-accent/90";
+    return "bg-blue-600 text-white hover:bg-blue-700";
+  }
+  if (r === "assistant_coach") {
+    return "bg-purple-600 text-white hover:bg-purple-700";
+  }
+  if (r === "member") {
+    return "bg-gray-200 text-gray-700 hover:bg-gray-300";
+  }
+  if (r === "guest") {
+    return "bg-gray-100 text-gray-500 hover:bg-gray-200";
   }
   if (r === "driver") {
     return "bg-secondary text-secondary-foreground hover:bg-secondary/80";
@@ -23,5 +31,6 @@ export function roleBadgeClass(role: string): string {
 export function roleLabel(role: string): string {
   const r = role.toLowerCase();
   if (r === "club_admin") return "Admin";
+  if (r === "assistant_coach") return "Asst. Coach";
   return role.charAt(0).toUpperCase() + role.slice(1).replace("_", " ");
 }

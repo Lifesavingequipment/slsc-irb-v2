@@ -129,7 +129,7 @@ function Dashboard() {
         <h1 className="text-2xl font-bold tracking-tight">{activeClub.club.name}</h1>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         <Card className="p-4">
           <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
             <Users className="h-3.5 w-3.5" /> Members
