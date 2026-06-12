@@ -242,20 +242,38 @@ function SessionDetail() {
         },
       ];
     });
-    const { data, error } = await supabase.from("session_rsvps").upsert(
-      { session_id: sessionId, member_id: member?.id ?? userId, user_id: member?.auth_user_id ?? null, status },
-      { onConflict: "session_id,member_id" },
-    ).select("id, user_id, status").maybeSingle();
-    if (error) {
+    const memberId = member?.id ?? userId;
+    const { data: existing, error: checkErr } = await supabase
+      .from("session_rsvps")
+      .select("id")
+      .eq("session_id", sessionId)
+      .eq("member_id", memberId)
+      .maybeSingle();
+    if (checkErr) {
       setRsvps(prev);
-      toast.error(error.message);
+      toast.error(checkErr.message);
       return;
     }
-    if (data) {
+    let savedId: string | null = null;
+    if (existing) {
+      const { error } = await supabase.from("session_rsvps").update({ status }).eq("id", existing.id);
+      if (error) { setRsvps(prev); toast.error(error.message); return; }
+      savedId = existing.id;
+    } else {
+      const { data: inserted, error } = await supabase.from("session_rsvps").insert({
+        session_id: sessionId,
+        member_id: memberId,
+        user_id: member?.auth_user_id ?? null,
+        status,
+      }).select("id").maybeSingle();
+      if (error) { setRsvps(prev); toast.error(error.message); return; }
+      savedId = inserted?.id ?? null;
+    }
+    if (savedId) {
       setRsvps((cur) =>
         cur.map((r) =>
           r.user_id === userId
-            ? { ...r, id: data.id, status: data.status as RsvpStatus }
+            ? { ...r, id: savedId!, status }
             : r,
         ),
       );
