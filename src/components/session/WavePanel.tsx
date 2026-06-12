@@ -32,25 +32,8 @@ type Partner = { driver_id: string; crew_id: string };
 type Member = { id: string; display_name: string; auth_user_id: string | null };
 type Cfg = { waves_count: number; lanes_count: number };
 
-const MAX_W = 4;
-const MAX_L = 5;
-
-function waveOptions(teamCount: number) {
-  const opts: { waves: number; lanes: number; waste: number }[] = [];
-  for (let w = 1; w <= MAX_W; w++) {
-    for (let l = 1; l <= MAX_L; l++) {
-      if (w * l >= teamCount) opts.push({ waves: w, lanes: l, waste: w * l - teamCount });
-    }
-  }
-  opts.sort((a, b) => a.waves - b.waves || a.lanes - b.lanes || a.waste - b.waste);
-  const seen = new Set<string>();
-  return opts.filter((o) => {
-    const k = `${o.waves}x${o.lanes}`;
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  });
-}
+const MAX_W = 10;
+const MAX_L = 10;
 
 export function WavePanel({
   sessionId, clubId, sessionTitle, sessionStartsAt, goingIds, canManage,
@@ -62,6 +45,7 @@ export function WavePanel({
   const [busy, setBusy] = useState(false);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [pairFor, setPairFor] = useState<Member | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const confirm = useConfirm();
 
   const load = useCallback(async () => {
@@ -88,7 +72,7 @@ export function WavePanel({
     [members],
   );
   const dn = (id: string | null | undefined) => (id && displayMap[id]) || "—";
-  const name = (id: string | null) => dn(id);
+
   const teamLabel = (t: Team) => {
     const d = t.driver_id ? dn(t.driver_id) : null;
     const c = t.crew_id ? dn(t.crew_id) : null;
@@ -96,7 +80,17 @@ export function WavePanel({
     return d || c || "Empty";
   };
 
-  // Members in any team already
+  // How many teams each member appears in (for ×2 indicator)
+  const memberTeamCount = useMemo(() => {
+    const counts: Record<string, number> = {};
+    teams.forEach((t) => {
+      if (t.driver_id) counts[t.driver_id] = (counts[t.driver_id] ?? 0) + 1;
+      if (t.crew_id) counts[t.crew_id] = (counts[t.crew_id] ?? 0) + 1;
+    });
+    return counts;
+  }, [teams]);
+
+  // Members in any team already (at least one team = "partnered")
   const inTeamIds = useMemo(() => {
     const s = new Set<string>();
     teams.forEach((t) => { if (t.driver_id) s.add(t.driver_id); if (t.crew_id) s.add(t.crew_id); });
@@ -105,12 +99,13 @@ export function WavePanel({
 
   const goingSet = useMemo(() => new Set(goingIds), [goingIds]);
 
-  // Translate auth_user_id → members.id for partner matching (member_partners stores auth_user_id)
+  // Translate auth_user_id → members.id for partner matching
   const authToMemberId = useMemo(() => {
     const m: Record<string, string> = {};
     Object.values(members).forEach((mem) => { if (mem.auth_user_id) m[mem.auth_user_id] = mem.id; });
     return m;
   }, [members]);
+
   const unpartnered = useMemo(
     () => goingIds
       .filter((id) => !inTeamIds.has(id))
@@ -157,13 +152,12 @@ export function WavePanel({
     load();
   };
 
-  // ── Auto-pair: confirmed partner pairs first, then pair leftovers ──
+  // ── Auto-pair ──
   const autoPair = async () => {
     setBusy(true);
     const used = new Set<string>(inTeamIds);
     const inserts: { session_id: string; driver_id: string | null; crew_id: string | null }[] = [];
 
-    // 1) Confirmed partner pairs where both are Going
     for (const p of partners) {
       const driverId = authToMemberId[p.driver_id] ?? p.driver_id;
       const crewId = authToMemberId[p.crew_id] ?? p.crew_id;
@@ -174,7 +168,6 @@ export function WavePanel({
       used.add(crewId);
     }
 
-    // 2) Pair whoever's still unpartnered
     const pool = goingIds.filter((id) => !used.has(id));
     for (let i = 0; i + 1 < pool.length; i += 2) {
       inserts.push({ session_id: sessionId, driver_id: pool[i], crew_id: pool[i + 1] });
@@ -191,7 +184,7 @@ export function WavePanel({
     load();
   };
 
-  // ── Manual pair ──
+  // ── Manual pair (from unpartnered list) ──
   const manualPair = async (driverId: string, crewId: string | null) => {
     setBusy(true);
     const { error } = await supabase.from("session_teams").insert({
@@ -203,7 +196,7 @@ export function WavePanel({
     load();
   };
 
-  // ── Going twice: clone an existing team's crew slot with a different member ──
+  // ── Going twice: pair an already-assigned member with this member ──
   const goingTwice = async (memberId: string, withTeam: Team) => {
     setBusy(true);
     const { error } = await supabase.from("session_teams").insert({
@@ -215,6 +208,18 @@ export function WavePanel({
     setBusy(false);
     if (error) { toast.error(error.message); return; }
     setPairFor(null);
+    load();
+  };
+
+  // ── Create team (free-form, no restrictions) ──
+  const createTeam = async (driverId: string | null, crewId: string | null) => {
+    setBusy(true);
+    const { error } = await supabase.from("session_teams").insert({
+      session_id: sessionId, driver_id: driverId, crew_id: crewId,
+    });
+    setBusy(false);
+    if (error) { toast.error(error.message); return; }
+    setCreateOpen(false);
     load();
   };
 
@@ -258,32 +263,13 @@ export function WavePanel({
     setCfg({ waves_count: waves, lanes_count: lanes });
   };
 
-  // ── Move/swap a team into a slot (or to bench) ──
+  // ── Move/swap a team into a slot — no duplicate-person restriction ──
   const moveToSlot = async (teamId: string, wave: number | null, lane: number | null) => {
     const moving = teams.find((t) => t.id === teamId);
     if (!moving) return;
     const occupant = wave != null && lane != null
       ? teams.find((t) => t.wave === wave && t.lane === lane && t.id !== teamId)
       : null;
-
-    // Validation: no person can crew/drive in two teams in the same wave.
-    if (wave != null) {
-      const peopleInWave = new Set<string>();
-      teams.forEach((t) => {
-        if (t.wave !== wave) return;
-        if (t.id === teamId) return;
-        if (occupant && t.id === occupant.id) return; // occupant will move out
-        if (t.driver_id) peopleInWave.add(t.driver_id);
-        if (t.crew_id) peopleInWave.add(t.crew_id);
-      });
-      const dupes: string[] = [];
-      if (moving.driver_id && peopleInWave.has(moving.driver_id)) dupes.push(dn(moving.driver_id));
-      if (moving.crew_id && peopleInWave.has(moving.crew_id)) dupes.push(dn(moving.crew_id));
-      if (dupes.length) {
-        toast.error(`${dupes.join(" and ")} already in wave ${wave}. Move them out first.`);
-        return;
-      }
-    }
 
     // Two-step swap to avoid unique-index collision: park occupant to NULL first.
     setBusy(true);
@@ -352,7 +338,8 @@ export function WavePanel({
           <WaveGrid
             cfg={cfg}
             teams={teams}
-            teamLabel={teamLabel}
+            nameOf={dn}
+            memberTeamCount={memberTeamCount}
             selectedTeamId={null}
             onSelect={() => {}}
             onMove={() => {}}
@@ -365,7 +352,6 @@ export function WavePanel({
     );
   }
 
-  const opts = waveOptions(teams.length);
   const overCapacity = cfg && teams.length > cfg.waves_count * cfg.lanes_count;
 
   return (
@@ -373,7 +359,7 @@ export function WavePanel({
       {/* Stats + actions */}
       <Card className="p-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex gap-2 text-xs">
+          <div className="flex gap-2 text-xs flex-wrap">
             <Badge variant="secondary"><Users className="h-3 w-3 mr-1" />{goingIds.length} going</Badge>
             <Badge variant="secondary">{teams.length} teams</Badge>
             {unpartnered.length > 0 && (
@@ -404,8 +390,16 @@ export function WavePanel({
             <Shuffle className="h-4 w-4 mr-1" />Auto-pair
           </Button>
         </div>
+        <Button
+          variant="outline"
+          className="w-full"
+          disabled={busy || goingIds.length === 0}
+          onClick={() => setCreateOpen(true)}
+        >
+          <Plus className="h-4 w-4 mr-1" />Create team
+        </Button>
         <p className="text-[11px] text-muted-foreground">
-          "Confirmed pairs" adds a team for each saved partner pair where both are Going. "Auto-pair" does that first, then pairs whoever's left.
+          "Confirmed pairs" adds saved partner pairs where both are going. "Auto-pair" pairs everyone. "Create team" lets you pick any driver and crew, including those already in another team.
         </p>
       </Card>
 
@@ -427,37 +421,54 @@ export function WavePanel({
       )}
 
       {/* Wave config */}
-      <Card className="p-3 space-y-2">
+      <Card className="p-3 space-y-3">
         <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Wave configuration</div>
         {teams.length === 0 ? (
           <p className="text-sm text-muted-foreground">Add teams first to choose a wave layout.</p>
-        ) : opts.length === 0 ? (
-          <p className="text-sm text-destructive">Too many teams — max {MAX_W * MAX_L}. Remove some.</p>
         ) : (
-          <div className="grid grid-cols-2 gap-2">
-            {opts.slice(0, 6).map((o) => {
-              const active = cfg?.waves_count === o.waves && cfg?.lanes_count === o.lanes;
-              return (
-                <Button
-                  key={`${o.waves}x${o.lanes}`}
-                  variant={active ? "default" : "outline"}
-                  onClick={() => setConfig(o.waves, o.lanes)}
-                  disabled={busy}
-                  className="h-auto py-2 flex-col gap-0.5"
-                >
-                  <div className="font-semibold text-sm leading-tight">
-                    {o.waves} {o.waves === 1 ? "wave" : "waves"} × {o.lanes} {o.lanes === 1 ? "lane" : "lanes"}
-                  </div>
-                  <div className="text-[10px] opacity-70">
-                    {o.waves * o.lanes} slots · {o.waste === 0 ? "perfect fit" : `${o.waste} empty`}
-                  </div>
-                </Button>
-              );
-            })}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <div className="text-[11px] text-muted-foreground">Waves</div>
+              <Select
+                value={cfg ? String(cfg.waves_count) : ""}
+                onValueChange={(v) => setConfig(Number(v), cfg?.lanes_count ?? 1)}
+                disabled={busy}
+              >
+                <SelectTrigger className="h-9"><SelectValue placeholder="Choose…" /></SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: MAX_W }, (_, i) => i + 1).map((n) => (
+                    <SelectItem key={n} value={String(n)}>{n} {n === 1 ? "wave" : "waves"}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <div className="text-[11px] text-muted-foreground">Lanes per wave</div>
+              <Select
+                value={cfg ? String(cfg.lanes_count) : ""}
+                onValueChange={(v) => setConfig(cfg?.waves_count ?? 1, Number(v))}
+                disabled={busy}
+              >
+                <SelectTrigger className="h-9"><SelectValue placeholder="Choose…" /></SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: MAX_L }, (_, i) => i + 1).map((n) => (
+                    <SelectItem key={n} value={String(n)}>{n} {n === 1 ? "lane" : "lanes"}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         )}
-        {overCapacity && (
-          <p className="text-xs text-destructive">More teams than slots — increase config or remove teams.</p>
+        {cfg && (
+          <div className="text-[11px] text-muted-foreground">
+            {cfg.waves_count * cfg.lanes_count} slots · {teams.length} teams
+            {overCapacity
+              ? <span className="text-destructive ml-1">— more teams than slots</span>
+              : teams.length < cfg.waves_count * cfg.lanes_count
+              ? <span className="ml-1">· {cfg.waves_count * cfg.lanes_count - teams.length} empty</span>
+              : <span className="ml-1">· perfect fit</span>
+            }
+          </div>
         )}
       </Card>
 
@@ -473,12 +484,13 @@ export function WavePanel({
             )}
           </div>
           {selectedTeamId && (
-            <p className="text-xs text-accent">Tap a slot to place — taps swap with whatever's there.</p>
+            <p className="text-xs text-accent">Tap a slot to place — taps occupied slots swap the two teams.</p>
           )}
           <WaveGrid
             cfg={cfg}
             teams={teams}
-            teamLabel={teamLabel}
+            nameOf={dn}
+            memberTeamCount={memberTeamCount}
             selectedTeamId={selectedTeamId}
             onSelect={(id) => setSelectedTeamId((cur) => (cur === id ? null : id))}
             onMove={moveToSlot}
@@ -497,7 +509,8 @@ export function WavePanel({
               <TeamChip
                 key={t.id}
                 team={t}
-                label={teamLabel(t)}
+                nameOf={dn}
+                memberTeamCount={memberTeamCount}
                 selected={selectedTeamId === t.id}
                 onSelect={() => setSelectedTeamId((cur) => (cur === t.id ? null : t.id))}
                 onRemove={() => removeTeam(t.id)}
@@ -534,16 +547,47 @@ export function WavePanel({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Create team dialog */}
+      <Dialog open={createOpen} onOpenChange={(o) => !o && setCreateOpen(false)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Create team</DialogTitle></DialogHeader>
+          <CreateTeamForm
+            goingIds={goingIds}
+            members={members}
+            memberTeamCount={memberTeamCount}
+            nameOf={dn}
+            busy={busy}
+            onCreate={createTeam}
+            onCancel={() => setCreateOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
+// ── Name with optional ×2 badge ──
+function NameBadge({ name, count }: { name: string; count: number }) {
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      <span>{name}</span>
+      {count >= 2 && (
+        <span className="ml-0.5 inline-block text-[9px] font-bold bg-warning/30 text-warning-foreground rounded px-0.5 leading-tight">
+          ×{count}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function WaveGrid({
-  cfg, teams, teamLabel, selectedTeamId, onSelect, onMove, readOnly,
+  cfg, teams, nameOf, memberTeamCount, selectedTeamId, onSelect, onMove, readOnly,
 }: {
   cfg: Cfg;
   teams: Team[];
-  teamLabel: (t: Team) => string;
+  nameOf: (id: string | null | undefined) => string;
+  memberTeamCount: Record<string, number>;
   selectedTeamId: string | null;
   onSelect: (id: string) => void;
   onMove: (teamId: string, wave: number | null, lane: number | null) => void;
@@ -556,7 +600,7 @@ function WaveGrid({
         return (
           <div key={w}>
             <div className="text-[10px] font-bold uppercase tracking-wide text-accent mb-1.5">Wave {w}</div>
-            <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cfg.lanes_count}, minmax(0, 1fr))` }}>
+            <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(cfg.lanes_count, 5)}, minmax(0, 1fr))` }}>
               {Array.from({ length: cfg.lanes_count }).map((__, li) => {
                 const l = li + 1;
                 const t = teams.find((x) => x.wave === w && x.lane === l);
@@ -576,10 +620,10 @@ function WaveGrid({
                       }
                     }}
                     className={[
-                      "min-h-[56px] rounded-lg border p-2 text-left text-xs transition-colors",
+                      "min-h-[64px] rounded-lg border p-2 text-left text-xs transition-colors",
                       t
                         ? isSelected
-                          ? "bg-primary text-primary-foreground border-primary"
+                          ? "bg-destructive/90 text-destructive-foreground border-destructive"
                           : "bg-card hover:bg-accent/10"
                         : placing
                         ? "bg-accent/10 border-dashed border-accent"
@@ -587,7 +631,18 @@ function WaveGrid({
                     ].join(" ")}
                   >
                     <div className="text-[9px] opacity-60 mb-0.5">L{l}</div>
-                    <div className="font-medium leading-tight break-words">{t ? teamLabel(t) : "—"}</div>
+                    {t ? (
+                      <div className="space-y-0.5 leading-tight">
+                        <div className="font-bold truncate">
+                          <NameBadge name={nameOf(t.driver_id)} count={t.driver_id ? (memberTeamCount[t.driver_id] ?? 0) : 0} />
+                        </div>
+                        <div className="opacity-75 truncate">
+                          <NameBadge name={nameOf(t.crew_id)} count={t.crew_id ? (memberTeamCount[t.crew_id] ?? 0) : 0} />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="opacity-40">—</div>
+                    )}
                   </button>
                 );
               })}
@@ -600,20 +655,29 @@ function WaveGrid({
 }
 
 function TeamChip({
-  team, label, selected, onSelect, onRemove,
+  team, nameOf, memberTeamCount, selected, onSelect, onRemove,
 }: {
-  team: Team; label: string; selected: boolean;
-  onSelect: () => void; onRemove: () => void;
+  team: Team;
+  nameOf: (id: string | null | undefined) => string;
+  memberTeamCount: Record<string, number>;
+  selected: boolean;
+  onSelect: () => void;
+  onRemove: () => void;
 }) {
   return (
     <div
       className={[
         "rounded-lg border p-2 text-xs flex items-center justify-between gap-1",
-        selected ? "bg-primary text-primary-foreground border-primary" : "bg-card",
+        selected ? "bg-destructive/90 text-destructive-foreground border-destructive" : "bg-card",
       ].join(" ")}
     >
-      <button type="button" onClick={onSelect} className="flex-1 text-left font-medium truncate">
-        {label}
+      <button type="button" onClick={onSelect} className="flex-1 text-left space-y-0.5 leading-tight min-w-0">
+        <div className="font-bold truncate">
+          <NameBadge name={nameOf(team.driver_id)} count={team.driver_id ? (memberTeamCount[team.driver_id] ?? 0) : 0} />
+        </div>
+        <div className="opacity-75 truncate">
+          <NameBadge name={nameOf(team.crew_id)} count={team.crew_id ? (memberTeamCount[team.crew_id] ?? 0) : 0} />
+        </div>
         {team.notes ? <span className="ml-1 opacity-60">({team.notes})</span> : null}
       </button>
       <button type="button" onClick={onRemove} className="opacity-60 hover:opacity-100 shrink-0">
@@ -643,8 +707,6 @@ function PairForm({
     if (chosen.teams.length === 0) {
       onPair(chosen.member.id);
     } else {
-      // Already on a team — adding target makes that person "going twice".
-      // Reuse goingTwice path: creates a new team with that person's driver + target as crew.
       onGoingTwice(chosen.teams[0]);
     }
   };
@@ -698,6 +760,78 @@ function PairForm({
       <div className="pt-2 border-t">
         <Button variant="outline" className="w-full" onClick={onSolo}>
           Add {targetName} as solo
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function CreateTeamForm({
+  goingIds, members, memberTeamCount, nameOf, busy, onCreate, onCancel,
+}: {
+  goingIds: string[];
+  members: Record<string, Member>;
+  memberTeamCount: Record<string, number>;
+  nameOf: (id: string) => string;
+  busy: boolean;
+  onCreate: (driverId: string | null, crewId: string | null) => void;
+  onCancel: () => void;
+}) {
+  const [driverId, setDriverId] = useState<string>("");
+  const [crewId, setCrewId] = useState<string>("");
+
+  const sortedAttending = goingIds
+    .filter((id) => members[id])
+    .slice()
+    .sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+
+  const memberOption = (id: string) => {
+    const count = memberTeamCount[id] ?? 0;
+    return (
+      <SelectItem key={id} value={id}>
+        {nameOf(id)}{count > 0 ? ` (×${count + 1} if added)` : ""}
+      </SelectItem>
+    );
+  };
+
+  return (
+    <div className="space-y-4 text-sm">
+      <p className="text-xs text-muted-foreground">
+        Any attending member can be selected. Members already in another team will be marked ×2.
+      </p>
+      <div className="space-y-1.5">
+        <div className="font-medium text-xs uppercase text-muted-foreground">Driver</div>
+        <Select value={driverId} onValueChange={setDriverId}>
+          <SelectTrigger><SelectValue placeholder="Select driver…" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none">— No driver —</SelectItem>
+            {sortedAttending.map(memberOption)}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1.5">
+        <div className="font-medium text-xs uppercase text-muted-foreground">Crew</div>
+        <Select value={crewId} onValueChange={setCrewId}>
+          <SelectTrigger><SelectValue placeholder="Select crew…" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none">— No crew —</SelectItem>
+            {sortedAttending.map(memberOption)}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex gap-2 pt-2">
+        <Button variant="outline" className="flex-1" onClick={onCancel} disabled={busy}>
+          Cancel
+        </Button>
+        <Button
+          className="flex-1"
+          disabled={busy || (!driverId || driverId === "__none") && (!crewId || crewId === "__none")}
+          onClick={() => onCreate(
+            driverId && driverId !== "__none" ? driverId : null,
+            crewId && crewId !== "__none" ? crewId : null,
+          )}
+        >
+          Create team
         </Button>
       </div>
     </div>
