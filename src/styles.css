@@ -1,0 +1,141 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * IRB Coaching — surf lifesaving design system.
+ * Navy / ocean blue / white. Mobile-first, high contrast on the beach.
+ * Tokens defined in oklch.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-surf-deep: var(--surf-deep);
+  --color-surf-mid: var(--surf-mid);
+  --color-surf-foam: var(--surf-foam);
+  --color-sand: var(--sand);
+  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --radius: 0.875rem;
+
+  /* White background, dark text */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.18 0.04 250);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.04 250);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.04 250);
+
+  /* Primary red #E63329 */
+  --primary: oklch(0.52 0.22 25);
+  --primary-foreground: oklch(0.99 0 0);
+
+  --secondary: oklch(0.96 0.01 25);
+  --secondary-foreground: oklch(0.52 0.22 25);
+
+  --muted: oklch(0.96 0.01 240);
+  --muted-foreground: oklch(0.5 0.03 250);
+
+  /* Accent yellow #FFD700 */
+  --accent: oklch(0.88 0.18 85);
+  --accent-foreground: oklch(0.18 0.04 250);
+
+  --destructive: oklch(0.58 0.22 25);
+  --destructive-foreground: oklch(0.99 0.005 240);
+
+  --success: oklch(0.62 0.14 160);
+  --success-foreground: oklch(0.99 0.005 240);
+
+  --warning: oklch(0.78 0.16 75);
+  --warning-foreground: oklch(0.2 0.05 60);
+
+  --border: oklch(0.91 0.015 240);
+  --input: oklch(0.91 0.015 240);
+  --ring: oklch(0.62 0.16 235);
+
+  /* Brand — dark navy to red gradient */
+  --surf-deep: oklch(0.22 0.04 250);
+  --surf-mid: oklch(0.52 0.22 25);
+  --surf-foam: oklch(0.96 0.02 220);
+  --sand: oklch(0.96 0.025 85);
+}
+
+.dark {
+  --background: oklch(0.16 0.04 250);
+  --foreground: oklch(0.97 0.01 240);
+  --card: oklch(0.22 0.05 250);
+  --card-foreground: oklch(0.97 0.01 240);
+  --popover: oklch(0.22 0.05 250);
+  --popover-foreground: oklch(0.97 0.01 240);
+  --primary: oklch(0.78 0.12 230);
+  --primary-foreground: oklch(0.18 0.04 250);
+  --secondary: oklch(0.28 0.06 250);
+  --secondary-foreground: oklch(0.97 0.01 240);
+  --muted: oklch(0.26 0.05 250);
+  --muted-foreground: oklch(0.72 0.03 240);
+  --accent: oklch(0.62 0.16 235);
+  --accent-foreground: oklch(0.99 0.005 240);
+  --destructive: oklch(0.65 0.22 25);
+  --destructive-foreground: oklch(0.99 0.005 240);
+  --success: oklch(0.7 0.15 160);
+  --success-foreground: oklch(0.18 0.04 250);
+  --warning: oklch(0.78 0.16 75);
+  --warning-foreground: oklch(0.2 0.05 60);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.62 0.16 235);
+}
+
+@layer base {
+  * { border-color: var(--color-border); }
+  html, body { height: 100%; }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-display);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  h1, h2, h3 { letter-spacing: -0.02em; }
+}
+
+@layer utilities {
+  .bg-surf-gradient {
+    background-image: linear-gradient(160deg, var(--surf-deep) 0%, var(--surf-mid) 100%);
+  }
+  .safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 0.5rem); }
+  .safe-top { padding-top: max(env(safe-area-inset-top), 0.5rem); }
+}

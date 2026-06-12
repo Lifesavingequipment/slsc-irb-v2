@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.enforce_carpool_capacity() FROM PUBLIC, anon, authenticated;
