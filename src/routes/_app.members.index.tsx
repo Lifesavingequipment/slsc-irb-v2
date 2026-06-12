@@ -15,7 +15,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { X, Trash2, Search, ChevronRight, Users, UserPlus, Handshake, TrendingUp } from "lucide-react";
+import { X, Trash2, Search, ChevronRight, ChevronDown, Users, UserPlus, Handshake, TrendingUp } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { buildNameMap, memberFullName } from "@/lib/names";
 import { roleBadgeClass, roleLabel } from "@/lib/role-colors";
@@ -243,6 +243,8 @@ function MembersPageInner({
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [tab, setTab] = useState<string>(initialTab ?? "approved");
+  const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
+  const toggleExpanded = (id: string) => setExpandedMemberId((prev) => (prev === id ? null : id));
   useEffect(() => { if (initialTab) setTab(initialTab); }, [initialTab]);
 
   const pending = useMemo(() => rows.filter((r) => r.status === "pending").sort(byName), [rows, byName]);
@@ -361,6 +363,8 @@ function MembersPageInner({
               activeClubId={activeClubId}
               onRemove={() => removeMember(m.id, m.membership_id, m.user_id)}
               onChange={load}
+              isExpanded={expandedMemberId === m.id}
+              onToggleExpand={() => toggleExpanded(m.id)}
             />
           ))}
         </TabsContent>
@@ -564,8 +568,8 @@ function PairRow({ p, nameOf, canRemove, onRemove }: {
 
 const ROLE_OPTIONS = ["Driver", "Crew", "Patient"] as const;
 
-function MemberRow({ row, displayName, partnerName, roles, canManage, canRemove, isAdmin, isSelf, activeClubId, onRemove, onChange }: {
-  row: Row; displayName: string; partnerName: string | null; roles: string[]; canManage: boolean; canRemove?: boolean; isAdmin?: boolean; isSelf?: boolean; activeClubId?: string; onRemove?: () => void; onChange: () => void;
+function MemberRow({ row, displayName, partnerName, roles, canManage, canRemove, isAdmin, isSelf, activeClubId, onRemove, onChange, isExpanded, onToggleExpand }: {
+  row: Row; displayName: string; partnerName: string | null; roles: string[]; canManage: boolean; canRemove?: boolean; isAdmin?: boolean; isSelf?: boolean; activeClubId?: string; onRemove?: () => void; onChange: () => void; isExpanded?: boolean; onToggleExpand?: () => void;
 }) {
   const serverPr = [
     ...(row.profile?.driver_flag ? ["Driver"] : []),
@@ -622,11 +626,22 @@ function MemberRow({ row, displayName, partnerName, roles, canManage, canRemove,
   return (
     <Card className="p-3">
       <div className="flex items-center gap-3">
-        <Link to="/members/$memberId" params={{ memberId: row.user_id }} className="flex items-center gap-3 flex-1 min-w-0 group">
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          className="flex items-center gap-3 flex-1 min-w-0 text-left"
+        >
           <Avatar><AvatarFallback>{initials(memberFullName(row.profile, ""))}</AvatarFallback></Avatar>
           <div className="flex-1 min-w-0">
-            <div className="font-medium truncate group-hover:underline">
-              {displayName}
+            <div className="font-medium truncate">
+              <Link
+                to="/members/$memberId"
+                params={{ memberId: row.user_id }}
+                className="hover:underline"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {displayName}
+              </Link>
               {isSelf && <Badge variant="secondary" className="ml-2 text-[10px] uppercase">You</Badge>}
             </div>
             <div className="text-xs text-muted-foreground truncate">
@@ -644,8 +659,10 @@ function MemberRow({ row, displayName, partnerName, roles, canManage, canRemove,
               ))}
             </div>
           </div>
-          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-        </Link>
+          {isExpanded
+            ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+            : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
+        </button>
         {canRemove && onRemove && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -668,7 +685,7 @@ function MemberRow({ row, displayName, partnerName, roles, canManage, canRemove,
           </AlertDialog>
         )}
       </div>
-      {canManage && (
+      {isExpanded && canManage && (
         <div className="mt-3 flex gap-1.5">
           {ROLE_OPTIONS.map((role) => {
             const active = pr.includes(role);
@@ -687,7 +704,7 @@ function MemberRow({ row, displayName, partnerName, roles, canManage, canRemove,
           })}
         </div>
       )}
-      {isAdmin && activeClubId && !isOwnerRole && (
+      {isExpanded && isAdmin && activeClubId && !isOwnerRole && (
         <div className="mt-2 flex items-center gap-3 text-xs">
           <label className="flex items-center gap-1.5">
             <input
@@ -711,7 +728,7 @@ function MemberRow({ row, displayName, partnerName, roles, canManage, canRemove,
           </label>
         </div>
       )}
-      {isAdmin && isOwnerRole && (
+      {isExpanded && isAdmin && isOwnerRole && (
         <div className="mt-2 text-[10px] uppercase text-muted-foreground">Owner role is locked</div>
       )}
     </Card>
