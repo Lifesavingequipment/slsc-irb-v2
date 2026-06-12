@@ -1,3 +1,5 @@
+# Last updated: June 2026
+
 # slsc-irb-v2
 
 IRB Training management app for Surf Life Saving clubs in Australia and New Zealand.
