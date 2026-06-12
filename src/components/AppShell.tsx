@@ -36,7 +36,7 @@ export function AppShell({ title, action, children }: {
   const userInitial = (user?.email ?? "?").trim().charAt(0).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-[#f9fafb] flex">
       {/* ── Desktop sidebar (≥768px) ── */}
       <aside className="hidden md:flex flex-col fixed inset-y-0 left-0 w-60 bg-[#1e293b] z-30">
         {/* Logo row */}
@@ -45,7 +45,7 @@ export function AppShell({ title, action, children }: {
             <Waves className="h-4 w-4 text-white" />
           </div>
           <div className="min-w-0">
-            <div className="text-white font-bold text-sm">IRB Coaching</div>
+            <div className="text-white font-bold text-sm">IRB Training</div>
             <div className="text-white/50 text-xs truncate">
               {activeClub ? activeClub.club.name : "Select club"}
             </div>

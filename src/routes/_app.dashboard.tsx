@@ -129,14 +129,14 @@ function Dashboard() {
         <h1 className="text-2xl font-bold tracking-tight">{activeClub.club.name}</h1>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <Card className="p-4">
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <Card className="p-4 bg-white border border-[#e5e7eb] shadow-none">
           <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
             <Users className="h-3.5 w-3.5" /> Members
           </div>
           <div className="mt-1 text-2xl font-bold">{memberCount ?? "—"}</div>
         </Card>
-        <Card className="p-4">
+        <Card className="p-4 bg-white border border-[#e5e7eb] shadow-none">
           <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
             <Calendar className="h-3.5 w-3.5" /> Upcoming
           </div>
@@ -272,15 +272,14 @@ function DashAction({ icon, label, count, cta, to, tone }: {
   to: string;
   tone: "warning" | "muted";
 }) {
-  const border = tone === "warning" ? "border-warning/40 bg-warning/10" : "";
   return (
-    <Card className={`p-3 flex items-center gap-3 ${border}`}>
+    <Card className="p-3 flex items-center gap-3 bg-white border border-[#e5e7eb] shadow-none">
       <div className="shrink-0">{icon}</div>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium">{label}</div>
         <div className="text-2xl font-bold leading-tight">{count}</div>
       </div>
-      <Button asChild size="sm" variant={tone === "warning" ? "default" : "outline"}>
+      <Button asChild size="sm" variant={tone === "warning" && count > 0 ? "default" : "outline"}>
         <Link to={to as "/sessions"}>{cta}</Link>
       </Button>
     </Card>
