@@ -98,9 +98,9 @@ function EditMember() {
     if (!clubId) return;
     setLoading(true);
     const [pRes, idRes, rRes, ecRes, miRes] = await Promise.all([
-      supabase.from("profiles")
-        .select("first_name, last_name, full_name, email, phone, gender, age_division, preferred_roles")
-        .eq("id", memberId).maybeSingle(),
+      supabase.from("members")
+        .select("first_name, last_name, preferred_name, email, phone, driver_flag, crew_flag, patient_flag")
+        .eq("auth_user_id", memberId).eq("club_id", clubId).maybeSingle(),
       supabase.from("profile_identity")
         .select("date_of_birth").eq("user_id", memberId).maybeSingle(),
       supabase.from("user_roles").select("role").eq("club_id", clubId).eq("user_id", memberId),
@@ -111,14 +111,18 @@ function EditMember() {
     ]);
     const p = (pRes.data ?? {}) as Record<string, unknown>;
     const idRow = (idRes.data ?? {}) as Record<string, unknown>;
-    setFirstName((p.first_name as string) ?? splitName((p.full_name as string) ?? "")[0]);
-    setLastName((p.last_name as string) ?? splitName((p.full_name as string) ?? "")[1]);
+    setFirstName((p.first_name as string) ?? "");
+    setLastName((p.last_name as string) ?? "");
     setEmail((p.email as string) ?? (isSelf ? user?.email ?? "" : ""));
     setPhone((p.phone as string) ?? "");
     setDob((idRow.date_of_birth as string) ?? "");
-    setGender((p.gender as string) ?? "");
-    setAgeDivision(((p.age_division as AgeDivision) ?? "") as AgeDivision | "");
-    setPreferredRoles((p.preferred_roles as string[]) ?? []);
+    setGender("");
+    setAgeDivision("");
+    setPreferredRoles([
+      ...(p.driver_flag ? ["driver"] : []),
+      ...(p.crew_flag ? ["crew"] : []),
+      ...(p.patient_flag ? ["patient"] : []),
+    ]);
 
 
     setClubRoles(((rRes.data ?? []) as { role: string }[]).map((r) => r.role));
@@ -192,18 +196,16 @@ function EditMember() {
 
     setBusy(true);
     try {
-      // 1. Profile
-      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
-      const { error: pErr } = await supabase.from("profiles").update({
+      // 1. Member record
+      const { error: pErr } = await supabase.from("members").update({
         first_name: firstName.trim(),
         last_name: lastName.trim(),
-        full_name: fullName,
         email: email.trim() || null,
         phone: phone.trim() || null,
-        gender: gender || null,
-        age_division: (ageDivision || null) as AgeDivision | null,
-        preferred_roles: preferredRoles,
-      }).eq("id", memberId);
+        driver_flag: preferredRoles.includes("driver"),
+        crew_flag: preferredRoles.includes("crew"),
+        patient_flag: preferredRoles.includes("patient"),
+      }).eq("auth_user_id", memberId).eq("club_id", clubId);
       if (pErr) throw pErr;
 
       // 1b. Identity (sensitive)

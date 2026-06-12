@@ -20,6 +20,7 @@ import {
 import { AlertTriangle, CheckCircle2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useRefetchOnFocus } from "@/hooks/use-refetch-on-focus";
+import { memberFullName } from "@/lib/names";
 import { EmptyState } from "@/components/ui/empty-state";
 
 export const Route = createFileRoute("/_app/equipment/faults")({
@@ -41,13 +42,7 @@ type Fault = {
 };
 
 type EquipmentLite = { id: string; name: string };
-type ProfileLite = { id: string; full_name: string | null; first_name: string | null; last_name: string | null };
-
-function displayName(p?: ProfileLite | null): string {
-  if (!p) return "Unknown";
-  const fn = [p.first_name, p.last_name].filter(Boolean).join(" ").trim();
-  return fn || p.full_name || "Unknown";
-}
+type MemberLite = { auth_user_id: string; first_name: string | null; last_name: string | null; preferred_name: string | null };
 
 function statusLabel(status: Fault["status"]): string {
   if (status === "open") return "Open";
@@ -66,7 +61,7 @@ function FaultsPage() {
   const { user } = useAuth();
   const canManage = useCanManage();
   const [faults, setFaults] = useState<Fault[]>([]);
-  const [profiles, setProfiles] = useState<Record<string, ProfileLite>>({});
+  const [memberNames, setMemberNames] = useState<Record<string, string>>({});
   const [equipment, setEquipment] = useState<EquipmentLite[]>([]);
   const [open, setOpen] = useState(false);
 
@@ -90,13 +85,14 @@ function FaultsPage() {
 
     const userIds = Array.from(new Set(list.flatMap((f) => [f.reported_by, f.resolved_by]).filter(Boolean) as string[]));
     if (userIds.length) {
-      const { data: p } = await supabase
-        .from("profiles")
-        .select("id, full_name, first_name, last_name")
-        .in("id", userIds);
-      const map: Record<string, ProfileLite> = {};
-      (p ?? []).forEach((row) => { map[row.id] = row as ProfileLite; });
-      setProfiles(map);
+      const { data: memData } = await supabase
+        .from("members")
+        .select("auth_user_id, first_name, last_name, preferred_name")
+        .in("auth_user_id", userIds)
+        .eq("club_id", activeClub.club_id);
+      const map: Record<string, string> = {};
+      (memData ?? []).forEach((m) => { map[m.auth_user_id] = memberFullName(m, "Unknown"); });
+      setMemberNames(map);
     }
   }, [activeClub?.club_id]);
 
@@ -131,13 +127,14 @@ function FaultsPage() {
 
   const onFaultCreated = async (row: Fault) => {
     setFaults((cur) => [row, ...cur]);
-    if (row.reported_by && !profiles[row.reported_by]) {
+    if (row.reported_by && !memberNames[row.reported_by] && activeClub) {
       const { data } = await supabase
-        .from("profiles")
-        .select("id, full_name, first_name, last_name")
-        .eq("id", row.reported_by)
+        .from("members")
+        .select("auth_user_id, first_name, last_name, preferred_name")
+        .eq("auth_user_id", row.reported_by)
+        .eq("club_id", activeClub.club_id)
         .maybeSingle();
-      if (data) setProfiles((cur) => ({ ...cur, [data.id]: data as ProfileLite }));
+      if (data) setMemberNames((cur) => ({ ...cur, [data.auth_user_id]: memberFullName(data, "Unknown") }));
     }
   };
 
@@ -189,7 +186,7 @@ function FaultsPage() {
                       </Badge>
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5">
-                      {equipName} · {displayName(profiles[f.reported_by])} ·{" "}
+                      {equipName} · {memberNames[f.reported_by] || "Unknown"} ·{" "}
                       {new Date(f.reported_at).toLocaleDateString()}
                     </div>
                     {f.title && (

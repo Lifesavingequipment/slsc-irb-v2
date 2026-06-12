@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { DateTimeFields } from "@/components/ui/date-time-fields";
 import { Plus, Trash2, Car } from "lucide-react";
+import { memberFullName } from "@/lib/names";
 
 export type CarpoolDraft = {
   // present when editing an existing carpool row
@@ -36,7 +37,7 @@ export function emptyCarpoolDraft(defaultDriverId: string, defaultDeparture = ""
   };
 }
 
-type Member = { user_id: string; full_name: string | null };
+type Member = { user_id: string; display_name: string };
 
 interface Props {
   clubId: string | null | undefined;
@@ -63,13 +64,14 @@ export function CarpoolEditor({
         .eq("status", "approved");
       const ids = (mems ?? []).map((m) => m.user_id);
       if (cancelled || ids.length === 0) { setMembers([]); return; }
-      const { data: profs } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("id", ids);
+      const { data: memData } = await supabase
+        .from("members")
+        .select("auth_user_id, first_name, last_name, preferred_name")
+        .in("auth_user_id", ids)
+        .eq("club_id", clubId!);
       if (cancelled) return;
-      const rows: Member[] = (profs ?? []).map((p) => ({ user_id: p.id, full_name: p.full_name }));
-      rows.sort((a, b) => (a.full_name ?? "").localeCompare(b.full_name ?? ""));
+      const rows: Member[] = (memData ?? []).map((m) => ({ user_id: m.auth_user_id, display_name: memberFullName(m, "Member") }));
+      rows.sort((a, b) => a.display_name.localeCompare(b.display_name));
       setMembers(rows);
     })();
     return () => { cancelled = true; };
@@ -77,7 +79,7 @@ export function CarpoolEditor({
 
   const nameFor = useMemo(() => {
     const map = new Map<string, string>();
-    members.forEach((m) => map.set(m.user_id, m.full_name || "Member"));
+    members.forEach((m) => map.set(m.user_id, m.display_name || "Member"));
     if (!map.has(currentUserId)) map.set(currentUserId, "You");
     return (id: string) => map.get(id) || "Member";
   }, [members, currentUserId]);

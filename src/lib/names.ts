@@ -5,6 +5,17 @@
 
 export type NamedPerson = { id: string; full_name?: string | null };
 
+/** Compute display name from a members table row. Shows preferred_name if set, else first + last. */
+export function memberFullName(
+  m: { first_name?: string | null; last_name?: string | null; preferred_name?: string | null } | null | undefined,
+  fallback = "Member",
+): string {
+  if (!m) return fallback;
+  const first = (m.preferred_name ?? m.first_name ?? "").trim();
+  const last = (m.last_name ?? "").trim();
+  return [first, last].filter(Boolean).join(" ") || fallback;
+}
+
 const parts = (full: string | null | undefined) => {
   const tokens = (full ?? "").trim().split(/\s+/).filter(Boolean);
   if (tokens.length === 0) return { first: "", last: "", full: "" };

@@ -1,6 +1,7 @@
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { memberFullName } from "@/lib/names";
 import { useClub, useCanManage } from "@/lib/club-context";
 import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
@@ -62,15 +63,22 @@ function AttendancePage() {
     }
 
     const { data: mRows } = await supabase.from("club_memberships")
-      .select("user_id, profile:profiles!inner(full_name, first_name, last_name)")
+      .select("user_id")
       .eq("club_id", clubId).eq("status", "approved");
-    type Row = { user_id: string; profile: { full_name: string | null; first_name: string | null; last_name: string | null } | null };
-    const rows = (mRows ?? []) as unknown as Row[];
-    setMembers(rows.map((r) => ({
-      user_id: r.user_id,
-      name: r.profile?.full_name
-        || [r.profile?.first_name, r.profile?.last_name].filter(Boolean).join(" ")
-        || "Unnamed",
+    const memberUserIds = (mRows ?? []).map((m) => m.user_id);
+    let memberNameMap: Record<string, string> = {};
+    if (memberUserIds.length) {
+      const { data: memData } = await supabase.from("members")
+        .select("auth_user_id, first_name, last_name, preferred_name")
+        .in("auth_user_id", memberUserIds)
+        .eq("club_id", clubId);
+      (memData ?? []).forEach((m) => {
+        memberNameMap[m.auth_user_id] = memberFullName(m, "Unnamed");
+      });
+    }
+    setMembers(memberUserIds.map((uid) => ({
+      user_id: uid,
+      name: memberNameMap[uid] || "Unnamed",
     })));
     setLoading(false);
   }, [clubId, range]);

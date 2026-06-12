@@ -23,7 +23,7 @@ import { WavePanel } from "@/components/session/WavePanel";
 import { SurveyEditor, SurveyRunner, SurveyResults, usePretrainingSurveyStatus } from "@/components/session/SurveyPanel";
 import { TrainingPlanView, TrainingPlanEditor } from "@/components/session/TrainingPlanPanel";
 import { useCoachPermissions } from "@/lib/coach-permissions";
-import { buildNameMap } from "@/lib/names";
+import { buildNameMap, memberFullName } from "@/lib/names";
 import { invalidateSessionsCache, removeSessionFromCache } from "./_app.sessions.index";
 
 export const Route = createFileRoute("/_app/sessions/$sessionId/")({
@@ -44,7 +44,7 @@ type AttStatus = "present" | "absent" | "excused" | "injured";
 
 type Rsvp = {
   id: string; user_id: string; status: RsvpStatus;
-  profile: { full_name: string | null } | null;
+  profile: { display_name: string } | null;
 };
 
 type Team = {
@@ -58,7 +58,7 @@ type Attendance = {
   id: string; user_id: string; status: AttStatus; note: string | null;
 };
 
-type Member = { user_id: string; full_name: string };
+type Member = { user_id: string; display_name: string };
 
 const STATUS_LABELS: Record<RsvpStatus, string> = {
   going: "Going", maybe: "Maybe", not_going: "Can't go",
@@ -95,13 +95,14 @@ function SessionDetail() {
       .eq("session_id", sessionId);
     const rsvpRows = (r ?? []) as { id: string; user_id: string; status: RsvpStatus }[];
     const rsvpUserIds = rsvpRows.map((x) => x.user_id);
-    let profMap = new Map<string, { full_name: string | null }>();
-    if (rsvpUserIds.length > 0) {
-      const { data: profs } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("id", rsvpUserIds);
-      profMap = new Map((profs ?? []).map((p) => [p.id, { full_name: p.full_name }]));
+    let profMap = new Map<string, { display_name: string }>();
+    if (rsvpUserIds.length > 0 && s?.club_id) {
+      const { data: memData } = await supabase
+        .from("members")
+        .select("auth_user_id, first_name, last_name, preferred_name")
+        .in("auth_user_id", rsvpUserIds)
+        .eq("club_id", s.club_id);
+      profMap = new Map((memData ?? []).map((m) => [m.auth_user_id, { display_name: memberFullName(m, "Member") }]));
     }
     setRsvps(rsvpRows.map((x) => ({ ...x, profile: profMap.get(x.user_id) ?? null })));
     const { data: t } = await supabase.from("session_teams").select("*")
@@ -125,15 +126,17 @@ function SessionDetail() {
         .eq("status", "approved");
       const ids = (mems ?? []).map((m) => m.user_id);
       if (ids.length === 0) { setMembers([]); return; }
-      const { data: profs } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("id", ids);
+      const { data: memData } = await supabase
+        .from("members")
+        .select("auth_user_id, first_name, last_name, preferred_name")
+        .in("auth_user_id", ids)
+        .eq("club_id", session.club_id);
+      const memMap = new Map((memData ?? []).map((m) => [m.auth_user_id, m]));
       const list: Member[] = ids.map((uid) => ({
         user_id: uid,
-        full_name: profs?.find((p) => p.id === uid)?.full_name || "Member",
+        display_name: memberFullName(memMap.get(uid), "Member"),
       }));
-      list.sort((a, b) => a.full_name.localeCompare(b.full_name));
+      list.sort((a, b) => a.display_name.localeCompare(b.display_name));
       setMembers(list);
     })();
   }, [session?.club_id]);
@@ -249,10 +252,10 @@ function SessionDetail() {
   // Unified display-name map across every visible name on this screen.
   const nameMap = useMemo(() => {
     const people = new Map<string, { id: string; full_name: string | null }>();
-    for (const m of members) people.set(m.user_id, { id: m.user_id, full_name: m.full_name });
+    for (const m of members) people.set(m.user_id, { id: m.user_id, full_name: m.display_name });
     for (const r of rsvps) {
       if (!people.has(r.user_id)) {
-        people.set(r.user_id, { id: r.user_id, full_name: r.profile?.full_name ?? null });
+        people.set(r.user_id, { id: r.user_id, full_name: r.profile?.display_name ?? null });
       }
     }
     return buildNameMap(Array.from(people.values()));
@@ -563,7 +566,7 @@ function TeamsPanel({
   const pickable = [...eligible, ...extras];
 
   const memberName = (id: string | null) =>
-    id ? members.find((m) => m.user_id === id)?.full_name ?? "Member" : "—";
+    id ? members.find((m) => m.user_id === id)?.display_name ?? "Member" : "—";
 
   const grouped = useMemo(() => {
     return teams.reduce<Record<number, Team[]>>((acc, t) => {
@@ -790,7 +793,7 @@ function RolePicker({ label, value, members, onChange, disabled }: {
         <SelectContent>
           <SelectItem value="__none">Unassigned</SelectItem>
           {members.map((m) => (
-            <SelectItem key={m.user_id} value={m.user_id}>{m.full_name}</SelectItem>
+            <SelectItem key={m.user_id} value={m.user_id}>{m.display_name}</SelectItem>
           ))}
         </SelectContent>
       </Select>

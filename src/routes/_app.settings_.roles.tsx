@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronLeft, Search, Shield, UserCog, History } from "lucide-react";
 import { toast } from "sonner";
-import { buildNameMap } from "@/lib/names";
+import { buildNameMap, memberFullName } from "@/lib/names";
 import { roleBadgeClass, roleLabel } from "@/lib/role-colors";
 import {
   useCoachPermissions, COACH_PERM_LABELS, type CoachPermKey, type CoachPermissions,
@@ -27,7 +27,9 @@ type RoleName = "club_admin" | "coach";
 
 type Row = {
   user_id: string;
-  full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  preferred_name: string | null;
   phone: string | null;
   roles: string[];
 };
@@ -66,22 +68,24 @@ function RolesPageInner({ clubId }: { clubId: string }) {
       .eq("status", "approved");
     const ids = (mems ?? []).map((m) => m.user_id);
     if (ids.length === 0) { setRows([]); setLoading(false); return; }
-    const [{ data: profs }, { data: r }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, phone").in("id", ids),
+    const [{ data: memberData }, { data: r }] = await Promise.all([
+      supabase.from("members").select("auth_user_id, first_name, last_name, preferred_name, phone").in("auth_user_id", ids).eq("club_id", clubId),
       supabase.from("user_roles").select("user_id, role").eq("club_id", clubId).in("user_id", ids),
     ]);
     const roleMap: Record<string, string[]> = {};
     (r ?? []).forEach((x) => {
       roleMap[x.user_id] = [...(roleMap[x.user_id] ?? []), x.role];
     });
-    const pmap = new Map((profs ?? []).map((p) => [p.id, p]));
+    const pmap = new Map((memberData ?? []).map((m) => [m.auth_user_id, m]));
     setRows(
       ids.map((id) => {
-        const p = pmap.get(id);
+        const m = pmap.get(id);
         return {
           user_id: id,
-          full_name: p?.full_name ?? null,
-          phone: p?.phone ?? null,
+          first_name: m?.first_name ?? null,
+          last_name: m?.last_name ?? null,
+          preferred_name: m?.preferred_name ?? null,
+          phone: m?.phone ?? null,
           roles: roleMap[id] ?? [],
         };
       }),
@@ -92,7 +96,7 @@ function RolesPageInner({ clubId }: { clubId: string }) {
   useEffect(() => { load(); }, [load]);
 
   const nameMap = useMemo(
-    () => buildNameMap(rows.map((r) => ({ id: r.user_id, full_name: r.full_name })), "Unnamed"),
+    () => buildNameMap(rows.map((r) => ({ id: r.user_id, full_name: memberFullName(r, "") || null })), "Unnamed"),
     [rows],
   );
   const dn = (id: string) => nameMap[id] || "Unnamed";
@@ -177,7 +181,7 @@ function RolesPageInner({ clubId }: { clubId: string }) {
               return (
                 <div key={m.user_id} className="p-3 flex items-center gap-3">
                   <Avatar className="h-9 w-9">
-                    <AvatarFallback>{initials(m.full_name)}</AvatarFallback>
+                    <AvatarFallback>{initials(memberFullName(m, ""))}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <Link to="/members/$memberId" params={{ memberId: m.user_id }} className="font-medium truncate hover:underline">
@@ -325,10 +329,10 @@ function AuditLogCard({ clubId }: { clubId: string }) {
         new Set(list.flatMap((e) => [e.actor_user_id, e.target_user_id].filter(Boolean) as string[])),
       );
       if (ids.length > 0) {
-        const { data: profs } = await supabase
-          .from("profiles").select("id, full_name").in("id", ids);
+        const { data: mems } = await supabase
+          .from("members").select("auth_user_id, first_name, last_name, preferred_name").in("auth_user_id", ids).eq("club_id", clubId);
         const map: Record<string, string> = {};
-        (profs ?? []).forEach((p) => { map[p.id] = p.full_name || "Unknown"; });
+        (mems ?? []).forEach((m) => { map[m.auth_user_id] = memberFullName(m) || "Unknown"; });
         setNames(map);
       }
     })();

@@ -14,12 +14,14 @@ IRB Training management app for Surf Life Saving clubs in Australia and New Zeal
 - Env vars: `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`
 
 ## Key tables
-- `profiles` — user profiles
-- `clubs` — club records
+- `members` — member profiles (per club; links via auth_user_id)
+- `clubs` — club records (use club_name not name)
+- `club_memberships` — user ↔ club membership with status/role
 - `sessions` — training sessions
 - `session_teams` — wave draw
 - `session_rsvps` — member RSVPs
 - `equipment` — gear inventory
+- `profiles` — legacy user profiles (kept for rollback; not queried by app)
 
 ## Deploy
 Push to `master` branch triggers auto-deploy on Vercel via GitHub connection.

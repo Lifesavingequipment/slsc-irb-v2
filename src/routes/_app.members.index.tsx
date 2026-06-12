@@ -17,7 +17,7 @@ import {
 import { toast } from "sonner";
 import { X, Trash2, Search, ChevronRight, Users, UserPlus, Handshake, TrendingUp } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
-import { buildNameMap } from "@/lib/names";
+import { buildNameMap, memberFullName } from "@/lib/names";
 import { roleBadgeClass, roleLabel } from "@/lib/role-colors";
 import { InviteShareCard } from "@/components/members/InviteShareCard";
 import { useRefetchOnFocus } from "@/hooks/use-refetch-on-focus";
@@ -48,10 +48,13 @@ type Row = {
   user_id: string;
   status: "pending" | "approved" | "rejected";
   profile: {
-    full_name: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    preferred_name: string | null;
     phone: string | null;
-    age_division: string | null;
-    preferred_roles: string[];
+    driver_flag: boolean;
+    crew_flag: boolean;
+    patient_flag: boolean;
   } | null;
 };
 
@@ -98,12 +101,13 @@ function MembersPage() {
     }
 
     const userIds = memRows.map((m) => m.user_id);
-    const { data: profiles } = userIds.length
-      ? await supabase.from("profiles")
-          .select("id, full_name, phone, age_division, preferred_roles")
-          .in("id", userIds)
-      : { data: [] as { id: string; full_name: string | null; phone: string | null; age_division: string | null; preferred_roles: string[] }[] };
-    const pmap = new Map((profiles ?? []).map((p) => [p.id, p]));
+    const { data: memberData } = userIds.length
+      ? await supabase.from("members")
+          .select("auth_user_id, first_name, last_name, preferred_name, phone, driver_flag, crew_flag, patient_flag")
+          .in("auth_user_id", userIds)
+          .eq("club_id", activeClub.club_id)
+      : { data: [] as { auth_user_id: string; first_name: string | null; last_name: string | null; preferred_name: string | null; phone: string | null; driver_flag: boolean; crew_flag: boolean; patient_flag: boolean }[] };
+    const pmap = new Map((memberData ?? []).map((m) => [m.auth_user_id, m]));
 
     const nextRows: Row[] = memRows.map((m) => {
       const pr = pmap.get(m.user_id);
@@ -113,10 +117,13 @@ function MembersPage() {
         status: m.status as Row["status"],
         profile: pr
           ? {
-              full_name: pr.full_name,
+              first_name: pr.first_name,
+              last_name: pr.last_name,
+              preferred_name: pr.preferred_name,
               phone: pr.phone,
-              age_division: pr.age_division,
-              preferred_roles: pr.preferred_roles ?? [],
+              driver_flag: pr.driver_flag ?? false,
+              crew_flag: pr.crew_flag ?? false,
+              patient_flag: pr.patient_flag ?? false,
             }
           : null,
       };
@@ -169,7 +176,7 @@ function MembersPage() {
   if (!activeClub) return null;
 
   const nameMap = buildNameMap(
-    rows.map((r) => ({ id: r.user_id, full_name: r.profile?.full_name ?? null })),
+    rows.map((r) => ({ id: r.user_id, full_name: r.profile ? memberFullName(r.profile, "") || null : null })),
     "Unnamed",
   );
   const display = (id: string) => nameMap[id] || "Unnamed";
@@ -242,7 +249,11 @@ function MembersPageInner({
       }
       if (roleFilter !== "all") {
         const rs = roles[r.user_id] ?? [];
-        const prefs = (r.profile?.preferred_roles ?? []).map((x) => x.toLowerCase());
+        const prefs = [
+          ...(r.profile?.driver_flag ? ["driver"] : []),
+          ...(r.profile?.crew_flag ? ["crew"] : []),
+          ...(r.profile?.patient_flag ? ["patient"] : []),
+        ];
         const combined = [...rs.map((x) => x.toLowerCase()), ...prefs];
         if (!combined.includes(roleFilter)) return false;
       }
@@ -356,9 +367,9 @@ function MembersPageInner({
           {pending.map((m) => (
             <Card key={m.id} className="p-4">
               <div className="flex items-center gap-3">
-                <Avatar><AvatarFallback>{initials(m.profile?.full_name)}</AvatarFallback></Avatar>
+                <Avatar><AvatarFallback>{initials(memberFullName(m.profile))}</AvatarFallback></Avatar>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{m.profile?.full_name?.trim() || display(m.user_id)}</div>
+                  <div className="font-medium truncate">{memberFullName(m.profile, "") || display(m.user_id)}</div>
                   {m.profile?.phone && <div className="text-xs text-muted-foreground truncate">{m.profile.phone}</div>}
                 </div>
               </div>
@@ -547,10 +558,13 @@ const ROLE_OPTIONS = ["Driver", "Crew", "Patient"] as const;
 function MemberRow({ row, displayName, partnerName, roles, canManage, canRemove, isAdmin, isSelf, activeClubId, onRemove, onChange }: {
   row: Row; displayName: string; partnerName: string | null; roles: string[]; canManage: boolean; canRemove?: boolean; isAdmin?: boolean; isSelf?: boolean; activeClubId?: string; onRemove?: () => void; onChange: () => void;
 }) {
-  const serverPr = row.profile?.preferred_roles ?? [];
+  const serverPr = [
+    ...(row.profile?.driver_flag ? ["Driver"] : []),
+    ...(row.profile?.crew_flag ? ["Crew"] : []),
+    ...(row.profile?.patient_flag ? ["Patient"] : []),
+  ];
   const [optimistic, setOptimistic] = useState<string[] | null>(null);
   const pr = optimistic ?? serverPr;
-  const age = row.profile?.age_division;
   const [saving, setSaving] = useState(false);
   const [roleBusy, setRoleBusy] = useState<string | null>(null);
 
@@ -575,8 +589,11 @@ function MemberRow({ row, displayName, partnerName, roles, canManage, canRemove,
     const next = wasActive ? pr.filter((r) => r !== role) : [...pr, role];
     setOptimistic(next);
     setSaving(true);
-    const { error } = await supabase.from("profiles")
-      .update({ preferred_roles: next }).eq("id", row.user_id);
+    const flagKey = `${role.toLowerCase()}_flag` as "driver_flag" | "crew_flag" | "patient_flag";
+    const { error } = await supabase.from("members")
+      .update({ [flagKey]: !wasActive })
+      .eq("auth_user_id", row.user_id)
+      .eq("club_id", activeClubId!);
     setSaving(false);
     if (error) {
       setOptimistic(serverPr);
@@ -598,7 +615,7 @@ function MemberRow({ row, displayName, partnerName, roles, canManage, canRemove,
     <Card className="p-3">
       <div className="flex items-center gap-3">
         <Link to="/members/$memberId" params={{ memberId: row.user_id }} className="flex items-center gap-3 flex-1 min-w-0 group">
-          <Avatar><AvatarFallback>{initials(row.profile?.full_name)}</AvatarFallback></Avatar>
+          <Avatar><AvatarFallback>{initials(memberFullName(row.profile, ""))}</AvatarFallback></Avatar>
           <div className="flex-1 min-w-0">
             <div className="font-medium truncate group-hover:underline">
               {displayName}
@@ -617,7 +634,6 @@ function MemberRow({ row, displayName, partnerName, roles, canManage, canRemove,
                   {roleLabel(r)}
                 </Badge>
               ))}
-              {age && <Badge variant="outline" className="text-[10px] uppercase">{age.replace("_", " ")}</Badge>}
             </div>
           </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -697,6 +713,6 @@ function MemberRow({ row, displayName, partnerName, roles, canManage, canRemove,
 
 function initials(name?: string | null) {
   if (!name) return "?";
-  return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+  return name.trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "?";
 }
 

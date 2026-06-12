@@ -22,6 +22,7 @@ import {
 import { ChevronLeft, AlertTriangle, Trash2, Plus, Wrench, Save } from "lucide-react";
 import { toast } from "sonner";
 import { CategoryPicker } from "@/components/equipment/CategoryPicker";
+import { memberFullName } from "@/lib/names";
 
 export const Route = createFileRoute("/_app/equipment/$equipmentId")({
   head: () => ({ meta: [{ title: "Equipment — IRB Coaching" }] }),
@@ -38,7 +39,7 @@ type Fault = {
   id: string; description: string; status: "open" | "repaired" | "cleared";
   reported_by: string; reported_at: string; resolved_at: string | null;
   resolution_notes: string | null;
-  reporter: { full_name: string | null } | null;
+  reporter_name: string | null;
 };
 
 function faultStatusLabel(status: Fault["status"]): string {
@@ -90,19 +91,18 @@ function EquipmentDetail() {
       .select("*")
       .eq("equipment_id", equipmentId)
       .order("reported_at", { ascending: false });
-    const rows = (f ?? []) as Omit<Fault, "reporter">[];
+    const rows = (f ?? []) as Omit<Fault, "reporter_name">[];
     const ids = Array.from(new Set(rows.map((x) => x.reported_by)));
-    let profs: { id: string; full_name: string | null }[] = [];
-    if (ids.length) {
-      const { data: p } = await supabase.from("profiles").select("id, full_name").in("id", ids);
-      profs = p ?? [];
+    const nameMap: Record<string, string> = {};
+    if (ids.length && e) {
+      const { data: memData } = await supabase
+        .from("members")
+        .select("auth_user_id, first_name, last_name, preferred_name")
+        .in("auth_user_id", ids)
+        .eq("club_id", (e as Equipment).club_id);
+      (memData ?? []).forEach((m) => { nameMap[m.auth_user_id] = memberFullName(m, "Unknown"); });
     }
-    setFaults(rows.map((r) => ({
-      ...r,
-      reporter: profs.find((p) => p.id === r.reported_by)
-        ? { full_name: profs.find((p) => p.id === r.reported_by)!.full_name }
-        : null,
-    })));
+    setFaults(rows.map((r) => ({ ...r, reporter_name: nameMap[r.reported_by] ?? null })));
   }, [equipmentId]);
 
   useEffect(() => { load(); }, [load]);
@@ -320,8 +320,8 @@ function EquipmentDetail() {
                     </span>
                   </div>
                   <p className="text-sm whitespace-pre-wrap">{f.description}</p>
-                  {f.reporter?.full_name && (
-                    <div className="mt-1 text-xs text-muted-foreground">Reported by {f.reporter.full_name}</div>
+                  {f.reporter_name && (
+                    <div className="mt-1 text-xs text-muted-foreground">Reported by {f.reporter_name}</div>
                   )}
                   {f.resolution_notes && (
                     <div className="mt-2 text-xs bg-muted/40 rounded p-2 whitespace-pre-wrap">
@@ -385,7 +385,7 @@ function ReportFaultDialog({ open, setOpen, equipmentId, clubId, userId, onCreat
     setDesc("");
     setOpen(false);
     if (data) {
-      onCreated({ ...(data as Omit<Fault, "reporter">), reporter: null });
+      onCreated({ ...(data as Omit<Fault, "reporter_name">), reporter_name: null });
     }
   };
 

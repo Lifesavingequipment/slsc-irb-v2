@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Lock, Share2, Shuffle, Trash2, Users, X, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { buildNameMap } from "@/lib/names";
+import { buildNameMap, memberFullName } from "@/lib/names";
 
 type Props = {
   sessionId: string;
@@ -29,7 +29,7 @@ type Team = {
   notes: string | null;
 };
 type Partner = { driver_id: string; crew_id: string };
-type Member = { id: string; full_name: string };
+type Member = { id: string; display_name: string };
 type Cfg = { waves_count: number; lanes_count: number };
 
 const MAX_W = 4;
@@ -69,20 +69,22 @@ export function WavePanel({
       supabase.from("session_teams").select("*").eq("session_id", sessionId),
       supabase.from("member_partners").select("driver_id, crew_id").eq("club_id", clubId),
       supabase.from("session_draw_configs").select("waves_count, lanes_count").eq("session_id", sessionId).maybeSingle(),
-      supabase.from("profiles").select("id, full_name").in("id", goingIds.length ? goingIds : ["00000000-0000-0000-0000-000000000000"]),
+      goingIds.length
+        ? supabase.from("members").select("auth_user_id, first_name, last_name, preferred_name").in("auth_user_id", goingIds).eq("club_id", clubId)
+        : Promise.resolve({ data: [] as { auth_user_id: string; first_name: string | null; last_name: string | null; preferred_name: string | null }[] }),
     ]);
     setTeams((t ?? []) as Team[]);
     setPartners((p ?? []) as Partner[]);
     setCfg((c as Cfg | null) ?? null);
     const map: Record<string, Member> = {};
-    (profs ?? []).forEach((r: any) => { map[r.id] = { id: r.id, full_name: r.full_name ?? "Member" }; });
+    (profs ?? []).forEach((m) => { map[m.auth_user_id] = { id: m.auth_user_id, display_name: memberFullName(m, "Member") }; });
     setMembers(map);
   }, [sessionId, clubId, goingIds]);
 
   useEffect(() => { load(); }, [load]);
 
   const displayMap = useMemo(
-    () => buildNameMap(Object.values(members)),
+    () => buildNameMap(Object.values(members).map((m) => ({ id: m.id, full_name: m.display_name }))),
     [members],
   );
   const dn = (id: string | null | undefined) => (id && displayMap[id]) || "—";
