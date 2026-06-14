@@ -147,7 +147,7 @@ export function CarpoolEditor({
                     )}
                     {members.map((m) => (
                       <SelectItem key={m.user_id} value={m.user_id}>
-                        {m.full_name || "Member"}{m.user_id === currentUserId ? " (you)" : ""}
+                        {m.display_name || "Member"}{m.user_id === currentUserId ? " (you)" : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
