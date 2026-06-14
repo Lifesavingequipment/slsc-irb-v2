@@ -340,19 +340,6 @@ function SessionDetail() {
     [members, dn],
   );
 
-  if (!session) {
-    return <AppShell><div className="py-12 text-center text-sm text-muted-foreground">Loading…</div></AppShell>;
-  }
-
-  const byName = (a: { user_id: string }, b: { user_id: string }) =>
-    dn(a.user_id).localeCompare(dn(b.user_id));
-
-  const going = rsvps.filter((r) => r.status === "going").slice().sort(byName);
-  const maybe = rsvps.filter((r) => r.status === "maybe").slice().sort(byName);
-  const not = rsvps.filter((r) => r.status === "not_going").slice().sort(byName);
-  const respondedIds = new Set(rsvps.map((r) => r.user_id));
-  const notResponded = members.filter((m) => !respondedIds.has(m.user_id)).slice().sort(byName);
-
   const goingMemberIds = useMemo(
     () =>
       rsvps
@@ -365,6 +352,19 @@ function SessionDetail() {
         .filter((id): id is string => id !== null),
     [rsvps, members],
   );
+
+  if (!session) {
+    return <AppShell><div className="py-12 text-center text-sm text-muted-foreground">Loading…</div></AppShell>;
+  }
+
+  const byName = (a: { user_id: string }, b: { user_id: string }) =>
+    dn(a.user_id).localeCompare(dn(b.user_id));
+
+  const going = rsvps.filter((r) => r.status === "going").slice().sort(byName);
+  const maybe = rsvps.filter((r) => r.status === "maybe").slice().sort(byName);
+  const not = rsvps.filter((r) => r.status === "not_going").slice().sort(byName);
+  const respondedIds = new Set(rsvps.map((r) => r.user_id));
+  const notResponded = members.filter((m) => !respondedIds.has(m.user_id)).slice().sort(byName);
 
   return (
     <AppShell>
