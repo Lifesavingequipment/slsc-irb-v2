@@ -1,7 +1,7 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import {
   Home, Calendar, Users, Settings, Waves,
-  ChevronDown, Wrench, LogOut, User as UserIcon,
+  ChevronDown, Wrench, LogOut, User as UserIcon, MessageSquare,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useClub } from "@/lib/club-context";
@@ -16,11 +16,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { NotificationBell } from "@/components/NotificationBell";
+import { useChatUnread } from "@/hooks/useChatUnread";
 
 const navItems = [
   { to: "/dashboard", label: "Home", icon: Home },
   { to: "/sessions", label: "Sessions", icon: Calendar },
-  { to: "/equipment/lists", label: "Gear", icon: Wrench },
+  { to: "/chat", label: "Chat", icon: MessageSquare },
   { to: "/members", label: "Members", icon: Users },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
@@ -32,6 +33,7 @@ export function AppShell({ title, action, children }: {
 }) {
   const { activeClub, memberships, setActiveClubId } = useClub();
   const { user } = useAuth();
+  const chatUnread = useChatUnread();
   const location = useLocation();
   const approved = memberships.filter((m) => m.status === "approved");
   const userInitial = (user?.email ?? "?").trim().charAt(0).toUpperCase();
@@ -82,6 +84,7 @@ export function AppShell({ title, action, children }: {
           {navItems.map((item) => {
             const active = location.pathname.startsWith(item.to);
             const Icon = item.icon;
+            const badge = item.to === "/chat" && chatUnread > 0 ? chatUnread : 0;
             return (
               <Link
                 key={item.to}
@@ -93,7 +96,12 @@ export function AppShell({ title, action, children }: {
                 }`}
               >
                 <Icon className="h-5 w-5 shrink-0" />
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {badge > 0 && (
+                  <span className="h-5 min-w-5 rounded-full bg-white text-[#E63329] text-[10px] font-bold flex items-center justify-center px-1">
+                    {badge}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -223,15 +231,23 @@ export function AppShell({ title, action, children }: {
             {navItems.map((item) => {
               const active = location.pathname.startsWith(item.to);
               const Icon = item.icon;
+              const badge = item.to === "/chat" && chatUnread > 0 ? chatUnread : 0;
               return (
                 <Link
                   key={item.to}
                   to={item.to}
-                  className={`flex flex-col items-center gap-1 py-2.5 text-xs font-medium transition-colors min-h-[56px] justify-center ${
+                  className={`flex flex-col items-center gap-1 py-2.5 text-xs font-medium transition-colors min-h-[56px] justify-center relative ${
                     active ? "text-[#FFD700]" : "text-white/60"
                   }`}
                 >
-                  <Icon className={`h-5 w-5 ${active ? "stroke-[2.3]" : ""}`} />
+                  <div className="relative">
+                    <Icon className={`h-5 w-5 ${active ? "stroke-[2.3]" : ""}`} />
+                    {badge > 0 && (
+                      <span className="absolute -top-1.5 -right-2 h-4 min-w-4 rounded-full bg-[#E63329] text-white text-[9px] font-bold flex items-center justify-center px-1">
+                        {badge}
+                      </span>
+                    )}
+                  </div>
                   <span>{item.label}</span>
                 </Link>
               );
