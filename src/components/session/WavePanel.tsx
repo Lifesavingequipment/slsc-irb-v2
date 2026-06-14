@@ -41,7 +41,14 @@ export function WavePanel({
   const [partners, setPartners] = useState<Partner[]>([]);
   const [members, setMembers] = useState<Record<string, Member>>({});
   const [cfg, setCfg] = useState<Cfg | null>(null);
-  const [lanes, setLanes] = useState(4);
+  const [lanes, setLanes] = useState(() => {
+    try {
+      const s = localStorage.getItem("slsc-irb-lanes");
+      return s ? Math.max(1, Math.min(10, Number(s))) : 4;
+    } catch {
+      return 4;
+    }
+  });
   const [busy, setBusy] = useState(false);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [pairFor, setPairFor] = useState<Member | null>(null);
@@ -401,19 +408,29 @@ export function WavePanel({
     );
   }
 
+  // Layout option cards: use goingIds.length when no teams exist yet
+  const teamCount = teams.length > 0 ? teams.length : goingIds.length;
+  const minWavesNeeded = teamCount > 0 ? Math.max(1, Math.ceil(teamCount / lanes)) : 1;
+  const waveOptions = Array.from({ length: 4 }, (_, i) => {
+    const waves = minWavesNeeded + i;
+    const totalSlots = waves * lanes;
+    const empty = totalSlots - teamCount;
+    return { waves, totalSlots, empty, isRecommended: i === 0 };
+  });
+
+  // Wave grid display
   const estimatedTeams = Math.ceil(goingIds.length / 2);
   const displayLanes = cfg?.lanes_count ?? lanes;
-  const minWaves = teams.length > 0
+  const displayMinWaves = teams.length > 0
     ? Math.max(1, Math.ceil(teams.length / displayLanes))
     : estimatedTeams > 0
     ? Math.max(1, Math.ceil(estimatedTeams / displayLanes))
     : 1;
-  const displayWaves = cfg?.waves_count ?? minWaves;
+  const displayWaves = cfg?.waves_count ?? displayMinWaves;
   const displayCfg: Cfg | null =
     goingIds.length > 0 || teams.length > 0
       ? { waves_count: displayWaves, lanes_count: displayLanes }
       : cfg ?? null;
-  const overCapacity = cfg ? teams.length > cfg.waves_count * cfg.lanes_count : false;
 
   return (
     <div className="space-y-4">
@@ -481,97 +498,74 @@ export function WavePanel({
         </Card>
       )}
 
-      {/* Wave config */}
-      <Card className="p-3 space-y-3">
+      {/* Wave configuration */}
+      <Card className="p-3 space-y-4">
         <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Wave configuration</div>
 
-        {teams.length === 0 ? (
-          /* Step 1: no teams yet — lanes selector only, waves auto-calculated */
-          <div className="space-y-2">
-            <div className="space-y-1">
-              <div className="text-[11px] text-muted-foreground">Lanes available today</div>
-              <Select
-                value={String(lanes)}
-                onValueChange={(v) => {
-                  const l = Number(v);
-                  setLanes(l);
-                  const w = estimatedTeams > 0 ? Math.max(1, Math.ceil(estimatedTeams / l)) : 1;
-                  setConfig(w, l);
-                }}
+        {/* Step 1 — Lane selector */}
+        <div className="space-y-2">
+          <div className="text-[11px] font-medium text-muted-foreground">Lanes available today</div>
+          <div className="flex flex-wrap gap-1.5">
+            {Array.from({ length: MAX_LANES }, (_, i) => i + 1).map((n) => (
+              <button
+                key={n}
+                type="button"
                 disabled={busy}
+                onClick={() => {
+                  setLanes(n);
+                  try { localStorage.setItem("slsc-irb-lanes", String(n)); } catch { /* ignore */ }
+                }}
+                className={[
+                  "w-9 h-9 rounded-lg border text-sm font-semibold transition-colors",
+                  lanes === n
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card hover:bg-accent/10 border-border",
+                ].join(" ")}
               >
-                <SelectTrigger className="h-9 w-40"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: MAX_LANES }, (_, i) => i + 1).map((n) => (
-                    <SelectItem key={n} value={String(n)}>{n} {n === 1 ? "lane" : "lanes"}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Step 2 — Layout options */}
+        {teamCount > 0 ? (
+          <div className="space-y-2">
+            <div className="text-[11px] font-medium text-muted-foreground">Choose a layout</div>
+            <div className="space-y-2">
+              {waveOptions.map((opt) => {
+                const isSelected = cfg?.waves_count === opt.waves && cfg?.lanes_count === lanes;
+                return (
+                  <button
+                    key={opt.waves}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setConfig(opt.waves, lanes)}
+                    className={[
+                      "w-full rounded-xl border p-3 text-left transition-colors",
+                      isSelected
+                        ? "bg-primary/10 border-primary"
+                        : "bg-card hover:bg-accent/10 border-border",
+                    ].join(" ")}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-base font-bold">{opt.waves} waves × {lanes} lanes</span>
+                      {opt.isRecommended && (
+                        <span className="shrink-0 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                          ⭐ Recommended
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                      {opt.totalSlots} slots · {opt.empty === 0 ? "perfect fit" : `${opt.empty} empty`}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-            {goingIds.length > 0 ? (
-              <p className="text-[11px] text-muted-foreground">
-                With ~{estimatedTeams} {estimatedTeams === 1 ? "team" : "teams"} and {lanes} {lanes === 1 ? "lane" : "lanes"} → {minWaves} {minWaves === 1 ? "wave" : "waves"} needed
-              </p>
-            ) : (
-              <p className="text-[11px] text-muted-foreground">No members going yet.</p>
-            )}
           </div>
         ) : (
-          /* Step 2: teams exist — both selectors for fine-tuning */
-          <>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <div className="text-[11px] text-muted-foreground">Waves</div>
-                <Select
-                  value={String(displayWaves)}
-                  onValueChange={(v) => setConfig(Number(v), displayLanes)}
-                  disabled={busy}
-                >
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {(() => {
-                      const minW = Math.max(1, Math.ceil(teams.length / displayLanes));
-                      const maxW = Math.max(minW, displayWaves, teams.length);
-                      return Array.from({ length: maxW - minW + 1 }, (_, i) => i + minW).map((n) => (
-                        <SelectItem key={n} value={String(n)}>{n} {n === 1 ? "wave" : "waves"}</SelectItem>
-                      ));
-                    })()}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <div className="text-[11px] text-muted-foreground">Lanes per wave</div>
-                <Select
-                  value={String(displayLanes)}
-                  onValueChange={(v) => {
-                    const l = Number(v);
-                    setLanes(l);
-                    const minW = Math.max(1, Math.ceil(teams.length / l));
-                    setConfig(Math.max(displayWaves, minW), l);
-                  }}
-                  disabled={busy}
-                >
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: MAX_LANES }, (_, i) => i + 1).map((n) => (
-                      <SelectItem key={n} value={String(n)}>{n} {n === 1 ? "lane" : "lanes"}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            {cfg && (
-              <div className="text-[11px] text-muted-foreground">
-                {cfg.waves_count * cfg.lanes_count} slots · {teams.length} teams
-                {overCapacity
-                  ? <span className="text-destructive ml-1">— more teams than slots</span>
-                  : teams.length < cfg.waves_count * cfg.lanes_count
-                  ? <span className="ml-1">· {cfg.waves_count * cfg.lanes_count - teams.length} empty</span>
-                  : <span className="ml-1">· perfect fit</span>
-                }
-              </div>
-            )}
-          </>
+          <p className="text-[11px] text-muted-foreground">No members going yet.</p>
         )}
       </Card>
 
