@@ -61,6 +61,7 @@ function SignupPage() {
   const [busy, setBusy] = useState(false);
   const [fromShare, setFromShare] = useState(false);
   const [newClubIntent, setNewClubIntent] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -83,6 +84,7 @@ function SignupPage() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMsg(null);
     const parsed = schema.safeParse({
       first_name: firstName,
       last_name: lastName,
@@ -94,7 +96,9 @@ function SignupPage() {
       confirm_password: confirmPassword,
     });
     if (!parsed.success) {
-      toast.error(parsed.error.issues[0].message);
+      const msg = parsed.error.issues[0].message;
+      setErrorMsg(msg);
+      toast.error(msg);
       return;
     }
     setBusy(true);
@@ -109,7 +113,9 @@ function SignupPage() {
     });
     if (error) {
       setBusy(false);
-      toast.error(readableSignupError(error.message));
+      const msg = readableSignupError(error.message);
+      setErrorMsg(msg);
+      toast.error(msg);
       return;
     }
 
@@ -137,11 +143,9 @@ function SignupPage() {
 
       if (profileError || identityError) {
         setBusy(false);
-        toast.error(
-          profileError?.message ??
-            identityError?.message ??
-            "Account created, but profile setup failed.",
-        );
+        const msg = profileError?.message ?? identityError?.message ?? "Account created, but profile setup failed.";
+        setErrorMsg(msg);
+        toast.error(msg);
         return;
       }
     }
@@ -297,6 +301,9 @@ function SignupPage() {
         <Button type="submit" className="w-full h-12 text-base" disabled={busy}>
           {busy ? "Creating..." : "Create account"}
         </Button>
+        {errorMsg && (
+          <p className="text-sm text-red-600 text-center">{errorMsg}</p>
+        )}
       </form>
     </AuthShell>
   );

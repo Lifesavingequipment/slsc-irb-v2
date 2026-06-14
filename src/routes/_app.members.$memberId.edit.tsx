@@ -16,6 +16,7 @@ import {
 import { ChevronLeft, Trash2, Plus, Shield, Heart, Save } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
+import { useConfirm } from "@/lib/confirm";
 
 export const Route = createFileRoute("/_app/members/$memberId/edit")({
   head: () => ({ meta: [{ title: "Edit member — IRB Coaching" }] }),
@@ -93,6 +94,7 @@ function EditMember() {
 
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     if (!clubId) return;
@@ -168,7 +170,13 @@ function EditMember() {
     name: "", relationship: "", phone: "", email: "", is_primary: p.length === 0,
   }]);
 
-  const removeContact = (i: number) => {
+  const removeContact = async (i: number) => {
+    const ok = await confirm({
+      title: "Remove emergency contact?",
+      description: "Are you sure? This cannot be undone.",
+      confirmText: "Remove",
+    });
+    if (!ok) return;
     setContacts((prev) => {
       const c = prev[i];
       if (c.id) setRemovedContactIds((r) => [...r, c.id!]);

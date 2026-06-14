@@ -1,7 +1,7 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import {
   Home, Calendar, Users, Settings, Waves,
-  ChevronDown, Wrench, LogOut, User as UserIcon,
+  ChevronDown, Wrench, LogOut, User as UserIcon, MessageSquare,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useClub } from "@/lib/club-context";
@@ -21,6 +21,7 @@ const navItems = [
   { to: "/sessions", label: "Sessions", icon: Calendar },
   { to: "/equipment/lists", label: "Gear", icon: Wrench },
   { to: "/members", label: "Members", icon: Users },
+  { to: "/chat", label: "Chat", icon: MessageSquare },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
@@ -216,7 +217,7 @@ export function AppShell({ title, action, children }: {
 
         {/* ── Mobile bottom tab bar (hidden on md+) ── */}
         <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-[#1e293b] safe-bottom">
-          <div className="grid grid-cols-5">
+          <div className="grid grid-cols-6">
             {navItems.map((item) => {
               const active = location.pathname.startsWith(item.to);
               const Icon = item.icon;
