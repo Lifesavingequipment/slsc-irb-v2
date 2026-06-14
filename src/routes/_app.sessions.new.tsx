@@ -229,8 +229,8 @@ function NewSession() {
       notes: parsed.data.notes || null,
       survey_enabled: parsed.data.survey_enabled,
       carpool_enabled: parsed.data.carpool_enabled,
-      carpool_pickups: cleanPickups.length > 0 ? cleanPickups : null,
-      trailers_required: carpool ? trailers : null,
+      carpool_pickups: cleanPickups.length > 0 ? cleanPickups : [],
+      trailers_required: carpool ? (trailers ?? 0) : 0,
       created_by: user.id,
     }));
 
