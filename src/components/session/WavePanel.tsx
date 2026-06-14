@@ -34,6 +34,23 @@ type Cfg = { waves_count: number; lanes_count: number };
 
 const MAX_LANES = 10;
 
+function computeLayouts(teamCount: number, maxLanes: number) {
+  if (teamCount === 0) return [];
+  const options: { waves: number; lanes: number; empty: number }[] = [];
+  for (let l = 1; l <= maxLanes; l++) {
+    const waves = Math.ceil(teamCount / l);
+    const slots = waves * l;
+    const empty = slots - teamCount;
+    options.push({ waves, lanes: l, empty });
+  }
+  const good = options.filter((o) => o.empty <= 4);
+  if (good.length === 0) {
+    const best = options.reduce((a, b) => (a.empty <= b.empty ? a : b));
+    return [best];
+  }
+  return good.sort((a, b) => a.waves - b.waves || a.empty - b.empty);
+}
+
 export function WavePanel({
   sessionId, clubId, sessionTitle, sessionStartsAt, goingIds, canManage,
 }: Props) {
@@ -410,13 +427,7 @@ export function WavePanel({
 
   // Layout option cards: use goingIds.length when no teams exist yet
   const teamCount = teams.length > 0 ? teams.length : goingIds.length;
-  const minWavesNeeded = teamCount > 0 ? Math.max(1, Math.ceil(teamCount / lanes)) : 1;
-  const waveOptions = Array.from({ length: 4 }, (_, i) => {
-    const waves = minWavesNeeded + i;
-    const totalSlots = waves * lanes;
-    const empty = totalSlots - teamCount;
-    return { waves, totalSlots, empty, isRecommended: i === 0 };
-  });
+  const waveOptions = computeLayouts(teamCount, lanes);
 
   // Wave grid display
   const estimatedTeams = Math.ceil(goingIds.length / 2);
@@ -533,14 +544,15 @@ export function WavePanel({
           <div className="space-y-2">
             <div className="text-[11px] font-medium text-muted-foreground">Choose a layout</div>
             <div className="space-y-2">
-              {waveOptions.map((opt) => {
-                const isSelected = cfg?.waves_count === opt.waves && cfg?.lanes_count === lanes;
+              {waveOptions.map((opt, i) => {
+                const slots = opt.waves * opt.lanes;
+                const isSelected = cfg?.waves_count === opt.waves && cfg?.lanes_count === opt.lanes;
                 return (
                   <button
-                    key={opt.waves}
+                    key={`${opt.waves}-${opt.lanes}`}
                     type="button"
                     disabled={busy}
-                    onClick={() => setConfig(opt.waves, lanes)}
+                    onClick={() => setConfig(opt.waves, opt.lanes)}
                     className={[
                       "w-full rounded-xl border p-3 text-left transition-colors",
                       isSelected
@@ -549,15 +561,15 @@ export function WavePanel({
                     ].join(" ")}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-base font-bold">{opt.waves} waves × {lanes} lanes</span>
-                      {opt.isRecommended && (
+                      <span className="text-base font-bold">{opt.waves} {opt.waves === 1 ? "wave" : "waves"} × {opt.lanes} {opt.lanes === 1 ? "lane" : "lanes"}</span>
+                      {i === 0 && (
                         <span className="shrink-0 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
                           ⭐ Recommended
                         </span>
                       )}
                     </div>
                     <div className="text-[11px] text-muted-foreground mt-0.5">
-                      {opt.totalSlots} slots · {opt.empty === 0 ? "perfect fit" : `${opt.empty} empty`}
+                      {slots} slots · {opt.empty === 0 ? "perfect fit" : `${opt.empty} empty`}
                     </div>
                   </button>
                 );
