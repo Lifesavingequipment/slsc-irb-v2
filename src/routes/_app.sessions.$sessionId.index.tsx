@@ -353,6 +353,19 @@ function SessionDetail() {
   const respondedIds = new Set(rsvps.map((r) => r.user_id));
   const notResponded = members.filter((m) => !respondedIds.has(m.user_id)).slice().sort(byName);
 
+  const goingMemberIds = useMemo(
+    () =>
+      rsvps
+        .filter((r) => r.status === "going")
+        .map((g) =>
+          g.member_id
+            ? g.member_id
+            : members.find((m) => m.auth_user_id === g.user_id)?.id ?? null,
+        )
+        .filter((id): id is string => id !== null),
+    [rsvps, members],
+  );
+
   return (
     <AppShell>
       <Link to="/sessions" className="inline-flex items-center text-sm text-muted-foreground mb-2">
@@ -511,12 +524,7 @@ function SessionDetail() {
             clubId={session.club_id}
             sessionTitle={session.title}
             sessionStartsAt={session.starts_at}
-            goingIds={going
-              .map((g) => {
-                if (g.member_id) return g.member_id;
-                return members.find((m) => m.auth_user_id === g.user_id)?.id ?? null;
-              })
-              .filter(Boolean) as string[]}
+            goingIds={goingMemberIds}
             canManage={canManage}
           />
         </TabsContent>
