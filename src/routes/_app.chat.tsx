@@ -74,6 +74,7 @@ function ChatPage() {
   const [chatType, setChatType] = useState<"group" | "direct">("group");
   const [memberSearch, setMemberSearch] = useState("");
   const [creating, setCreating] = useState(false);
+  const [loading, setLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
   const realtimeRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
@@ -97,65 +98,76 @@ function ChatPage() {
 
   const loadChannels = useCallback(async () => {
     if (!myMemberId || !activeClub) return;
+    setLoading(true);
+    try {
+      // Ensure main channel exists + self is a member (non-blocking — don't let errors stop the fetch)
+      try {
+        await ensureMainChannel(activeClub.club_id, activeClub.club.name, myMemberId);
+      } catch (e) {
+        console.error("ensureMainChannel failed (non-fatal):", e);
+      }
 
-    // Ensure main channel exists + self is a member
-    await ensureMainChannel(activeClub.club_id, activeClub.club.name, myMemberId);
+      // Load channels I'm in
+      const { data: cm, error: cmErr } = await supabase
+        .from("chat_members")
+        .select("channel_id, last_read_at, channel:chat_channels(id, name, type)")
+        .eq("member_id", myMemberId);
 
-    // Load channels I'm in
-    const { data: cm } = await supabase
-      .from("chat_members")
-      .select("channel_id, last_read_at, channel:chat_channels(id, name, type)")
-      .eq("member_id", myMemberId);
+      if (cmErr) { console.error("chat_members fetch error:", cmErr); return; }
+      if (!cm) return;
 
-    if (!cm) return;
+      const channelIds = cm.map((r) => r.channel_id);
+      if (channelIds.length === 0) { setChannels([]); return; }
 
-    const channelIds = cm.map((r) => r.channel_id);
-    if (channelIds.length === 0) { setChannels([]); return; }
+      // Last message per channel
+      const msgPromises = channelIds.map((cid) =>
+        supabase
+          .from("chat_messages")
+          .select("body, created_at")
+          .eq("channel_id", cid)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      );
+      const msgResults = await Promise.all(msgPromises);
 
-    // Last message per channel
-    const msgPromises = channelIds.map((cid) =>
-      supabase
-        .from("chat_messages")
-        .select("body, created_at")
-        .eq("channel_id", cid)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-    );
-    const msgResults = await Promise.all(msgPromises);
+      // Unread counts
+      const unreadPromises = cm.map((r) =>
+        supabase
+          .from("chat_messages")
+          .select("id", { count: "exact", head: true })
+          .eq("channel_id", r.channel_id)
+          .gt("created_at", r.last_read_at ?? "1970-01-01")
+      );
+      const unreadResults = await Promise.all(unreadPromises);
 
-    // Unread counts
-    const unreadPromises = cm.map((r) =>
-      supabase
-        .from("chat_messages")
-        .select("id", { count: "exact", head: true })
-        .eq("channel_id", r.channel_id)
-        .gt("created_at", r.last_read_at ?? "1970-01-01")
-    );
-    const unreadResults = await Promise.all(unreadPromises);
+      const built: Channel[] = cm.map((r, i) => {
+        const ch = r.channel as unknown as { id: string; name: string; type: string };
+        return {
+          id: ch.id,
+          name: ch.name,
+          type: ch.type,
+          lastMessage: msgResults[i].data?.body ?? undefined,
+          lastTime: msgResults[i].data?.created_at ?? undefined,
+          unread: unreadResults[i].count ?? 0,
+        };
+      });
 
-    const built: Channel[] = cm.map((r, i) => {
-      const ch = r.channel as unknown as { id: string; name: string; type: string };
-      return {
-        id: ch.id,
-        name: ch.name,
-        type: ch.type,
-        lastMessage: msgResults[i].data?.body ?? undefined,
-        lastTime: msgResults[i].data?.created_at ?? undefined,
-        unread: unreadResults[i].count ?? 0,
-      };
-    });
+      // Sort: main first, then by last message time desc
+      built.sort((a, b) => {
+        if (a.type === "main") return -1;
+        if (b.type === "main") return 1;
+        const ta = a.lastTime ?? "";
+        const tb = b.lastTime ?? "";
+        return tb.localeCompare(ta);
+      });
 
-    // Sort: main first, then by last message time desc
-    built.sort((a, b) => {
-      if (a.type === "main") return -1;
-      if (b.type === "main") return 1;
-      const ta = a.lastTime ?? "";
-      const tb = b.lastTime ?? "";
-      return tb.localeCompare(ta);
-    });
-
-    setChannels(built);
+      setChannels(built);
+    } catch (e) {
+      console.error("loadChannels error:", e);
+    } finally {
+      setLoading(false);
+    }
   }, [myMemberId, activeClub]);
 
   useEffect(() => { loadChannels(); }, [loadChannels]);
@@ -324,8 +336,10 @@ function ChatPage() {
           </div>
 
           <ScrollArea className="flex-1">
-            {channels.length === 0 ? (
+            {loading ? (
               <div className="p-4 text-sm text-muted-foreground text-center">Loading…</div>
+            ) : channels.length === 0 ? (
+              <div className="p-4 text-sm text-muted-foreground text-center">No conversations yet</div>
             ) : (
               channels.map((ch) => (
                 <button
