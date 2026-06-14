@@ -238,7 +238,9 @@ function ChatPage() {
               .maybeSingle();
             if (s) senderName = s.preferred_name || [s.first_name, s.last_name].filter(Boolean).join(" ") || "Unknown";
           }
-          setMessages((prev) => [...prev, { ...msg, senderName }]);
+          setMessages((prev) =>
+            prev.some((m) => m.id === msg.id) ? prev : [...prev, { ...msg, senderName }]
+          );
           void markRead(channelId);
           void loadChannels();
         },
@@ -258,14 +260,22 @@ function ChatPage() {
   const sendMessage = async () => {
     if (!body.trim() || !activeChannelId || !myMemberId) return;
     setSending(true);
-    const { error } = await supabase.from("chat_messages").insert({
-      channel_id: activeChannelId,
-      sender_id: myMemberId,
-      body: body.trim(),
-    });
-    setSending(false);
-    if (error) { toast.error(error.message); return; }
+    const trimmed = body.trim();
     setBody("");
+    const { data: inserted, error } = await supabase
+      .from("chat_messages")
+      .insert({ channel_id: activeChannelId, sender_id: myMemberId, body: trimmed })
+      .select("id, sender_id, body, created_at")
+      .single();
+    setSending(false);
+    if (error) { toast.error(error.message); setBody(trimmed); return; }
+    if (inserted) {
+      setMessages((prev) =>
+        prev.some((m) => m.id === inserted.id)
+          ? prev
+          : [...prev, { ...inserted, senderName: myMemberName }]
+      );
+    }
   };
 
   const openNewChat = async () => {
