@@ -18,6 +18,7 @@ import { ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 import { DateTimeFields } from "@/components/ui/date-time-fields";
 import { CarpoolEditor, validateCarpoolDrafts, emptyCarpoolDraft, type CarpoolDraft } from "@/components/session/CarpoolEditor";
+import { CoachSetupSection, type VehicleDraft, type ExistingVehicle } from "@/components/session/CoachSetupSection";
 import { invalidateSessionsCache } from "./_app.sessions.index";
 
 export const Route = createFileRoute("/_app/sessions/$sessionId/edit")({
@@ -94,6 +95,13 @@ function EditSession() {
   const [clubId, setClubId] = useState<string | null>(null);
   const [carpools, setCarpools] = useState<CarpoolDraft[]>([]);
   const [originalCarpoolIds, setOriginalCarpoolIds] = useState<string[]>([]);
+  const [pickups, setPickups] = useState<string[]>([]);
+  const [trailers, setTrailers] = useState(0);
+  const [existingVehicles, setExistingVehicles] = useState<ExistingVehicle[]>([]);
+  const [vehiclesToDelete, setVehiclesToDelete] = useState<string[]>([]);
+  const [pendingVehicles, setPendingVehicles] = useState<VehicleDraft[]>([]);
+  const [newVehicle, setNewVehicle] = useState<VehicleDraft>({ name: "", seats: 8, pickup: "", can_tow: false });
+  const [savedLocations, setSavedLocations] = useState<{ id: string; name: string; address: string | null }[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -114,6 +122,8 @@ function EditSession() {
       setClubId(data.club_id);
       setLocationId(data.location_id ?? "custom");
       setCustomLocation(data.location_id ? "" : (data.location ?? ""));
+      setPickups([...(data.carpool_pickups ?? []), ""]);
+      setTrailers(data.trailers_required ?? 0);
 
       const { data: locs } = await supabase
         .from("locations")
@@ -121,6 +131,20 @@ function EditSession() {
         .eq("club_id", data.club_id)
         .order("name");
       setLocations((locs ?? []) as Loc[]);
+      setSavedLocations((locs ?? []) as { id: string; name: string; address: string | null }[]);
+
+      const { data: cvs } = await supabase
+        .from("session_club_vehicles")
+        .select("id, name, seats, pickup_location, can_tow")
+        .eq("session_id", sessionId)
+        .order("created_at");
+      setExistingVehicles((cvs ?? []).map((v) => ({
+        id: v.id,
+        name: v.name,
+        seats: v.seats,
+        pickup_location: v.pickup_location,
+        can_tow: v.can_tow,
+      })));
 
       const { data: cps } = await supabase
         .from("carpools")
@@ -197,6 +221,8 @@ function EditSession() {
     }
 
     setBusy(true);
+    const cleanPickups = carpool ? pickups.map((p) => p.trim()).filter(Boolean) : [];
+
     const { error } = await supabase.from("sessions").update({
       title: parsed.data.title,
       session_type: parsed.data.session_type,
@@ -211,6 +237,8 @@ function EditSession() {
       notes: parsed.data.notes || null,
       survey_enabled: parsed.data.survey_enabled,
       carpool_enabled: parsed.data.carpool_enabled,
+      carpool_pickups: cleanPickups.length > 0 ? cleanPickups : null,
+      trailers_required: carpool ? trailers : null,
     }).eq("id", sessionId);
     if (error) { setBusy(false); toast.error(error.message); return; }
 
@@ -243,6 +271,27 @@ function EditSession() {
         });
         if (insErr) { setBusy(false); toast.error(`Couldn't add vehicle: ${insErr.message}`); return; }
       }
+    }
+
+    // Club vehicles: delete removed, insert pending new ones.
+    if (vehiclesToDelete.length > 0) {
+      const { error: vDelErr } = await supabase
+        .from("session_club_vehicles").delete().in("id", vehiclesToDelete);
+      if (vDelErr) { setBusy(false); toast.error(`Couldn't remove vehicles: ${vDelErr.message}`); return; }
+    }
+    const newVehicleRows = pendingVehicles.filter((v) => v.name.trim());
+    if (newVehicleRows.length > 0 && targetClubId) {
+      const { error: vInsErr } = await supabase.from("session_club_vehicles").insert(
+        newVehicleRows.map((v) => ({
+          session_id: sessionId,
+          club_id: targetClubId,
+          name: v.name.trim(),
+          seats: v.seats,
+          pickup_location: v.pickup.trim() || null,
+          can_tow: v.can_tow,
+        })),
+      );
+      if (vInsErr) { setBusy(false); toast.error(`Couldn't add vehicles: ${vInsErr.message}`); return; }
     }
 
     setBusy(false);
@@ -396,6 +445,7 @@ function EditSession() {
                   if (v && carpools.length === 0 && user) {
                     setCarpools([emptyCarpoolDraft(user.id, startsAt)]);
                   }
+                  if (v && pickups.length === 0) setPickups([""]);
                 }}
               />
             </div>
@@ -407,6 +457,26 @@ function EditSession() {
                 value={carpools}
                 onChange={setCarpools}
                 defaultDeparture={startsAt}
+              />
+            )}
+            {carpool && (
+              <CoachSetupSection
+                pickups={pickups}
+                onPickupsChange={setPickups}
+                trailers={trailers}
+                onTrailersChange={setTrailers}
+                savedLocations={savedLocations}
+                existingVehicles={existingVehicles.filter((v) => !vehiclesToDelete.includes(v.id))}
+                onRemoveExisting={(id) => setVehiclesToDelete((prev) => [...prev, id])}
+                pendingVehicles={pendingVehicles}
+                onRemovePending={(i) => setPendingVehicles((v) => v.filter((_, idx) => idx !== i))}
+                newVehicle={newVehicle}
+                onNewVehicleChange={setNewVehicle}
+                onAddVehicle={() => {
+                  if (!newVehicle.name.trim()) return;
+                  setPendingVehicles((v) => [...v, newVehicle]);
+                  setNewVehicle({ name: "", seats: 8, pickup: "", can_tow: false });
+                }}
               />
             )}
           </div>

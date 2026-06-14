@@ -18,6 +18,7 @@ import { ChevronLeft, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { DateTimeFields } from "@/components/ui/date-time-fields";
 import { CarpoolEditor, validateCarpoolDrafts, emptyCarpoolDraft, type CarpoolDraft } from "@/components/session/CarpoolEditor";
+import { CoachSetupSection, type VehicleDraft } from "@/components/session/CoachSetupSection";
 import { invalidateSessionsCache } from "./_app.sessions.index";
 import { addDays, addMonths, addWeeks, format as fmt } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -114,6 +115,10 @@ function NewSession() {
   const [questions, setQuestions] = useState<DraftQ[]>([]);
   const [carpool, setCarpool] = useState(false);
   const [carpools, setCarpools] = useState<CarpoolDraft[]>([]);
+  const [pickups, setPickups] = useState<string[]>([]);
+  const [trailers, setTrailers] = useState(0);
+  const [pendingVehicles, setPendingVehicles] = useState<VehicleDraft[]>([]);
+  const [newVehicle, setNewVehicle] = useState<VehicleDraft>({ name: "", seats: 8, pickup: "", can_tow: false });
   const [repeatUntil, setRepeatUntil] = useState("");
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -200,6 +205,8 @@ function NewSession() {
       ? new Date(parsed.data.starts_at).getTime() - new Date(parsed.data.rsvp_deadline).getTime()
       : null;
 
+    const cleanPickups = carpool ? pickups.map((p) => p.trim()).filter(Boolean) : [];
+
     const rowsToInsert = occurrences.map((o) => ({
       club_id: activeClub.club_id,
       title: parsed.data.title,
@@ -217,6 +224,8 @@ function NewSession() {
       notes: parsed.data.notes || null,
       survey_enabled: parsed.data.survey_enabled,
       carpool_enabled: parsed.data.carpool_enabled,
+      carpool_pickups: cleanPickups.length > 0 ? cleanPickups : null,
+      trailers_required: carpool ? trailers : null,
       created_by: user.id,
     }));
 
@@ -265,6 +274,25 @@ function NewSession() {
         invalidateSessionsCache(activeClub.club_id);
         navigate({ to: "/sessions/$sessionId/carpool", params: { sessionId: created.id } });
         return;
+      }
+    }
+
+    // Club vehicles (coach setup) — first occurrence only.
+    if (carpool && pendingVehicles.length > 0) {
+      const vrows = pendingVehicles
+        .filter((v) => v.name.trim())
+        .map((v) => ({
+          session_id: created.id,
+          club_id: activeClub.club_id,
+          name: v.name.trim(),
+          seats: v.seats,
+          pickup_location: v.pickup.trim() || null,
+          can_tow: v.can_tow,
+          created_by: user.id,
+        }));
+      if (vrows.length > 0) {
+        const { error: vErr } = await supabase.from("session_club_vehicles").insert(vrows);
+        if (vErr) toast.error(`Session created, but couldn't save club vehicles: ${vErr.message}`);
       }
     }
 
@@ -515,6 +543,7 @@ function NewSession() {
                   if (v && carpools.length === 0 && user) {
                     setCarpools([emptyCarpoolDraft(user.id, startsAt)]);
                   }
+                  if (v && pickups.length === 0) setPickups([""]);
                 }}
               />
             </div>
@@ -526,6 +555,24 @@ function NewSession() {
                 value={carpools}
                 onChange={setCarpools}
                 defaultDeparture={startsAt}
+              />
+            )}
+            {carpool && (
+              <CoachSetupSection
+                pickups={pickups}
+                onPickupsChange={setPickups}
+                trailers={trailers}
+                onTrailersChange={setTrailers}
+                savedLocations={(locations ?? []) as { id: string; name: string; address: string | null }[]}
+                pendingVehicles={pendingVehicles}
+                onRemovePending={(i) => setPendingVehicles((v) => v.filter((_, idx) => idx !== i))}
+                newVehicle={newVehicle}
+                onNewVehicleChange={setNewVehicle}
+                onAddVehicle={() => {
+                  if (!newVehicle.name.trim()) return;
+                  setPendingVehicles((v) => [...v, newVehicle]);
+                  setNewVehicle({ name: "", seats: 8, pickup: "", can_tow: false });
+                }}
               />
             )}
           </div>
