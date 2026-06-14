@@ -8,7 +8,7 @@ import path from "path";
 export default defineConfig({
   plugins: [
     TanStackRouterVite({ autoCodeSplitting: true }),
-    tanstackStart({ target: "vercel" }),
+    tanstackStart({ spa: { enabled: true } }),
     react(),
     tailwindcss(),
   ],

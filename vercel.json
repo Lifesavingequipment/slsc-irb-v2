@@ -1,4 +1,7 @@
 {
   "buildCommand": "vite build",
-  "outputDirectory": ".vercel/output"
+  "outputDirectory": "dist/client",
+  "rewrites": [
+    { "source": "/((?!assets/|favicon\\.ico|favicon\\.png|icons/|manifest\\.webmanifest|sw\\.js).*)", "destination": "/_shell.html" }
+  ]
 }
