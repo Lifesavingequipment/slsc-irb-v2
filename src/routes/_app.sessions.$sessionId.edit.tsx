@@ -68,6 +68,15 @@ function toLocalInput(iso: string | null | undefined): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// Parse a local datetime-local string ("yyyy-MM-ddTHH:mm") as local time,
+// bypassing any browser ambiguity in how Date() parses timezone-less ISO strings.
+function parseLocalDateTime(s: string): Date {
+  const [date, time = "00:00"] = s.split("T");
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour = 0, minute = 0] = time.split(":").map(Number);
+  return new Date(year, month - 1, day, hour, minute);
+}
+
 function EditSession() {
   const { sessionId } = Route.useParams();
   const { user } = useAuth();
@@ -231,9 +240,9 @@ function EditSession() {
       repeat_frequency: parsed.data.repeat_frequency,
       location: parsed.data.location || null,
       location_id: parsed.data.location_id ?? null,
-      starts_at: new Date(parsed.data.starts_at).toISOString(),
-      ends_at: parsed.data.ends_at ? new Date(parsed.data.ends_at).toISOString() : null,
-      rsvp_deadline: parsed.data.rsvp_deadline ? new Date(parsed.data.rsvp_deadline).toISOString() : null,
+      starts_at: parseLocalDateTime(parsed.data.starts_at).toISOString(),
+      ends_at: parsed.data.ends_at ? parseLocalDateTime(parsed.data.ends_at).toISOString() : null,
+      rsvp_deadline: parsed.data.rsvp_deadline ? parseLocalDateTime(parsed.data.rsvp_deadline).toISOString() : null,
       capacity: parsed.data.capacity ?? null,
       notes: parsed.data.notes || null,
       survey_enabled: parsed.data.survey_enabled,
@@ -255,7 +264,7 @@ function EditSession() {
       const payload = {
         vehicle_name: c.vehicle_name.trim(),
         departure_location: c.departure_location.trim(),
-        departure_time: new Date(c.departure_time).toISOString(),
+        departure_time: parseLocalDateTime(c.departure_time).toISOString(),
         available_seats: c.available_seats,
         notes: c.notes.trim() || null,
         can_tow_trailer: c.can_tow_trailer,

@@ -22,6 +22,7 @@ function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) navigate({ to: "/dashboard", replace: true });
@@ -29,6 +30,7 @@ function LoginPage() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginError(null);
     setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
@@ -37,15 +39,18 @@ function LoginPage() {
     setBusy(false);
     if (error) {
       const msg = error.message.toLowerCase();
+      let displayMsg: string;
       if (msg.includes("invalid login") || msg.includes("invalid credentials")) {
-        toast.error("Email or password is incorrect. Check your details and try again.");
+        displayMsg = "Email or password is incorrect. Check your details and try again.";
       } else if (msg.includes("email not confirmed")) {
-        toast.error("Please confirm your email first — check your inbox for the link.");
+        displayMsg = "Please confirm your email first — check your inbox for the link.";
       } else if (msg.includes("rate limit") || msg.includes("too many")) {
-        toast.error("Too many attempts. Wait a minute and try again.");
+        displayMsg = "Too many attempts. Wait a minute and try again.";
       } else {
-        toast.error(error.message);
+        displayMsg = error.message;
       }
+      setLoginError(displayMsg);
+      toast.error(displayMsg);
     }
     // On success, the auth listener updates `user` and the useEffect above
     // navigates to /dashboard. Navigating manually here races the listener
@@ -112,6 +117,9 @@ function LoginPage() {
         <Button type="submit" className="w-full h-12 text-base" disabled={busy}>
           {busy ? "Signing in..." : "Sign in"}
         </Button>
+        {loginError && (
+          <p className="text-sm text-destructive mt-2">{loginError}</p>
+        )}
       </form>
     </AuthShell>
   );

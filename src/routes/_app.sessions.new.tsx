@@ -60,6 +60,15 @@ export const Route = createFileRoute("/_app/sessions/new")({
   component: NewSession,
 });
 
+// Parse a local datetime-local string ("yyyy-MM-ddTHH:mm") as local time,
+// bypassing any browser ambiguity in how Date() parses timezone-less ISO strings.
+function parseLocalDateTime(s: string): Date {
+  const [date, time = "00:00"] = s.split("T");
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour = 0, minute = 0] = time.split(":").map(Number);
+  return new Date(year, month - 1, day, hour, minute);
+}
+
 const schema = z.object({
   title: z.string().trim().min(2, "Title must be at least 2 characters").max(120),
   session_type: z.enum(["training", "fitness", "theory", "other"]),
@@ -129,7 +138,7 @@ function NewSession() {
   const occurrenceCount = useMemo(() => {
     if (repeat === "none" || !startsAt || !repeatUntil) return 1;
     try {
-      return generateOccurrences(new Date(startsAt).toISOString(), endsAt ? new Date(endsAt).toISOString() : null, repeat, repeatUntil).length;
+      return generateOccurrences(parseLocalDateTime(startsAt).toISOString(), endsAt ? parseLocalDateTime(endsAt).toISOString() : null, repeat, repeatUntil).length;
     } catch { return 1; }
   }, [repeat, startsAt, endsAt, repeatUntil]);
 
@@ -200,14 +209,14 @@ function NewSession() {
     setBusy(true);
 
     const occurrences = generateOccurrences(
-      new Date(parsed.data.starts_at).toISOString(),
-      parsed.data.ends_at ? new Date(parsed.data.ends_at).toISOString() : null,
+      parseLocalDateTime(parsed.data.starts_at).toISOString(),
+      parsed.data.ends_at ? parseLocalDateTime(parsed.data.ends_at).toISOString() : null,
       parsed.data.repeat_frequency,
       repeat !== "none" ? (repeatUntil || null) : null,
     );
 
     const rsvpOffsetMs = parsed.data.rsvp_deadline
-      ? new Date(parsed.data.starts_at).getTime() - new Date(parsed.data.rsvp_deadline).getTime()
+      ? parseLocalDateTime(parsed.data.starts_at).getTime() - parseLocalDateTime(parsed.data.rsvp_deadline).getTime()
       : null;
 
     const cleanPickups = carpool ? pickups.map((p) => p.trim()).filter(Boolean) : [];
@@ -455,7 +464,7 @@ function NewSession() {
                   <p className="text-xs text-muted-foreground">
                     This will create <span className="font-medium text-foreground">{occurrenceCount}</span> session{occurrenceCount === 1 ? "" : "s"}
                     {occurrenceCount > 0 && (
-                      <> · last on {fmt(new Date(generateOccurrences(new Date(startsAt).toISOString(), null, repeat, repeatUntil).slice(-1)[0]?.startsAt ?? startsAt), "EEE d MMM")}</>
+                      <> · last on {fmt(new Date(generateOccurrences(parseLocalDateTime(startsAt).toISOString(), null, repeat, repeatUntil).slice(-1)[0]?.startsAt ?? startsAt), "EEE d MMM")}</>
                     )}.
                   </p>
                 )}

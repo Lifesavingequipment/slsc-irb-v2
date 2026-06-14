@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useConfirm } from "@/lib/confirm";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -105,6 +106,7 @@ export function TrainingPlanEditor({
   const [drills, setDrills] = useState<Drill[]>([]);
   const [templates, setTemplates] = useState<PlanTemplate[]>([]);
   const [pickTpl, setPickTpl] = useState("");
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -140,8 +142,11 @@ export function TrainingPlanEditor({
   const update = (i: number, patch: Partial<BlockDraft>) =>
     setBlocks((bs) => bs.map((b, idx) => (idx === i ? { ...b, ...patch } : b)));
   const add = () => setBlocks((bs) => [...bs, emptyBlock(bs.length)]);
-  const remove = (i: number) =>
+  const remove = async (i: number) => {
+    const ok = await confirm({ title: "Are you sure?", description: "This cannot be undone." });
+    if (!ok) return;
     setBlocks((bs) => bs.filter((_, idx) => idx !== i).map((b, idx) => ({ ...b, position: idx })));
+  };
   const move = (i: number, dir: -1 | 1) => {
     setBlocks((bs) => {
       const j = i + dir;
