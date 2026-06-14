@@ -122,6 +122,8 @@ function NewSession() {
   const [repeatUntil, setRepeatUntil] = useState("");
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [surveyTemplates, setSurveyTemplates] = useState<{ id: string; name: string; questions: DraftQ[] }[]>([]);
+  const [carpoolTemplates, setCarpoolTemplates] = useState<{ id: string; name: string; vehicles: { vehicle_name: string; available_seats: number; can_tow_trailer: boolean }[] }[]>([]);
 
   const occurrenceCount = useMemo(() => {
     if (repeat === "none" || !startsAt || !repeatUntil) return 1;
@@ -133,12 +135,14 @@ function NewSession() {
   useEffect(() => {
     if (!activeClub) return;
     (async () => {
-      const { data } = await supabase
-        .from("locations")
-        .select("id, name, address")
-        .eq("club_id", activeClub.club_id)
-        .order("name");
-      setLocations((data ?? []) as Loc[]);
+      const [locsRes, surveyRes, carpoolRes] = await Promise.all([
+        supabase.from("locations").select("id, name, address").eq("club_id", activeClub.club_id).order("name"),
+        supabase.from("survey_templates").select("id, name, questions").eq("club_id", activeClub.club_id).order("name"),
+        supabase.from("carpool_templates").select("id, name, vehicles").eq("club_id", activeClub.club_id).order("name"),
+      ]);
+      setLocations((locsRes.data ?? []) as Loc[]);
+      setSurveyTemplates((surveyRes.data ?? []) as typeof surveyTemplates);
+      setCarpoolTemplates((carpoolRes.data ?? []) as typeof carpoolTemplates);
     })();
   }, [activeClub?.club_id]);
 
@@ -467,6 +471,28 @@ function NewSession() {
             </div>
             {survey && (
               <div className="space-y-2">
+                {surveyTemplates.length > 0 && (
+                  <div className="space-y-1">
+                    <Select onValueChange={(id) => {
+                      const tpl = surveyTemplates.find((t) => t.id === id);
+                      if (tpl) setQuestions(tpl.questions.map((q) => ({
+                        question_text: q.question_text ?? "",
+                        question_type: (q.question_type ?? "yes_no") as QType,
+                        options: q.options ?? [],
+                        required: q.required ?? true,
+                      })));
+                    }}>
+                      <SelectTrigger className="h-9 text-sm">
+                        <SelectValue placeholder="Load saved survey…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {surveyTemplates.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 {questions.map((q, i) => (
                   <div key={i} className="rounded-md border p-2.5 space-y-2 bg-muted/20">
                     <div className="flex items-center gap-2">
@@ -547,6 +573,26 @@ function NewSession() {
                 }}
               />
             </div>
+            {carpool && carpoolTemplates.length > 0 && (
+              <Select onValueChange={(id) => {
+                const tpl = carpoolTemplates.find((t) => t.id === id);
+                if (tpl) setPendingVehicles(tpl.vehicles.map((v) => ({
+                  name: v.vehicle_name ?? "",
+                  seats: v.available_seats ?? 4,
+                  pickup: "",
+                  can_tow: v.can_tow_trailer ?? false,
+                })));
+              }}>
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Load saved carpool setup…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {carpoolTemplates.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             {carpool && user && (
               <CarpoolEditor
                 clubId={activeClub?.club_id ?? null}
@@ -555,6 +601,7 @@ function NewSession() {
                 value={carpools}
                 onChange={setCarpools}
                 defaultDeparture={startsAt}
+                savedLocations={(locations ?? []) as { id: string; name: string; address: string | null }[]}
               />
             )}
             {carpool && (

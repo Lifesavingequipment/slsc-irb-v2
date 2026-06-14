@@ -102,6 +102,7 @@ function EditSession() {
   const [pendingVehicles, setPendingVehicles] = useState<VehicleDraft[]>([]);
   const [newVehicle, setNewVehicle] = useState<VehicleDraft>({ name: "", seats: 8, pickup: "", can_tow: false });
   const [savedLocations, setSavedLocations] = useState<{ id: string; name: string; address: string | null }[]>([]);
+  const [carpoolTemplates, setCarpoolTemplates] = useState<{ id: string; name: string; vehicles: { vehicle_name: string; available_seats: number; can_tow_trailer: boolean }[] }[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -125,13 +126,13 @@ function EditSession() {
       setPickups([...(data.carpool_pickups ?? []), ""]);
       setTrailers(data.trailers_required ?? 0);
 
-      const { data: locs } = await supabase
-        .from("locations")
-        .select("id, name, address")
-        .eq("club_id", data.club_id)
-        .order("name");
-      setLocations((locs ?? []) as Loc[]);
-      setSavedLocations((locs ?? []) as { id: string; name: string; address: string | null }[]);
+      const [locsRes, carpoolTplRes] = await Promise.all([
+        supabase.from("locations").select("id, name, address").eq("club_id", data.club_id).order("name"),
+        supabase.from("carpool_templates").select("id, name, vehicles").eq("club_id", data.club_id).order("name"),
+      ]);
+      setLocations((locsRes.data ?? []) as Loc[]);
+      setSavedLocations((locsRes.data ?? []) as { id: string; name: string; address: string | null }[]);
+      setCarpoolTemplates((carpoolTplRes.data ?? []) as typeof carpoolTemplates);
 
       const { data: cvs } = await supabase
         .from("session_club_vehicles")
@@ -449,6 +450,26 @@ function EditSession() {
                 }}
               />
             </div>
+            {carpool && carpoolTemplates.length > 0 && (
+              <Select onValueChange={(id) => {
+                const tpl = carpoolTemplates.find((t) => t.id === id);
+                if (tpl) setPendingVehicles(tpl.vehicles.map((v) => ({
+                  name: v.vehicle_name ?? "",
+                  seats: v.available_seats ?? 4,
+                  pickup: "",
+                  can_tow: v.can_tow_trailer ?? false,
+                })));
+              }}>
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Load saved carpool setup…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {carpoolTemplates.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             {carpool && user && (
               <CarpoolEditor
                 clubId={clubId ?? activeClub?.club_id ?? null}
@@ -457,6 +478,7 @@ function EditSession() {
                 value={carpools}
                 onChange={setCarpools}
                 defaultDeparture={startsAt}
+                savedLocations={savedLocations}
               />
             )}
             {carpool && (
