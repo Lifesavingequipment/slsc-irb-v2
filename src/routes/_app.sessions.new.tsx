@@ -21,6 +21,7 @@ import { CarpoolEditor, validateCarpoolDrafts, emptyCarpoolDraft, type CarpoolDr
 import { CoachSetupSection, type VehicleDraft } from "@/components/session/CoachSetupSection";
 import { invalidateSessionsCache } from "./_app.sessions.index";
 import { addDays, addMonths, addWeeks, format as fmt } from "date-fns";
+import { notifyAllClubMembers } from "@/lib/notify";
 import { Badge } from "@/components/ui/badge";
 
 type QType = "yes_no" | "text" | "single_choice";
@@ -303,6 +304,18 @@ function NewSession() {
     setBusy(false);
     invalidateSessionsCache(activeClub.club_id);
     toast.success(insertedSessions.length > 1 ? `${insertedSessions.length} sessions created` : "Session created");
+
+    // Notify all active club members about the new session(s)
+    for (const s of insertedSessions) {
+      void notifyAllClubMembers({
+        club_id: activeClub.club_id,
+        type: "session_created",
+        title: `New session: ${parsed.data.title}`,
+        body: fmt(new Date(s.starts_at), "EEE d MMM 'at' h:mma"),
+        link: `/sessions/${s.id}`,
+      });
+    }
+
     navigate({ to: "/sessions" });
   };
 

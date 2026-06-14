@@ -10,6 +10,7 @@ import { Lock, Share2, Shuffle, Trash2, Users, X, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { buildNameMap, memberFullName } from "@/lib/names";
+import { notifyMembers } from "@/lib/notify";
 
 type Props = {
   sessionId: string;
@@ -398,6 +399,16 @@ export function WavePanel({
       if (navigator.share) await navigator.share({ text, title: sessionTitle });
       else { await navigator.clipboard.writeText(text); toast.success("Copied to clipboard"); }
     } catch { /* user cancelled */ }
+
+    if (canManage && goingIds.length > 0) {
+      void notifyMembers(goingIds, {
+        club_id: clubId,
+        type: "wave_draw_published",
+        title: "Wave draw is ready",
+        body: `${sessionTitle} — tap to see your wave`,
+        link: `/sessions/${sessionId}?tab=waves`,
+      });
+    }
   };
 
   // ── Read-only view ──

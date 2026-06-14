@@ -19,6 +19,7 @@ import { X, Trash2, Search, ChevronRight, ChevronDown, Users, UserPlus, Handshak
 import { EmptyState } from "@/components/ui/empty-state";
 import { buildNameMap, memberFullName } from "@/lib/names";
 import { roleBadgeClass, roleLabel } from "@/lib/role-colors";
+import { notifyMembers } from "@/lib/notify";
 import { InviteShareCard } from "@/components/members/InviteShareCard";
 import { useRefetchOnFocus } from "@/hooks/use-refetch-on-focus";
 import { useConfirm } from "@/lib/confirm";
@@ -444,6 +445,23 @@ function PartnersPanel({
     });
     if (error) { toast.error(error.message); return; }
     toast.success("Pair created");
+
+    // Notify each member who they're paired with
+    void notifyMembers([driver], {
+      club_id: clubId,
+      type: "partner_assigned",
+      title: "Preferred partner set",
+      body: `You've been paired with ${nameOf(crew)}`,
+      link: `/members/${crew}`,
+    });
+    void notifyMembers([crew], {
+      club_id: clubId,
+      type: "partner_assigned",
+      title: "Preferred partner set",
+      body: `You've been paired with ${nameOf(driver)}`,
+      link: `/members/${driver}`,
+    });
+
     if (canManageAll) setDriver("");
     setCrew("");
     onChange();

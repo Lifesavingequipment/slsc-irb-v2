@@ -15,6 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { NotificationBell } from "@/components/NotificationBell";
 
 const navItems = [
   { to: "/dashboard", label: "Home", icon: Home },
@@ -167,6 +168,8 @@ export function AppShell({ title, action, children }: {
             </div>
 
             {action && <div className="shrink-0">{action}</div>}
+
+            <NotificationBell />
 
             {/* Avatar / account dropdown */}
             <DropdownMenu>

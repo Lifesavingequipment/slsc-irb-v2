@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { buildNameMap } from "@/lib/names";
+import { notifyGoingMembers } from "@/lib/notify";
 
 export const Route = createFileRoute("/_app/sessions/$sessionId/carpool")({
   head: () => ({ meta: [{ title: "Carpool — IRB Coaching" }] }),
@@ -184,6 +185,14 @@ function CarpoolPage() {
     toast.success("Ride offered");
     setOfferOpen(false);
     load();
+
+    void notifyGoingMembers(sessionId, {
+      club_id: session.club_id,
+      type: "carpool_update",
+      title: "Carpool updated",
+      body: session.title,
+      link: `/sessions/${sessionId}/carpool`,
+    });
   };
 
   const cancelCarpool = async (id: string) => {
@@ -207,6 +216,14 @@ function CarpoolPage() {
     toast.success("Ride updated");
     setEditCarpool(null);
     load();
+
+    void notifyGoingMembers(sessionId, {
+      club_id: session.club_id,
+      type: "carpool_update",
+      title: "Carpool updated",
+      body: session.title,
+      link: `/sessions/${sessionId}/carpool`,
+    });
   };
 
 
