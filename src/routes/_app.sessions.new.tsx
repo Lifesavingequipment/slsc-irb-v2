@@ -593,17 +593,6 @@ function NewSession() {
                 </SelectContent>
               </Select>
             )}
-            {carpool && user && (
-              <CarpoolEditor
-                clubId={activeClub?.club_id ?? null}
-                currentUserId={user.id}
-                canPickAnyDriver={canManage}
-                value={carpools}
-                onChange={setCarpools}
-                defaultDeparture={startsAt}
-                savedLocations={(locations ?? []) as { id: string; name: string; address: string | null }[]}
-              />
-            )}
             {carpool && (
               <CoachSetupSection
                 pickups={pickups}
@@ -620,6 +609,17 @@ function NewSession() {
                   setPendingVehicles((v) => [...v, newVehicle]);
                   setNewVehicle({ name: "", seats: 8, pickup: "", can_tow: false });
                 }}
+              />
+            )}
+            {carpool && user && (
+              <CarpoolEditor
+                clubId={activeClub?.club_id ?? null}
+                currentUserId={user.id}
+                canPickAnyDriver={canManage}
+                value={carpools}
+                onChange={setCarpools}
+                defaultDeparture={startsAt}
+                savedLocations={(locations ?? []) as { id: string; name: string; address: string | null }[]}
               />
             )}
           </div>
