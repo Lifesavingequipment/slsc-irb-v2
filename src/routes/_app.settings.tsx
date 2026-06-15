@@ -20,8 +20,11 @@ import {
 import { LocationsSection } from "@/components/settings/LocationsSection";
 import {
   LogOut, Plus, Trash2, ShieldAlert, HeartPulse, User, Mail, KeyRound,
-  Bell, MapPin, GripVertical, ChevronDown,
+  Bell, MapPin, GripVertical, ChevronDown, MessageSquare,
 } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useConfirm } from "@/lib/confirm";
 
@@ -811,6 +814,8 @@ function SettingsPage() {
         </Card>
       )}
 
+      <FeedbackCard clubId={activeClubId ?? null} userId={user?.id ?? null} />
+
       <div className="space-y-3">
         {order.map((key) => renderSection(key))}
       </div>
@@ -820,6 +825,103 @@ function SettingsPage() {
   );
 }
 
+
+type FeedbackCategory = "bug" | "suggestion" | "question";
+
+function FeedbackCard({ clubId, userId }: { clubId: string | null; userId: string | null }) {
+  const [open, setOpen] = useState(false);
+  const [category, setCategory] = useState<FeedbackCategory>("suggestion");
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    if (!userId || message.trim().length < 20) {
+      toast.error("Message must be at least 20 characters.");
+      return;
+    }
+    setSubmitting(true);
+    const { error } = await supabase.from("feedback").insert({
+      club_id: clubId,
+      submitted_by: userId,
+      category,
+      message: message.trim(),
+    });
+    setSubmitting(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Feedback sent — thank you!");
+    setOpen(false);
+    setMessage("");
+    setCategory("suggestion");
+  };
+
+  return (
+    <>
+      <Card className="p-3 mb-3">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex w-full items-center gap-3 text-left"
+        >
+          <MessageSquare className="h-4 w-4 text-primary" />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold">Send Feedback</div>
+            <div className="text-xs text-muted-foreground">Report a bug, suggest a feature, or ask a question.</div>
+          </div>
+          <ChevronDown className="h-4 w-4 -rotate-90 text-muted-foreground" />
+        </button>
+      </Card>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Feedback</DialogTitle>
+            <DialogDescription>We read every submission. Thank you for helping improve the app.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <div className="space-y-1.5">
+              <Label>Category</Label>
+              <div className="flex gap-2">
+                {(["bug", "suggestion", "question"] as FeedbackCategory[]).map((c) => {
+                  const emoji = c === "bug" ? "🐛" : c === "suggestion" ? "💡" : "❓";
+                  const label = c.charAt(0).toUpperCase() + c.slice(1);
+                  return (
+                    <Button
+                      key={c}
+                      type="button"
+                      variant={category === c ? "default" : "outline"}
+                      className="flex-1 gap-1"
+                      onClick={() => setCategory(c)}
+                    >
+                      {emoji} {label}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="fb-msg">Message</Label>
+              <Textarea
+                id="fb-msg"
+                rows={4}
+                placeholder="Describe your bug, idea, or question… (min 20 characters)"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">{message.trim().length} / 20 characters minimum</p>
+            </div>
+            <Button
+              className="w-full"
+              disabled={submitting || message.trim().length < 20}
+              onClick={submit}
+            >
+              {submitting ? "Sending…" : "Submit feedback"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 
 function SignOutButton({ onConfirm }: { onConfirm: () => void }) {
   const [open, setOpen] = useState(false);

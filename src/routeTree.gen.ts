@@ -16,9 +16,11 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppSessionsRouteImport } from './routes/_app.sessions'
+import { Route as AppOwnerRouteImport } from './routes/_app.owner'
 import { Route as AppLocationsRouteImport } from './routes/_app.locations'
 import { Route as AppEquipmentRouteImport } from './routes/_app.equipment'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppChatRouteImport } from './routes/_app.chat'
 import { Route as AppAttendanceRouteImport } from './routes/_app.attendance'
 import { Route as AppAdminRouteImport } from './routes/_app.admin'
 import { Route as AppSessionsIndexRouteImport } from './routes/_app.sessions.index'
@@ -79,6 +81,11 @@ const AppSessionsRoute = AppSessionsRouteImport.update({
   path: '/sessions',
   getParentRoute: () => AppRoute,
 } as any)
+const AppOwnerRoute = AppOwnerRouteImport.update({
+  id: '/owner',
+  path: '/owner',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppLocationsRoute = AppLocationsRouteImport.update({
   id: '/locations',
   path: '/locations',
@@ -92,6 +99,11 @@ const AppEquipmentRoute = AppEquipmentRouteImport.update({
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppChatRoute = AppChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAttendanceRoute = AppAttendanceRouteImport.update({
@@ -232,9 +244,11 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/admin': typeof AppAdminRoute
   '/attendance': typeof AppAttendanceRoute
+  '/chat': typeof AppChatRoute
   '/dashboard': typeof AppDashboardRoute
   '/equipment': typeof AppEquipmentRouteWithChildren
   '/locations': typeof AppLocationsRoute
+  '/owner': typeof AppOwnerRoute
   '/sessions': typeof AppSessionsRouteWithChildren
   '/settings': typeof AppSettingsRoute
   '/admin/audit': typeof AppAdminAuditRoute
@@ -268,8 +282,10 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/admin': typeof AppAdminRoute
   '/attendance': typeof AppAttendanceRoute
+  '/chat': typeof AppChatRoute
   '/dashboard': typeof AppDashboardRoute
   '/locations': typeof AppLocationsRoute
+  '/owner': typeof AppOwnerRoute
   '/settings': typeof AppSettingsRoute
   '/admin/audit': typeof AppAdminAuditRoute
   '/equipment/$equipmentId': typeof AppEquipmentEquipmentIdRoute
@@ -303,9 +319,11 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/_app/admin': typeof AppAdminRoute
   '/_app/attendance': typeof AppAttendanceRoute
+  '/_app/chat': typeof AppChatRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/equipment': typeof AppEquipmentRouteWithChildren
   '/_app/locations': typeof AppLocationsRoute
+  '/_app/owner': typeof AppOwnerRoute
   '/_app/sessions': typeof AppSessionsRouteWithChildren
   '/_app/settings': typeof AppSettingsRoute
   '/_app/admin_/audit': typeof AppAdminAuditRoute
@@ -341,9 +359,11 @@ export interface FileRouteTypes {
     | '/signup'
     | '/admin'
     | '/attendance'
+    | '/chat'
     | '/dashboard'
     | '/equipment'
     | '/locations'
+    | '/owner'
     | '/sessions'
     | '/settings'
     | '/admin/audit'
@@ -377,8 +397,10 @@ export interface FileRouteTypes {
     | '/signup'
     | '/admin'
     | '/attendance'
+    | '/chat'
     | '/dashboard'
     | '/locations'
+    | '/owner'
     | '/settings'
     | '/admin/audit'
     | '/equipment/$equipmentId'
@@ -411,9 +433,11 @@ export interface FileRouteTypes {
     | '/signup'
     | '/_app/admin'
     | '/_app/attendance'
+    | '/_app/chat'
     | '/_app/dashboard'
     | '/_app/equipment'
     | '/_app/locations'
+    | '/_app/owner'
     | '/_app/sessions'
     | '/_app/settings'
     | '/_app/admin_/audit'
@@ -500,6 +524,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSessionsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/owner': {
+      id: '/_app/owner'
+      path: '/owner'
+      fullPath: '/owner'
+      preLoaderRoute: typeof AppOwnerRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/locations': {
       id: '/_app/locations'
       path: '/locations'
@@ -519,6 +550,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/chat': {
+      id: '/_app/chat'
+      path: '/chat'
+      fullPath: '/chat'
+      preLoaderRoute: typeof AppChatRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/attendance': {
@@ -759,9 +797,11 @@ const AppMembersMemberIdRouteWithChildren =
 interface AppRouteChildren {
   AppAdminRoute: typeof AppAdminRoute
   AppAttendanceRoute: typeof AppAttendanceRoute
+  AppChatRoute: typeof AppChatRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppEquipmentRoute: typeof AppEquipmentRouteWithChildren
   AppLocationsRoute: typeof AppLocationsRoute
+  AppOwnerRoute: typeof AppOwnerRoute
   AppSessionsRoute: typeof AppSessionsRouteWithChildren
   AppSettingsRoute: typeof AppSettingsRoute
   AppAdminAuditRoute: typeof AppAdminAuditRoute
@@ -778,9 +818,11 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppAdminRoute: AppAdminRoute,
   AppAttendanceRoute: AppAttendanceRoute,
+  AppChatRoute: AppChatRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppEquipmentRoute: AppEquipmentRouteWithChildren,
   AppLocationsRoute: AppLocationsRoute,
+  AppOwnerRoute: AppOwnerRoute,
   AppSessionsRoute: AppSessionsRouteWithChildren,
   AppSettingsRoute: AppSettingsRoute,
   AppAdminAuditRoute: AppAdminAuditRoute,

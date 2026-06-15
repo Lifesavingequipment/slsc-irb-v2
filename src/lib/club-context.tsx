@@ -44,7 +44,7 @@ export function ClubProvider({ children }: { children: ReactNode }) {
         .from("club_memberships")
         .select("club_id, status, club:clubs(id, name:club_name, location:state_region)")
         .eq("user_id", user.id),
-      supabase.from("user_roles").select("club_id, role").eq("user_id", user.id),
+      supabase.from("club_roles").select("club_id, role").eq("user_id", user.id),
       supabase
         .from("platform_owners")
         .select("user_id", { head: true, count: "exact" })
