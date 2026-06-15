@@ -186,6 +186,7 @@ function Onboarding() {
           first_name: firstName,
           last_name: lastName,
           email: user.email ?? "",
+          membership_status: "pending",
         });
       }
     }
