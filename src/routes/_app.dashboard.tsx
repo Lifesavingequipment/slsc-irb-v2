@@ -8,7 +8,7 @@ import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, Plus, Users, ShieldCheck, Shield, ClipboardList, CheckCircle2, Dumbbell } from "lucide-react";
+import { Calendar, MapPin, Plus, Users, UserPlus, Shield, ClipboardList, CheckCircle2, Dumbbell } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useIsPlatformOwner } from "@/lib/platform-owner";
 import { useRefetchOnFocus } from "@/hooks/use-refetch-on-focus";
@@ -54,10 +54,10 @@ function Dashboard() {
         .or(`ends_at.gte.${nowIso},and(ends_at.is.null,starts_at.gte.${nowIso})`)
         .order("starts_at", { ascending: true })
         .limit(5),
-      supabase.from("club_memberships").select("id", { count: "exact", head: true })
-        .eq("club_id", activeClub.club_id).eq("status", "approved"),
-      supabase.from("club_memberships").select("id", { count: "exact", head: true })
-        .eq("club_id", activeClub.club_id).eq("status", "pending"),
+      supabase.from("members").select("id", { count: "exact", head: true })
+        .eq("club_id", activeClub.club_id).eq("membership_status", "active"),
+      supabase.from("members").select("id", { count: "exact", head: true })
+        .eq("club_id", activeClub.club_id).eq("membership_status", "pending"),
       supabase.from("session_rsvps").select("session_id, status").eq("user_id", user.id),
       supabase.from("sessions")
         .select("id, session_type, survey_enabled")
@@ -191,15 +191,15 @@ function Dashboard() {
       )}
 
       {isAdmin && pendingCount !== null && pendingCount > 0 && (
-        <Card className="mb-5 p-4 border-warning/40 bg-warning/10">
+        <Card className="mb-5 p-4 rounded-xl border-l-4 border-l-warning border-warning/20 bg-warning/5">
           <div className="flex items-start gap-3">
-            <ShieldCheck className="h-5 w-5 text-warning shrink-0 mt-0.5" />
+            <UserPlus className="h-5 w-5 text-warning shrink-0 mt-0.5" />
             <div className="flex-1">
-              <div className="font-medium">{pendingCount} join request{pendingCount === 1 ? "" : "s"} waiting</div>
-              <p className="text-sm text-muted-foreground">Review and approve members.</p>
+              <div className="font-medium">{pendingCount} member request{pendingCount === 1 ? "" : "s"} pending approval</div>
+              <p className="text-sm text-muted-foreground">Review and approve new members to give them access</p>
             </div>
             <Button asChild size="sm" variant="secondary">
-              <Link to="/members" search={{ tab: "pending" }}>Review</Link>
+              <Link to="/members" search={{ tab: "pending" }}>Review now</Link>
             </Button>
           </div>
         </Card>
