@@ -310,18 +310,18 @@ function EditSession() {
     navigate({ to: "/sessions/$sessionId", params: { sessionId } });
   };
 
-  const addLocation = async () => {
+  const saveCustomLocation = async () => {
     const targetClub = clubId ?? activeClub?.club_id;
     if (!targetClub) return;
-    const name = prompt("Location name (e.g. North Beach)")?.trim();
+    const name = customLocation.trim();
     if (!name) return;
-    const address = prompt("Address (optional)")?.trim() || null;
     const { data, error } = await supabase.from("locations")
-      .insert({ club_id: targetClub, name, address, created_by: user?.id ?? null })
+      .insert({ club_id: targetClub, name, address: null, created_by: user?.id ?? null })
       .select("id, name, address")
       .single();
     if (error) { toast.error(error.message); return; }
     setLocations((prev) => [...prev, data as Loc].sort((a, b) => a.name.localeCompare(b.name)));
+    setSavedLocations((prev) => [...prev, data as Loc].sort((a, b) => a.name.localeCompare(b.name)));
     setLocationId(data!.id);
     toast.success("Location saved");
   };
@@ -382,16 +382,19 @@ function EditSession() {
                 <SelectItem value="custom">Custom address…</SelectItem>
               </SelectContent>
             </Select>
-            {locationId === "custom" ? (
-              <Input
-                value={customLocation}
-                onChange={(e) => setCustomLocation(e.target.value)}
-                placeholder="Type address or place name"
-              />
-            ) : (
-              <Button type="button" variant="ghost" size="sm" onClick={addLocation} className="h-7 px-2 text-xs">
-                + Save a new location
-              </Button>
+            {locationId === "custom" && (
+              <>
+                <Input
+                  value={customLocation}
+                  onChange={(e) => setCustomLocation(e.target.value)}
+                  placeholder="Type address or place name"
+                />
+                {customLocation.trim() && (
+                  <Button type="button" variant="ghost" size="sm" onClick={saveCustomLocation} className="h-7 px-2 text-xs">
+                    + Save this location
+                  </Button>
+                )}
+              </>
             )}
           </div>
 

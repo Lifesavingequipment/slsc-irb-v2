@@ -328,13 +328,12 @@ function NewSession() {
     navigate({ to: "/sessions" });
   };
 
-  const addLocation = async () => {
+  const saveCustomLocation = async () => {
     if (!activeClub) return;
-    const name = prompt("Location name (e.g. North Beach)")?.trim();
+    const name = customLocation.trim();
     if (!name) return;
-    const address = prompt("Address (optional)")?.trim() || null;
     const { data, error } = await supabase.from("locations")
-      .insert({ club_id: activeClub.club_id, name, address, created_by: user?.id ?? null })
+      .insert({ club_id: activeClub.club_id, name, address: null, created_by: user?.id ?? null })
       .select("id, name, address")
       .single();
     if (error) { toast.error(error.message); return; }
@@ -404,16 +403,19 @@ function NewSession() {
                 </SelectContent>
               </Select>
             )}
-            {locationId === "custom" ? (
-              <Input
-                value={customLocation}
-                onChange={(e) => setCustomLocation(e.target.value)}
-                placeholder="Type address or place name"
-              />
-            ) : (
-              <Button type="button" variant="ghost" size="sm" onClick={addLocation} className="h-7 px-2 text-xs">
-                + Save a new location
-              </Button>
+            {locationId === "custom" && (
+              <>
+                <Input
+                  value={customLocation}
+                  onChange={(e) => setCustomLocation(e.target.value)}
+                  placeholder="Type address or place name"
+                />
+                {customLocation.trim() && (
+                  <Button type="button" variant="ghost" size="sm" onClick={saveCustomLocation} className="h-7 px-2 text-xs">
+                    + Save this location
+                  </Button>
+                )}
+              </>
             )}
           </div>
 
