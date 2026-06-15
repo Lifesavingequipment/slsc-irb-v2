@@ -289,7 +289,7 @@ function MembersPageInner({
         <InviteShareCard
           clubId={activeClubId}
           clubName={clubName}
-          canManage={canManage}
+          canManage={isAdmin}
           isAdmin={isAdmin}
           currentUserId={currentUserId}
         />
@@ -518,7 +518,7 @@ function PartnersPanel({
           {canManageAll ? "Create partner pair" : "Add a teammate"}
         </div>
         <p className="text-xs text-muted-foreground">
-          You can pair with multiple people — add one pair at a time.
+          Set a preferred partner for wave draw auto-pairing.
         </p>
         <Select value={driver} onValueChange={setDriver} disabled={!canManageAll}>
           <SelectTrigger className="h-9"><SelectValue placeholder="Driver…" /></SelectTrigger>

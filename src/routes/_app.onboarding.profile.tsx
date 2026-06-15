@@ -134,20 +134,22 @@ function PendingProfile() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="bg-surf-gradient text-primary-foreground safe-top px-6 pt-10 pb-12">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-white/15 flex items-center justify-center">
-            <Waves className="h-5 w-5" />
+      <div className="bg-white border-b safe-top px-6 pt-10 pb-6">
+        <div className="flex items-center gap-3 max-w-2xl mx-auto">
+          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Waves className="h-5 w-5 text-primary" />
           </div>
-          <div className="font-semibold">IRB Coaching</div>
+          <div className="font-semibold text-foreground">IRB Coaching</div>
         </div>
-        <h1 className="mt-8 text-2xl font-bold">Finish your profile</h1>
-        <p className="mt-1 text-sm opacity-90">
-          Fill this in while you wait for approval — you'll be ready to go the moment an admin lets you in.
-        </p>
+        <div className="max-w-2xl mx-auto mt-6">
+          <h1 className="text-2xl font-bold text-foreground">Finish your profile</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Fill this in while you wait for approval — you'll be ready to go the moment an admin lets you in.
+          </p>
+        </div>
       </div>
 
-      <div className="px-4 -mt-6 max-w-2xl mx-auto pb-10">
+      <div className="px-4 mt-6 max-w-2xl mx-auto pb-10">
         <Link to="/onboarding" className="inline-flex items-center text-sm text-muted-foreground mb-2">
           <ChevronLeft className="h-4 w-4" /> Back
         </Link>

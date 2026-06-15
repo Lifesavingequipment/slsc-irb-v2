@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { useClub, useIsAdmin } from "@/lib/club-context";
 import { useCoachPermissions } from "@/lib/coach-permissions";
+import { useConfirm } from "@/lib/confirm";
 import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,7 @@ type Drill = { id: string; name: string; description: string | null; default_dur
 
 function DrillsTab({ clubId }: { clubId: string }) {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [items, setItems] = useState<Drill[]>([]);
   const [editing, setEditing] = useState<Drill | null>(null);
   const [open, setOpen] = useState(false);
@@ -94,10 +96,11 @@ function DrillsTab({ clubId }: { clubId: string }) {
   };
 
   const remove = async (id: string) => {
-    if (!confirm("Delete this drill?")) return;
+    const ok = await confirm({ title: "Remove this drill?", description: "This drill will be permanently deleted.", confirmText: "Remove" });
+    if (!ok) return;
     const { error } = await supabase.from("training_drills").delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
-    toast.success("Deleted"); load();
+    toast.success("Removed"); load();
   };
 
   return (
@@ -145,6 +148,7 @@ type PlanTpl = { id: string; name: string; description: string | null; blocks: a
 
 function PlansTab({ clubId }: { clubId: string }) {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [items, setItems] = useState<PlanTpl[]>([]);
   const [editing, setEditing] = useState<PlanTpl | null>(null);
   const [open, setOpen] = useState(false);
@@ -178,10 +182,11 @@ function PlansTab({ clubId }: { clubId: string }) {
   };
 
   const remove = async (id: string) => {
-    if (!confirm("Delete this template?")) return;
+    const ok = await confirm({ title: "Remove this template?", description: "This plan template will be permanently deleted.", confirmText: "Remove" });
+    if (!ok) return;
     const { error } = await supabase.from("training_plan_templates").delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
-    toast.success("Deleted"); load();
+    toast.success("Removed"); load();
   };
 
   return (
@@ -229,6 +234,7 @@ type SurveyTpl = { id: string; name: string; questions: any[] };
 
 function SurveysTab({ clubId }: { clubId: string }) {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [items, setItems] = useState<SurveyTpl[]>([]);
   const [editing, setEditing] = useState<SurveyTpl | null>(null);
   const [open, setOpen] = useState(false);
@@ -275,10 +281,11 @@ function SurveysTab({ clubId }: { clubId: string }) {
   };
 
   const remove = async (id: string) => {
-    if (!confirm("Delete this template?")) return;
+    const ok = await confirm({ title: "Remove this template?", description: "This survey template will be permanently deleted.", confirmText: "Remove" });
+    if (!ok) return;
     const { error } = await supabase.from("survey_templates").delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
-    toast.success("Deleted"); load();
+    toast.success("Removed"); load();
   };
 
   return (
@@ -353,6 +360,7 @@ type CarpoolTpl = { id: string; name: string; vehicles: any[] };
 
 function CarpoolTab({ clubId }: { clubId: string }) {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [items, setItems] = useState<CarpoolTpl[]>([]);
   const [editing, setEditing] = useState<CarpoolTpl | null>(null);
   const [open, setOpen] = useState(false);
@@ -390,10 +398,11 @@ function CarpoolTab({ clubId }: { clubId: string }) {
   };
 
   const remove = async (id: string) => {
-    if (!confirm("Delete this template?")) return;
+    const ok = await confirm({ title: "Remove this template?", description: "This carpool template will be permanently deleted.", confirmText: "Remove" });
+    if (!ok) return;
     const { error } = await supabase.from("carpool_templates").delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
-    toast.success("Deleted"); load();
+    toast.success("Removed"); load();
   };
 
   return (

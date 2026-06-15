@@ -88,7 +88,7 @@ export function LocationsSection() {
     if (!ok) return;
     const { error } = await supabase.from("locations").delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
-    toast.success("Deleted");
+    toast.success("Removed");
     refresh();
   };
 
