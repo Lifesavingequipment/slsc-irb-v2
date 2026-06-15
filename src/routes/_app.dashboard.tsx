@@ -12,6 +12,7 @@ import { Calendar, MapPin, Plus, Users, ShieldCheck, Shield, ClipboardList, Chec
 import { EmptyState } from "@/components/ui/empty-state";
 import { useIsPlatformOwner } from "@/lib/platform-owner";
 import { useRefetchOnFocus } from "@/hooks/use-refetch-on-focus";
+import { useMemberFirstName } from "@/hooks/useMemberFirstName";
 
 export const Route = createFileRoute("/_app/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — IRB Coaching" }] }),
@@ -28,6 +29,7 @@ function Dashboard() {
   const canManage = useCanManage();
   const isAdmin = useIsAdmin();
   const isPlatformOwner = useIsPlatformOwner();
+  const firstName = useMemberFirstName();
 
   const [upcoming, setUpcoming] = useState<Upcoming[]>([]);
   const [memberCount, setMemberCount] = useState<number | null>(null);
@@ -125,7 +127,7 @@ function Dashboard() {
   return (
     <AppShell>
       <div className="mb-5">
-        <p className="text-sm text-muted-foreground">Welcome back</p>
+        <p className="text-sm text-muted-foreground">{firstName ? `Welcome back, ${firstName}` : "Welcome back"}</p>
         <h1 className="text-2xl font-bold tracking-tight">{activeClub.club.name}</h1>
       </div>
 

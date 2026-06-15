@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useChatUnread } from "@/hooks/useChatUnread";
+import { useMemberFirstName } from "@/hooks/useMemberFirstName";
 
 const navItems = [
   { to: "/dashboard", label: "Home", icon: Home },
@@ -35,8 +36,9 @@ export function AppShell({ title, action, children }: {
   const { user } = useAuth();
   const chatUnread = useChatUnread();
   const location = useLocation();
+  const firstName = useMemberFirstName();
   const approved = memberships.filter((m) => m.status === "approved");
-  const userInitial = (user?.email ?? "?").trim().charAt(0).toUpperCase();
+  const userInitial = firstName ? firstName[0].toUpperCase() : (user?.email ?? "?").trim().charAt(0).toUpperCase();
 
   return (
     <div className="min-h-screen bg-[#f9fafb] flex">
