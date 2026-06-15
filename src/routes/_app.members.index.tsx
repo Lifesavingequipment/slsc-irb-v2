@@ -85,7 +85,7 @@ function MembersPage() {
     // Load all members for this club directly (includes test members without auth accounts)
     const { data: memberData } = await supabase
       .from("members")
-      .select("id, auth_user_id, email, first_name, last_name, preferred_name, phone, driver_flag, crew_flag, patient_flag")
+      .select("id, auth_user_id, email, first_name, last_name, preferred_name, phone, driver_flag, crew_flag, patient_flag, membership_status")
       .eq("club_id", activeClub.club_id);
 
     // Load club_memberships for status (pending/approved/rejected) keyed by auth user id
@@ -101,7 +101,7 @@ function MembersPage() {
         id: m.id,
         membership_id: membership?.id ?? null,
         user_id: m.auth_user_id ?? m.id,
-        status: (membership?.status as Row["status"]) ?? "approved",
+        status: (membership?.status as Row["status"]) ?? (m.membership_status as Row["status"]) ?? "approved",
         email: m.email ?? null,
         profile: {
           first_name: m.first_name,
@@ -130,6 +130,8 @@ function MembersPage() {
       }
     }
 
+    const pendingRows = nextRows.filter((r) => r.status === "pending");
+    console.log("[Members] pendingRows", pendingRows);
     setRows(nextRows);
 
     const { data: r } = await supabase
@@ -371,7 +373,7 @@ function MembersPageInner({
             <EmptyState
               icon={<UserPlus className="h-5 w-5" />}
               title="No pending requests"
-              description="When someone uses your invite code to join, their request will land here for an admin to approve."
+              description="Members who request to join will appear here for approval"
             />
           )}
           {pending.map((m) => {
