@@ -49,6 +49,7 @@ type Row = {
   membership_id: string | null; // club_memberships.id (null for members without auth accounts)
   user_id: string;              // auth_user_id if present, else members.id as fallback key
   status: "pending" | "approved" | "rejected";
+  email: string | null;
   profile: {
     first_name: string | null;
     last_name: string | null;
@@ -84,7 +85,7 @@ function MembersPage() {
     // Load all members for this club directly (includes test members without auth accounts)
     const { data: memberData } = await supabase
       .from("members")
-      .select("id, auth_user_id, first_name, last_name, preferred_name, phone, driver_flag, crew_flag, patient_flag")
+      .select("id, auth_user_id, email, first_name, last_name, preferred_name, phone, driver_flag, crew_flag, patient_flag")
       .eq("club_id", activeClub.club_id);
 
     // Load club_memberships for status (pending/approved/rejected) keyed by auth user id
@@ -101,6 +102,7 @@ function MembersPage() {
         membership_id: membership?.id ?? null,
         user_id: m.auth_user_id ?? m.id,
         status: (membership?.status as Row["status"]) ?? "approved",
+        email: m.email ?? null,
         profile: {
           first_name: m.first_name,
           last_name: m.last_name,
@@ -113,22 +115,16 @@ function MembersPage() {
       };
     });
 
-    // Fallback: ensure the current auth user is represented even if their members row is missing
-    const { data: meAuth } = await supabase.auth.getUser();
-    const meId = meAuth.user?.id ?? null;
-    if (meId && !nextRows.some((r) => r.user_id === meId)) {
-      const { data: selfMem } = await supabase
-        .from("club_memberships")
-        .select("id, user_id, status")
-        .eq("club_id", activeClub.club_id)
-        .eq("user_id", meId)
-        .maybeSingle();
-      if (selfMem) {
+    // Fallback: add any pending memberships that have no members row so they show on the Pending tab
+    const representedUserIds = new Set(nextRows.map((r) => r.user_id));
+    for (const mem of mems ?? []) {
+      if (mem.status === "pending" && !representedUserIds.has(mem.user_id)) {
         nextRows.push({
-          id: selfMem.id,
-          membership_id: selfMem.id,
-          user_id: meId,
-          status: selfMem.status as Row["status"],
+          id: mem.id,
+          membership_id: mem.id,
+          user_id: mem.user_id,
+          status: "pending",
+          email: null,
           profile: null,
         });
       }
@@ -378,13 +374,17 @@ function MembersPageInner({
               description="When someone uses your invite code to join, their request will land here for an admin to approve."
             />
           )}
-          {pending.map((m) => (
+          {pending.map((m) => {
+            const name = memberFullName(m.profile, "");
+            const displayLabel = name || m.email || display(m.id);
+            return (
             <Card key={m.id} className="p-4">
               <div className="flex items-center gap-3">
-                <Avatar><AvatarFallback>{initials(memberFullName(m.profile))}</AvatarFallback></Avatar>
+                <Avatar><AvatarFallback>{initials(name || m.email || undefined)}</AvatarFallback></Avatar>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{memberFullName(m.profile, "") || display(m.id)}</div>
+                  <div className="font-medium truncate">{displayLabel}</div>
                   {m.profile?.phone && <div className="text-xs text-muted-foreground truncate">{m.profile.phone}</div>}
+                  {!name && m.email && <div className="text-xs text-muted-foreground truncate">{m.email}</div>}
                 </div>
               </div>
               {isAdmin && (
@@ -394,7 +394,7 @@ function MembersPageInner({
                 </div>
               )}
             </Card>
-          ))}
+          ); })}
         </TabsContent>
 
         <TabsContent value="partners" className="mt-4 space-y-3">

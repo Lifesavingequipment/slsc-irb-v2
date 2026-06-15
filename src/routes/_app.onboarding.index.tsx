@@ -167,6 +167,28 @@ function Onboarding() {
         .eq("club_id", clubId);
       error = res.error;
     }
+    if (!error) {
+      // Ensure a members row exists so the admin's Pending tab can show this request
+      const { data: existingMember } = await supabase
+        .from("members")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .eq("club_id", clubId)
+        .maybeSingle();
+      if (!existingMember) {
+        const fullName: string = (user.user_metadata?.full_name as string | undefined) ?? "";
+        const spaceIdx = fullName.indexOf(" ");
+        const firstName = spaceIdx > 0 ? fullName.slice(0, spaceIdx) : fullName || null;
+        const lastName = spaceIdx > 0 ? fullName.slice(spaceIdx + 1) : null;
+        await supabase.from("members").insert({
+          club_id: clubId,
+          auth_user_id: user.id,
+          first_name: firstName,
+          last_name: lastName,
+          email: user.email ?? "",
+        });
+      }
+    }
     setBusy(false);
     if (error) { toast.error(error.message); return; }
     toast.success("Request sent! A coach or admin will approve you shortly.");
