@@ -247,7 +247,7 @@ function MembersPageInner({
   useEffect(() => { if (initialTab) setTab(initialTab); }, [initialTab]);
 
   const pending = useMemo(() => rows.filter((r) => r.status === "pending").sort(byName), [rows, byName]);
-  const approved = useMemo(() => rows.filter((r) => r.status === "approved").sort(byName), [rows, byName]);
+  const approved = useMemo(() => rows.filter((r) => r.status === "active" || r.status === "approved").sort(byName), [rows, byName]);
 
   const filteredApproved = useMemo(() => {
     const q = search.trim().toLowerCase();
