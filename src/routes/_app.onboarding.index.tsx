@@ -83,7 +83,6 @@ function Onboarding() {
       location: parsed.data.location || null,
       description: parsed.data.description || null,
       logo_url: parsed.data.logo_url || null,
-      created_by: user.id,
     }).select("id, name").single();
     if (error || !clubRow) { setBusy(false); toast.error(error?.message ?? "Could not create club"); return; }
 
