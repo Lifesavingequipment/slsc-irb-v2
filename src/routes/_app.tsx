@@ -15,6 +15,18 @@ function AppLayout() {
   const location = useLocation();
   const [ecChecked, setEcChecked] = useState(false);
   const [needsEc, setNeedsEc] = useState(false);
+  const [isPlatformOwner, setIsPlatformOwner] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!user) { setIsPlatformOwner(null); return; }
+    let cancelled = false;
+    supabase
+      .from("platform_owners")
+      .select("user_id", { head: true, count: "exact" })
+      .eq("user_id", user.id)
+      .then(({ count }) => { if (!cancelled) setIsPlatformOwner((count ?? 0) > 0); });
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -22,10 +34,17 @@ function AppLayout() {
     if (clubLoading) return;
     const approved = memberships.some((m) => m.status === "approved");
     const onOnboarding = location.pathname.startsWith("/onboarding");
-    if (!approved && !onOnboarding) {
-      navigate({ to: "/onboarding", replace: true });
+    const onOwner = location.pathname.startsWith("/owner");
+    if (!approved && !onOnboarding && !onOwner) {
+      // Don't redirect until we know platform owner status
+      if (isPlatformOwner === null) return;
+      if (isPlatformOwner) {
+        navigate({ to: "/owner", replace: true });
+      } else {
+        navigate({ to: "/onboarding", replace: true });
+      }
     }
-  }, [authLoading, clubLoading, user, memberships, location.pathname, navigate]);
+  }, [authLoading, clubLoading, user, memberships, location.pathname, navigate, isPlatformOwner]);
 
   // Check whether the user has at least one emergency contact across their approved clubs.
   useEffect(() => {
