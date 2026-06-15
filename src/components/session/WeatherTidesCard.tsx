@@ -36,52 +36,79 @@ function formatHour(isoStr: string): string {
   return `${h % 12 || 12}${h < 12 ? "am" : "pm"}`;
 }
 
-async function geocode(location: string): Promise<{ lat: number; lng: number } | null> {
+const GOLD_COAST_FALLBACK = { lat: -28.0167, lng: 153.4000 };
+
+async function geocode(location: string): Promise<{ lat: number; lng: number }> {
   const m = location.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
-  if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+  if (m) {
+    const coords = { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+    console.log("[WeatherTidesCard] geocode: matched lat/lng directly", coords);
+    return coords;
+  }
+  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&format=json&limit=1`;
+  console.log("[WeatherTidesCard] geocode: fetching", url);
   try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&format=json&limit=1`,
-      { headers: { "User-Agent": "slsc-irb-v2/1.0" } },
-    );
+    const res = await fetch(url, { headers: { "User-Agent": "SLSC-IRB-App/1.0" } });
     const data = await res.json();
-    if (data?.[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-  } catch { /* */ }
-  return null;
+    console.log("[WeatherTidesCard] geocode: response", data);
+    if (data?.[0]) {
+      const coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+      console.log("[WeatherTidesCard] geocode: resolved", coords);
+      return coords;
+    }
+    console.warn("[WeatherTidesCard] geocode: no results, falling back to Gold Coast coords");
+  } catch (err) {
+    console.error("[WeatherTidesCard] geocode: error", err);
+  }
+  return GOLD_COAST_FALLBACK;
 }
 
 async function fetchWeather(lat: number, lng: number, date: string): Promise<WeatherData | null> {
+  const url =
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
+    `&daily=temperature_2m_max,weathercode,windspeed_10m_max,winddirection_10m_dominant` +
+    `&timezone=auto&start_date=${date}&end_date=${date}`;
+  console.log("[WeatherTidesCard] fetchWeather: fetching", url);
   try {
-    const res = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
-      `&daily=temperature_2m_max,weathercode,windspeed_10m_max,winddirection_10m_dominant` +
-      `&timezone=auto&start_date=${date}&end_date=${date}`,
-    );
+    const res = await fetch(url);
     const d = await res.json();
-    if (!d?.daily) return null;
+    console.log("[WeatherTidesCard] fetchWeather: response", d);
+    if (!d?.daily) {
+      console.warn("[WeatherTidesCard] fetchWeather: no daily data in response");
+      return null;
+    }
     const { weathercode, temperature_2m_max, windspeed_10m_max, winddirection_10m_dominant } = d.daily;
     const { emoji, label } = weatherCodeInfo(weathercode?.[0] ?? 0);
-    return {
+    const result = {
       emoji,
       label,
       maxTemp: Math.round(temperature_2m_max?.[0] ?? 0),
       windDir: degreesToCompass(winddirection_10m_dominant?.[0] ?? 0),
       windSpeed: Math.round(windspeed_10m_max?.[0] ?? 0),
     };
-  } catch { /* */ }
+    console.log("[WeatherTidesCard] fetchWeather: result", result);
+    return result;
+  } catch (err) {
+    console.error("[WeatherTidesCard] fetchWeather: error", err);
+  }
   return null;
 }
 
 async function fetchTides(lat: number, lng: number, date: string): Promise<TidesData | null> {
+  const url =
+    `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lng}` +
+    `&hourly=wave_height&timezone=auto&start_date=${date}&end_date=${date}`;
+  console.log("[WeatherTidesCard] fetchTides: fetching", url);
   try {
-    const res = await fetch(
-      `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lng}` +
-      `&hourly=wave_height&timezone=auto&start_date=${date}&end_date=${date}`,
-    );
+    const res = await fetch(url);
     const d = await res.json();
+    console.log("[WeatherTidesCard] fetchTides: response", d);
     const heights: (number | null)[] = d?.hourly?.wave_height ?? [];
     const times: string[] = d?.hourly?.time ?? [];
-    if (heights.length < 3) return null;
+    if (heights.length < 3) {
+      console.warn("[WeatherTidesCard] fetchTides: insufficient data points", heights.length);
+      return null;
+    }
 
     const highs: TidePoint[] = [];
     const lows: TidePoint[] = [];
@@ -94,9 +121,16 @@ async function fetchTides(lat: number, lng: number, date: string): Promise<Tides
 
     highs.sort((a, b) => b.height - a.height);
     lows.sort((a, b) => a.height - b.height);
-    if (highs.length === 0 && lows.length === 0) return null;
-    return { highs: highs.slice(0, 2), lows: lows.slice(0, 2) };
-  } catch { /* */ }
+    if (highs.length === 0 && lows.length === 0) {
+      console.warn("[WeatherTidesCard] fetchTides: no highs or lows found");
+      return null;
+    }
+    const result = { highs: highs.slice(0, 2), lows: lows.slice(0, 2) };
+    console.log("[WeatherTidesCard] fetchTides: result", result);
+    return result;
+  } catch (err) {
+    console.error("[WeatherTidesCard] fetchTides: error", err);
+  }
   return null;
 }
 
@@ -114,6 +148,7 @@ export function WeatherTidesCard({
   const [loading, setLoading] = useState(true);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [tides, setTides] = useState<TidesData | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const date = format(new Date(startsAt), "yyyy-MM-dd");
@@ -124,6 +159,8 @@ export function WeatherTidesCard({
       return;
     }
 
+    console.log("[WeatherTidesCard] starting fetch for location:", location, "date:", date);
+
     const cached = sessionStorage.getItem(cacheKey);
     if (cached) {
       try {
@@ -131,24 +168,32 @@ export function WeatherTidesCard({
         setWeather(w);
         setTides(t);
         setLoading(false);
+        console.log("[WeatherTidesCard] loaded from cache", { weather: w, tides: t });
         return;
       } catch { /* bad cache */ }
     }
 
     (async () => {
-      const coords = await geocode(location);
-      if (!coords) {
+      try {
+        const coords = await geocode(location);
+        console.log("[WeatherTidesCard] using coords", coords);
+        const [w, t] = await Promise.all([
+          fetchWeather(coords.lat, coords.lng, date),
+          fetchTides(coords.lat, coords.lng, date),
+        ]);
+        setWeather(w);
+        setTides(t);
+        sessionStorage.setItem(cacheKey, JSON.stringify({ weather: w, tides: t }));
+        console.log("[WeatherTidesCard] fetch complete", { weather: w, tides: t });
+        if (!w && !t) {
+          setError("Weather and tide data unavailable for this location.");
+        }
+      } catch (err) {
+        console.error("[WeatherTidesCard] unexpected error", err);
+        setError(`Failed to load weather data: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
         setLoading(false);
-        return;
       }
-      const [w, t] = await Promise.all([
-        fetchWeather(coords.lat, coords.lng, date),
-        fetchTides(coords.lat, coords.lng, date),
-      ]);
-      setWeather(w);
-      setTides(t);
-      sessionStorage.setItem(cacheKey, JSON.stringify({ weather: w, tides: t }));
-      setLoading(false);
     })();
   }, [sessionId, location, startsAt]);
 
@@ -178,7 +223,15 @@ export function WeatherTidesCard({
     );
   }
 
-  if (!weather && !tides) return null;
+  if (!weather && !tides) {
+    return (
+      <Card className="mt-4 p-4">
+        <p className="text-sm text-destructive">
+          ⚠️ {error ?? "No weather or tide data returned. Check console for details."}
+        </p>
+      </Card>
+    );
+  }
 
   const tideSegments: string[] = [];
   if (tides) {
