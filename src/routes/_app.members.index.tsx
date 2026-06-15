@@ -162,10 +162,17 @@ function MembersPage() {
   useEffect(() => { load(); }, [load]);
   useRefetchOnFocus(load);
 
-  const setStatus = async (membershipId: string, status: Row["status"]) => {
+  const setStatus = async (membershipId: string, status: Row["status"], memberId?: string) => {
     if (!membershipId) return;
     const { error } = await supabase.from("club_memberships").update({ status }).eq("id", membershipId);
     if (error) { toast.error(error.message); return; }
+    if (status === "approved" && memberId) {
+      const { error: memberError } = await supabase
+        .from("members")
+        .update({ membership_status: "active" })
+        .eq("id", memberId);
+      if (memberError) { toast.error(memberError.message); return; }
+    }
     toast.success(status === "approved" ? "Member approved" : "Updated");
     load();
   };
@@ -234,7 +241,7 @@ function MembersPageInner({
   currentUserId: string | null;
   canManage: boolean;
   isAdmin: boolean;
-  setStatus: (membershipId: string, status: Row["status"]) => void;
+  setStatus: (membershipId: string, status: Row["status"], memberId?: string) => void;
   removeMember: (memberId: string, membershipId: string | null, userId: string) => void;
   load: () => void;
   initialTab?: "approved" | "pending" | "partners";
@@ -391,7 +398,7 @@ function MembersPageInner({
               </div>
               {isAdmin && (
                 <div className="mt-3 grid grid-cols-2 gap-2">
-                  <Button size="sm" onClick={() => setStatus(m.membership_id ?? "", "approved")}>Approve</Button>
+                  <Button size="sm" onClick={() => setStatus(m.membership_id ?? "", "approved", m.id)}>Approve</Button>
                   <Button size="sm" variant="outline" onClick={() => setStatus(m.membership_id ?? "", "rejected")}>Reject</Button>
                 </div>
               )}
