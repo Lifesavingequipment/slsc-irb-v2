@@ -162,13 +162,13 @@ function EditSession() {
         .eq("session_id", sessionId);
       const drafts: CarpoolDraft[] = (cps ?? []).map((c) => ({
         id: c.id,
-        driver_user_id: c.driver_user_id,
-        vehicle_name: c.vehicle_name,
-        departure_location: c.departure_location,
+        driver_user_id: c.driver_user_id ?? "",
+        vehicle_name: c.vehicle_name ?? "",
+        departure_location: c.departure_location ?? "",
         departure_time: toLocalInput(c.departure_time),
-        available_seats: c.available_seats,
+        available_seats: c.available_seats ?? 0,
         notes: c.notes ?? "",
-        can_tow_trailer: c.can_tow_trailer,
+        can_tow_trailer: c.can_tow_trailer ?? false,
       }));
       setCarpools(drafts);
       setOriginalCarpoolIds(drafts.map((d) => d.id!).filter(Boolean));
