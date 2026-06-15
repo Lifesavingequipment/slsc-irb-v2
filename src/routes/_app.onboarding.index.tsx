@@ -86,16 +86,30 @@ function Onboarding() {
       address: parsed.data.location || null,
       ...(Object.keys(branding).length > 0 ? { branding } : {}),
     }).select("id, club_name").single();
-    if (error || !clubRow) { setBusy(false); toast.error(error?.message ?? "Could not create club"); return; }
+    if (error || !clubRow) { setBusy(false); toast.error(`Club insert failed: ${error?.message ?? "unknown error"}`); return; }
+
+    // Create the owner membership record — without this the app sees no membership and loops back to onboarding
+    const { error: memberError } = await supabase.from("club_memberships").insert({
+      user_id: user.id,
+      club_id: clubRow.id,
+      status: "approved",
+      role: "owner",
+      is_primary_club: true,
+      approved_at: new Date().toISOString(),
+      approved_by: user.id,
+      joined_at: new Date().toISOString(),
+    });
+    if (memberError) { setBusy(false); toast.error(`Membership insert failed: ${memberError.message}`); return; }
 
     // Optional primary venue → saved location
     if (parsed.data.venue_name) {
-      await supabase.from("locations").insert({
+      const { error: locError } = await supabase.from("locations").insert({
         club_id: clubRow.id,
         name: parsed.data.venue_name,
         address: parsed.data.venue_address || null,
         created_by: user.id,
       });
+      if (locError) toast.error(`Location insert failed: ${locError.message}`);
     }
 
     // Auto-generate an invite code so the owner can immediately share it
@@ -107,7 +121,7 @@ function Onboarding() {
       active: true,
     });
     setBusy(false);
-    if (codeError) { toast.error(codeError.message); return; }
+    if (codeError) { toast.error(`Invite code insert failed: ${codeError.message}`); return; }
     toast.success("Club created — you're the owner.");
     await refresh();
     setCreated({ id: clubRow.id, name: clubRow.club_name, inviteCode: code });
