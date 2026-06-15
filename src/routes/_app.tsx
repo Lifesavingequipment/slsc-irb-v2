@@ -10,23 +10,11 @@ export const Route = createFileRoute("/_app")({
 
 function AppLayout() {
   const { user, loading: authLoading } = useAuth();
-  const { memberships, loading: clubLoading } = useClub();
+  const { memberships, loading: clubLoading, isPlatformOwner } = useClub();
   const navigate = useNavigate();
   const location = useLocation();
   const [ecChecked, setEcChecked] = useState(false);
   const [needsEc, setNeedsEc] = useState(false);
-  const [isPlatformOwner, setIsPlatformOwner] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    if (!user) { setIsPlatformOwner(null); return; }
-    let cancelled = false;
-    supabase
-      .from("platform_owners")
-      .select("user_id", { head: true, count: "exact" })
-      .eq("user_id", user.id)
-      .then(({ count }) => { if (!cancelled) setIsPlatformOwner((count ?? 0) > 0); });
-    return () => { cancelled = true; };
-  }, [user?.id]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -36,8 +24,6 @@ function AppLayout() {
     const onOnboarding = location.pathname.startsWith("/onboarding");
     const onOwner = location.pathname.startsWith("/owner");
     if (!approved && !onOnboarding && !onOwner) {
-      // Don't redirect until we know platform owner status
-      if (isPlatformOwner === null) return;
       if (isPlatformOwner) {
         navigate({ to: "/owner", replace: true });
       } else {
