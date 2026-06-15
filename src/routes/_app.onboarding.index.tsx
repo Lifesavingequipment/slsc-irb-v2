@@ -18,7 +18,7 @@ export const Route = createFileRoute("/_app/onboarding/")({
   component: Onboarding,
 });
 
-type ClubRow = { id: string; name: string; location: string | null };
+type ClubRow = { id: string; club_name: string; address: string | null };
 
 function generateInviteCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -55,7 +55,7 @@ function Onboarding() {
   }, [memberships, navigate, created]);
 
   useEffect(() => {
-    supabase.from("clubs").select("id, name, location").order("name").then(({ data }) => {
+    supabase.from("clubs").select("id, club_name, address").order("club_name").then(({ data }) => {
       setClubs(data ?? []);
     });
   }, []);
@@ -78,12 +78,14 @@ function Onboarding() {
     if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
     if (!user) return;
     setBusy(true);
+    const branding: Record<string, string> = {};
+    if (parsed.data.description) branding.description = parsed.data.description;
+    if (parsed.data.logo_url) branding.logo_url = parsed.data.logo_url;
     const { data: clubRow, error } = await supabase.from("clubs").insert({
-      name: parsed.data.name,
-      location: parsed.data.location || null,
-      description: parsed.data.description || null,
-      logo_url: parsed.data.logo_url || null,
-    }).select("id, name").single();
+      club_name: parsed.data.name,
+      address: parsed.data.location || null,
+      ...(Object.keys(branding).length > 0 ? { branding } : {}),
+    }).select("id, club_name").single();
     if (error || !clubRow) { setBusy(false); toast.error(error?.message ?? "Could not create club"); return; }
 
     // Optional primary venue → saved location
@@ -108,7 +110,7 @@ function Onboarding() {
     if (codeError) { toast.error(codeError.message); return; }
     toast.success("Club created — you're the owner.");
     await refresh();
-    setCreated({ id: clubRow.id, name: clubRow.name, inviteCode: code });
+    setCreated({ id: clubRow.id, name: clubRow.club_name, inviteCode: code });
   };
 
   const onJoin = async (clubId: string) => {
@@ -207,8 +209,8 @@ function Onboarding() {
                 return (
                   <div key={c.id} className="flex items-center justify-between rounded-xl border p-3">
                     <div className="min-w-0">
-                      <div className="font-medium truncate">{c.name}</div>
-                      {c.location && <div className="text-xs text-muted-foreground truncate">{c.location}</div>}
+                      <div className="font-medium truncate">{c.club_name}</div>
+                      {c.address && <div className="text-xs text-muted-foreground truncate">{c.address}</div>}
                     </div>
                     {pending ? (
                       <span className="text-xs flex items-center gap-1 text-warning-foreground bg-warning/30 px-2.5 py-1 rounded-full">
