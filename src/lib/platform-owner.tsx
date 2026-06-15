@@ -12,6 +12,7 @@ export function useIsPlatformOwner() {
 
   useEffect(() => {
     if (!user) { setIsOwner(false); return; }
+    setIsOwner(null); // reset to loading while querying
     let cancelled = false;
     supabase
       .from("platform_owners")
