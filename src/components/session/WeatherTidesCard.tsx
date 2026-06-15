@@ -11,9 +11,11 @@ type WeatherData = {
   windSpeed: number;
 };
 
-type TidePoint = { time: string; height: number };
-type TidesData = { highs: TidePoint[]; lows: TidePoint[] };
-type TidesResult = { data: TidesData; approx: boolean };
+type WaveData = {
+  times: string[];
+  heights: (number | null)[];
+  approx: boolean;
+};
 
 function degreesToCompass(deg: number): string {
   return ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(deg / 45) % 8];
@@ -30,14 +32,54 @@ function weatherCodeInfo(code: number): { emoji: string; label: string } {
   return { emoji: "🌡️", label: "Cloudy" };
 }
 
-function formatHour(isoStr: string): string {
-  const timePart = isoStr.split("T")[1] ?? "00:00";
-  const [hStr] = timePart.split(":");
-  const h = parseInt(hStr, 10);
-  return `${h % 12 || 12}${h < 12 ? "am" : "pm"}`;
+function hourLabel(hour: number): string {
+  if (hour < 12) return "morning";
+  if (hour < 14) return "midday";
+  if (hour < 18) return "afternoon";
+  if (hour < 21) return "evening";
+  return "night";
 }
 
-const GOLD_COAST_FALLBACK = { lat: -28.0167, lng: 153.4000 };
+function getTimezone(lat: number, lng: number): string {
+  if (lat >= -44 && lat <= -10 && lng >= 113 && lng <= 154) return "Australia/Brisbane";
+  if (lat >= -47 && lat <= -34 && lng >= 166 && lng <= 178) return "Pacific/Auckland";
+  return "auto";
+}
+
+function getLocalHour(dateStr: string, timezone: string): number {
+  const date = new Date(dateStr);
+  if (timezone === "auto") return date.getHours();
+  try {
+    const fmt = new Intl.DateTimeFormat("en-AU", { timeZone: timezone, hour: "numeric", hour12: false });
+    const h = parseInt(fmt.format(date), 10);
+    return isNaN(h) ? date.getHours() : h;
+  } catch {
+    return date.getHours();
+  }
+}
+
+function buildWaveSegments(
+  waves: WaveData,
+  startsAt: string,
+  timezone: string,
+): { height: number; label: string }[] {
+  const startHour = getLocalHour(startsAt, timezone);
+  const segments: { height: number; label: string }[] = [];
+  for (const offset of [0, 2]) {
+    const targetHour = (startHour + offset) % 24;
+    const timeStr = `T${targetHour.toString().padStart(2, "0")}:00`;
+    const idx = waves.times.findIndex((t) => t.includes(timeStr));
+    if (idx !== -1 && waves.heights[idx] != null) {
+      segments.push({
+        height: Math.round((waves.heights[idx] as number) * 10) / 10,
+        label: hourLabel(targetHour),
+      });
+    }
+  }
+  return segments;
+}
+
+const GOLD_COAST_FALLBACK = { lat: -28.0167, lng: 153.4 };
 
 async function geocode(location: string): Promise<{ lat: number; lng: number }> {
   const m = location.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
@@ -64,11 +106,16 @@ async function geocode(location: string): Promise<{ lat: number; lng: number }> 
   return GOLD_COAST_FALLBACK;
 }
 
-async function fetchWeather(lat: number, lng: number, date: string): Promise<WeatherData | null> {
+async function fetchWeather(
+  lat: number,
+  lng: number,
+  date: string,
+  timezone: string,
+): Promise<WeatherData | null> {
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
     `&daily=temperature_2m_max,weathercode,windspeed_10m_max,winddirection_10m_dominant` +
-    `&timezone=auto&start_date=${date}&end_date=${date}`;
+    `&timezone=${encodeURIComponent(timezone)}&start_date=${date}&end_date=${date}`;
   console.log("[WeatherTidesCard] fetchWeather: fetching", url);
   try {
     const res = await fetch(url);
@@ -95,60 +142,53 @@ async function fetchWeather(lat: number, lng: number, date: string): Promise<Wea
   return null;
 }
 
-async function fetchTidesOnce(lat: number, lng: number, date: string): Promise<TidesData | null> {
+async function fetchWaveOnce(
+  lat: number,
+  lng: number,
+  date: string,
+  timezone: string,
+): Promise<{ times: string[]; heights: (number | null)[] } | null> {
   const url =
     `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lng}` +
-    `&hourly=wave_height&timezone=auto&start_date=${date}&end_date=${date}`;
-  console.log("[WeatherTidesCard] fetchTidesOnce: fetching", url);
+    `&hourly=wave_height&timezone=${encodeURIComponent(timezone)}&start_date=${date}&end_date=${date}`;
+  console.log("[WeatherTidesCard] fetchWaveOnce: fetching", url);
   try {
     const res = await fetch(url);
     const d = await res.json();
-    console.log("[WeatherTidesCard] fetchTidesOnce: response", d);
+    console.log("[WeatherTidesCard] fetchWaveOnce: response", d);
     const heights: (number | null)[] = d?.hourly?.wave_height ?? [];
     const times: string[] = d?.hourly?.time ?? [];
     if (heights.length < 3) {
-      console.warn("[WeatherTidesCard] fetchTidesOnce: insufficient data points", heights.length);
+      console.warn("[WeatherTidesCard] fetchWaveOnce: insufficient data points", heights.length);
       return null;
     }
-    // Check all values are null (inland location returns all-null array)
     if (heights.every((h) => h == null)) {
-      console.warn("[WeatherTidesCard] fetchTidesOnce: all wave heights null — inland location");
+      console.warn("[WeatherTidesCard] fetchWaveOnce: all wave heights null — inland location, lng:", lng);
       return null;
     }
-
-    const highs: TidePoint[] = [];
-    const lows: TidePoint[] = [];
-    for (let i = 1; i < heights.length - 1; i++) {
-      const p = heights[i - 1], c = heights[i], n = heights[i + 1];
-      if (p == null || c == null || n == null) continue;
-      if (c > p && c > n) highs.push({ height: Math.round(c * 10) / 10, time: times[i] });
-      else if (c < p && c < n) lows.push({ height: Math.round(c * 10) / 10, time: times[i] });
-    }
-
-    highs.sort((a, b) => b.height - a.height);
-    lows.sort((a, b) => a.height - b.height);
-    if (highs.length === 0 && lows.length === 0) {
-      console.warn("[WeatherTidesCard] fetchTidesOnce: no highs or lows found");
-      return null;
-    }
-    const result = { highs: highs.slice(0, 2), lows: lows.slice(0, 2) };
-    console.log("[WeatherTidesCard] fetchTidesOnce: result", result);
-    return result;
+    return { times, heights };
   } catch (err) {
-    console.error("[WeatherTidesCard] fetchTidesOnce: error", err);
+    console.error("[WeatherTidesCard] fetchWaveOnce: error", err);
   }
   return null;
 }
 
-async function fetchTides(lat: number, lng: number, date: string): Promise<TidesResult | null> {
-  const data = await fetchTidesOnce(lat, lng, date);
-  if (data) return { data, approx: false };
-
-  // Inland location — shift longitude +0.5° east toward the ocean and retry once
-  console.log("[WeatherTidesCard] fetchTides: retrying with lng offset +0.5 for coastal lookup");
-  const shiftedData = await fetchTidesOnce(lat, lng + 0.5, date);
-  if (shiftedData) return { data: shiftedData, approx: true };
-
+async function fetchWaves(
+  lat: number,
+  lng: number,
+  date: string,
+  timezone: string,
+): Promise<WaveData | null> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const shiftedLng = Math.round((lng + attempt * 0.3) * 10000) / 10000;
+    const result = await fetchWaveOnce(lat, shiftedLng, date, timezone);
+    if (result) return { ...result, approx: attempt > 0 };
+    if (attempt < 2) {
+      console.log(
+        `[WeatherTidesCard] fetchWaves: attempt ${attempt + 1} failed, shifting lng +0.3 to ${shiftedLng + 0.3}`,
+      );
+    }
+  }
   return null;
 }
 
@@ -165,12 +205,13 @@ export function WeatherTidesCard({
 }) {
   const [loading, setLoading] = useState(true);
   const [weather, setWeather] = useState<WeatherData | null>(null);
-  const [tides, setTides] = useState<TidesResult | null>(null);
+  const [waves, setWaves] = useState<WaveData | null>(null);
+  const [timezone, setTimezone] = useState<string>("auto");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const date = format(new Date(startsAt), "yyyy-MM-dd");
-    const cacheKey = `weather-tides-${sessionId}`;
+    const cacheKey = `weather-tides-${sessionId}-${location}`;
 
     if (!location) {
       setLoading(false);
@@ -183,18 +224,11 @@ export function WeatherTidesCard({
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        // Support old cache format (tides was TidesData) and new format (tides is TidesResult)
-        const w = parsed.weather ?? null;
-        const t: TidesResult | null =
-          parsed.tides && "data" in parsed.tides
-            ? parsed.tides
-            : parsed.tides
-            ? { data: parsed.tides, approx: false }
-            : null;
-        setWeather(w);
-        setTides(t);
+        setWeather(parsed.weather ?? null);
+        setWaves(parsed.waves ?? null);
+        setTimezone(parsed.timezone ?? "auto");
         setLoading(false);
-        console.log("[WeatherTidesCard] loaded from cache", { weather: w, tides: t });
+        console.log("[WeatherTidesCard] loaded from cache", parsed);
         return;
       } catch { /* bad cache */ }
     }
@@ -203,16 +237,18 @@ export function WeatherTidesCard({
       try {
         const coords = await geocode(location);
         console.log("[WeatherTidesCard] using coords", coords);
-        const [w, t] = await Promise.all([
-          fetchWeather(coords.lat, coords.lng, date),
-          fetchTides(coords.lat, coords.lng, date),
+        const tz = getTimezone(coords.lat, coords.lng);
+        const [w, wv] = await Promise.all([
+          fetchWeather(coords.lat, coords.lng, date, tz),
+          fetchWaves(coords.lat, coords.lng, date, tz),
         ]);
         setWeather(w);
-        setTides(t);
-        sessionStorage.setItem(cacheKey, JSON.stringify({ weather: w, tides: t }));
-        console.log("[WeatherTidesCard] fetch complete", { weather: w, tides: t });
-        if (!w && !t) {
-          setError("Weather and tide data unavailable for this location.");
+        setWaves(wv);
+        setTimezone(tz);
+        sessionStorage.setItem(cacheKey, JSON.stringify({ weather: w, waves: wv, timezone: tz }));
+        console.log("[WeatherTidesCard] fetch complete", { weather: w, waves: wv, timezone: tz });
+        if (!w && !wv) {
+          setError("Weather and wave data unavailable for this location.");
         }
       } catch (err) {
         console.error("[WeatherTidesCard] unexpected error", err);
@@ -249,26 +285,17 @@ export function WeatherTidesCard({
     );
   }
 
-  if (!weather && !tides) {
+  if (!weather && !waves) {
     return (
       <Card className="mt-4 p-4">
         <p className="text-sm text-destructive">
-          ⚠️ {error ?? "No weather or tide data returned. Check console for details."}
+          ⚠️ {error ?? "No weather or wave data returned. Check console for details."}
         </p>
       </Card>
     );
   }
 
-  const tideSegments: string[] = [];
-  if (tides) {
-    const allPoints = [
-      ...tides.data.highs.map((h) => ({ ...h, type: "High" as const })),
-      ...tides.data.lows.map((l) => ({ ...l, type: "Low" as const })),
-    ].sort((a, b) => a.time.localeCompare(b.time));
-    for (const pt of allPoints) {
-      tideSegments.push(`${pt.type} ~${pt.height}m at ${formatHour(pt.time)}`);
-    }
-  }
+  const waveSegments = waves ? buildWaveSegments(waves, startsAt, timezone) : [];
 
   return (
     <Card className="mt-4 p-4">
@@ -278,9 +305,10 @@ export function WeatherTidesCard({
             {weather.emoji} {weather.label} · {weather.maxTemp}°C · {weather.windDir} {weather.windSpeed} km/h
           </div>
         )}
-        {tideSegments.length > 0 && (
+        {waveSegments.length > 0 && (
           <div className="text-muted-foreground">
-            🌊 {tides?.approx ? "Approx. surf conditions" : "Surf conditions"}: {tideSegments.join(" · ")}
+            🌊 Wave {waveSegments.map((s) => `~${s.height}m (${s.label})`).join(" · ")}
+            {waves?.approx ? " (approx.)" : ""}
           </div>
         )}
       </div>
