@@ -88,6 +88,20 @@ function Onboarding() {
     }).select("id, club_name").single();
     if (error || !clubRow) { setBusy(false); toast.error(`Club insert failed: ${error?.message ?? "unknown error"}`); return; }
 
+    // Create the member profile row so the owner isn't shown as "Unnamed"
+    const fullName: string = (user.user_metadata?.full_name as string | undefined) ?? "";
+    const spaceIdx = fullName.indexOf(" ");
+    const firstName = spaceIdx > 0 ? fullName.slice(0, spaceIdx) : fullName || "Unknown";
+    const lastName = spaceIdx > 0 ? fullName.slice(spaceIdx + 1) : "Unknown";
+    const { error: memberProfileError } = await supabase.from("members").insert({
+      club_id: clubRow.id,
+      auth_user_id: user.id,
+      first_name: firstName,
+      last_name: lastName,
+      email: user.email ?? "",
+    });
+    if (memberProfileError) { setBusy(false); toast.error(`Member profile insert failed: ${memberProfileError.message}`); return; }
+
     // Create the owner membership record — without this the app sees no membership and loops back to onboarding
     const { error: memberError } = await supabase.from("club_memberships").insert({
       user_id: user.id,
@@ -100,6 +114,13 @@ function Onboarding() {
       joined_at: new Date().toISOString(),
     });
     if (memberError) { setBusy(false); toast.error(`Membership insert failed: ${memberError.message}`); return; }
+
+    // Grant owner role in user_roles so the Members page displays "Owner" badge
+    await supabase.from("user_roles").insert({
+      user_id: user.id,
+      club_id: clubRow.id,
+      role: "owner",
+    }).throwOnError().catch((e: Error) => toast.error(`Role insert failed: ${e.message}`));
 
     // Optional primary venue → saved location
     if (parsed.data.venue_name) {
