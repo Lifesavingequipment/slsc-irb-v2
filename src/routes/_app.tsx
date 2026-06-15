@@ -15,11 +15,17 @@ function AppLayout() {
   const location = useLocation();
   const [ecChecked, setEcChecked] = useState(false);
   const [needsEc, setNeedsEc] = useState(false);
+  // Only true once both auth and club (incl. platform_owners) checks are done
+  const [redirectReady, setRedirectReady] = useState(false);
 
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || clubLoading) return;
+    setRedirectReady(true);
+  }, [authLoading, clubLoading]);
+
+  useEffect(() => {
+    if (!redirectReady) return;
     if (!user) { navigate({ to: "/login", replace: true }); return; }
-    if (clubLoading) return;
     const approved = memberships.some((m) => m.status === "approved");
     const onOnboarding = location.pathname.startsWith("/onboarding");
     const onOwner = location.pathname.startsWith("/owner");
@@ -30,7 +36,7 @@ function AppLayout() {
         navigate({ to: "/onboarding", replace: true });
       }
     }
-  }, [authLoading, clubLoading, user, memberships, location.pathname, navigate, isPlatformOwner]);
+  }, [redirectReady, user, memberships, location.pathname, navigate, isPlatformOwner]);
 
   // Check whether the user has at least one emergency contact across their approved clubs.
   useEffect(() => {
@@ -55,7 +61,8 @@ function AppLayout() {
     }
   }, [ecChecked, needsEc, location.pathname, navigate]);
 
-  if (authLoading || (user && clubLoading)) {
+  // Show nothing until both auth and club checks are complete
+  if (!redirectReady) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />

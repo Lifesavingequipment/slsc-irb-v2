@@ -48,7 +48,7 @@ function Onboarding() {
   const [venueAddress, setVenueAddress] = useState("");
 
   useEffect(() => {
-    if (created) return; // wait on the success panel before auto-redirecting
+    if (created) return;
     if (memberships.some((m) => m.status === "approved")) {
       navigate({ to: "/dashboard", replace: true });
     }
@@ -88,7 +88,6 @@ function Onboarding() {
     }).select("id, club_name").single();
     if (error || !clubRow) { setBusy(false); toast.error(`Club insert failed: ${error?.message ?? "unknown error"}`); return; }
 
-    // Create the member profile row so the owner isn't shown as "Unnamed"
     const fullName: string = (user.user_metadata?.full_name as string | undefined) ?? "";
     const spaceIdx = fullName.indexOf(" ");
     const firstName = spaceIdx > 0 ? fullName.slice(0, spaceIdx) : fullName || "Unknown";
@@ -102,7 +101,6 @@ function Onboarding() {
     });
     if (memberProfileError) { setBusy(false); toast.error(`Member profile insert failed: ${memberProfileError.message}`); return; }
 
-    // Create the owner membership record — without this the app sees no membership and loops back to onboarding
     const { error: memberError } = await supabase.from("club_memberships").insert({
       user_id: user.id,
       club_id: clubRow.id,
@@ -115,7 +113,6 @@ function Onboarding() {
     });
     if (memberError) { setBusy(false); toast.error(`Membership insert failed: ${memberError.message}`); return; }
 
-    // Grant owner role in user_roles so the Members page displays "Owner" badge
     const { error: roleError } = await supabase.from("user_roles").insert({
       user_id: user.id,
       club_id: clubRow.id,
@@ -123,7 +120,6 @@ function Onboarding() {
     });
     if (roleError) { setBusy(false); toast.error(`Role insert failed: ${roleError.message}`); return; }
 
-    // Optional primary venue → saved location
     if (parsed.data.venue_name) {
       const { error: locError } = await supabase.from("locations").insert({
         club_id: clubRow.id,
@@ -134,7 +130,6 @@ function Onboarding() {
       if (locError) toast.error(`Location insert failed: ${locError.message}`);
     }
 
-    // Auto-generate an invite code so the owner can immediately share it
     const code = generateInviteCode();
     const { error: codeError } = await supabase.from("club_invite_codes").insert({
       club_id: clubRow.id,
@@ -149,7 +144,7 @@ function Onboarding() {
     setCreated({ id: clubRow.id, name: clubRow.club_name, inviteCode: code });
   };
 
-  const onJoin = async (clubId: string) => {
+  const onRequestToJoin = async (clubId: string) => {
     if (!user) return;
     setBusy(true);
     const { data: existing } = await supabase
@@ -161,7 +156,7 @@ function Onboarding() {
     let error = null;
     if (!existing) {
       const res = await supabase.from("club_memberships").insert({
-        user_id: user.id, club_id: clubId, status: "pending",
+        user_id: user.id, club_id: clubId, status: "pending", role: "member",
       });
       error = res.error;
     } else if (existing.status === "rejected") {
@@ -174,7 +169,7 @@ function Onboarding() {
     }
     setBusy(false);
     if (error) { toast.error(error.message); return; }
-    toast.success("Request sent. A club admin will review it.");
+    toast.success("Request sent! A coach or admin will approve you shortly.");
     await refresh();
   };
 
@@ -187,27 +182,31 @@ function Onboarding() {
     );
   }
 
+  const defaultTab = typeof window !== "undefined" && sessionStorage.getItem("new_club_intent") === "1" ? "create" : "find";
+
   return (
     <div className="min-h-screen bg-background">
-      <div className="bg-surf-gradient text-primary-foreground safe-top px-6 pt-10 pb-12">
-        <div className="flex items-center justify-between">
+      <div className="bg-white border-b safe-top px-6 pt-10 pb-6">
+        <div className="flex items-center justify-between max-w-2xl mx-auto">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-white/15 flex items-center justify-center">
-              <Waves className="h-5 w-5" />
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Waves className="h-5 w-5 text-primary" />
             </div>
-            <div className="font-semibold">IRB Coaching</div>
+            <div className="font-semibold text-foreground">IRB Coaching</div>
           </div>
-          <button onClick={signOut} className="text-sm opacity-80 hover:opacity-100 flex items-center gap-1.5">
+          <button onClick={signOut} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5">
             <LogOut className="h-4 w-4" /> Sign out
           </button>
         </div>
-        <h1 className="mt-8 text-2xl font-bold">Join or create a club</h1>
-        <p className="mt-1 text-sm opacity-90">Pick how you'd like to get started.</p>
+        <div className="max-w-2xl mx-auto mt-6">
+          <h1 className="text-2xl font-bold text-foreground">Get started</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Find your club or create a new one.</p>
+        </div>
       </div>
 
-      <div className="px-4 -mt-6 max-w-2xl mx-auto pb-10 space-y-4">
+      <div className="px-4 mt-6 max-w-2xl mx-auto pb-10 space-y-4">
         {memberships.some((m) => m.status === "pending") && (
-          <Card className="p-4 border-accent/40 bg-accent/5">
+          <Card className="p-4 border-accent/40 bg-accent/5 rounded-xl">
             <div className="flex items-start gap-3">
               <UserCog className="h-5 w-5 text-accent shrink-0 mt-0.5" />
               <div className="flex-1">
@@ -222,19 +221,14 @@ function Onboarding() {
             </Button>
           </Card>
         )}
-        <Card className="p-4">
-          <Tabs defaultValue={typeof window !== "undefined" && sessionStorage.getItem("new_club_intent") === "1" ? "create" : "code"}>
-            <TabsList className="w-full grid grid-cols-3">
-              <TabsTrigger value="code">Invite code</TabsTrigger>
-              <TabsTrigger value="join">Join a club</TabsTrigger>
+        <Card className="p-4 rounded-xl border">
+          <Tabs defaultValue={defaultTab}>
+            <TabsList className="w-full grid grid-cols-2">
+              <TabsTrigger value="find">Find a club</TabsTrigger>
               <TabsTrigger value="create">Create a club</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="code" className="mt-4">
-              <InviteCodeRedeem busy={busy} setBusy={setBusy} refresh={refresh} navigate={navigate} />
-            </TabsContent>
-
-            <TabsContent value="join" className="mt-4 space-y-2">
+            <TabsContent value="find" className="mt-4 space-y-2">
               {clubs.length === 0 && (
                 <p className="text-sm text-muted-foreground py-6 text-center">
                   No clubs yet. Create the first one.
@@ -243,21 +237,21 @@ function Onboarding() {
               {clubs.map((c) => {
                 const pending = pendingIds.has(c.id);
                 return (
-                  <div key={c.id} className="flex items-center justify-between rounded-xl border p-3">
+                  <Card key={c.id} className="flex items-center justify-between rounded-xl border p-3">
                     <div className="min-w-0">
                       <div className="font-medium truncate">{c.club_name}</div>
                       {c.address && <div className="text-xs text-muted-foreground truncate">{c.address}</div>}
                     </div>
                     {pending ? (
-                      <span className="text-xs flex items-center gap-1 text-warning-foreground bg-warning/30 px-2.5 py-1 rounded-full">
-                        <Clock className="h-3 w-3" /> Pending
+                      <span className="text-xs flex items-center gap-1 text-warning-foreground bg-warning/30 px-2.5 py-1 rounded-full shrink-0">
+                        <Clock className="h-3 w-3" /> Request pending
                       </span>
                     ) : (
-                      <Button size="sm" variant="secondary" disabled={busy} onClick={() => onJoin(c.id)}>
-                        Request
+                      <Button size="sm" variant="secondary" disabled={busy} onClick={() => onRequestToJoin(c.id)} className="shrink-0">
+                        Request to join
                       </Button>
                     )}
-                  </div>
+                  </Card>
                 );
               })}
               {memberships.some((m) => m.status === "pending") && (
@@ -346,21 +340,23 @@ function CoachInvitePanel({
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="bg-surf-gradient text-primary-foreground safe-top px-6 pt-10 pb-12">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-white/15 flex items-center justify-center">
-            <CheckCircle2 className="h-5 w-5" />
+      <div className="bg-white border-b safe-top px-6 pt-10 pb-6">
+        <div className="flex items-center gap-3 max-w-2xl mx-auto">
+          <div className="h-10 w-10 rounded-xl bg-success/10 flex items-center justify-center">
+            <CheckCircle2 className="h-5 w-5 text-success" />
           </div>
-          <div className="font-semibold">{club.name} is ready</div>
+          <div className="font-semibold text-foreground">{club.name} is ready</div>
         </div>
-        <h1 className="mt-8 text-2xl font-bold">Invite a coach to help set up</h1>
-        <p className="mt-1 text-sm opacity-90">
-          Share this link with a coach. When they sign up and enter the invite code, you can promote them to coach from the Members page.
-        </p>
+        <div className="max-w-2xl mx-auto mt-6">
+          <h1 className="text-2xl font-bold text-foreground">Invite a coach to help set up</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Share this link with a coach. When they sign up and enter the invite code, you can promote them to coach from the Members page.
+          </p>
+        </div>
       </div>
 
-      <div className="px-4 -mt-6 max-w-2xl mx-auto pb-10 space-y-4">
-        <Card className="p-4 space-y-3">
+      <div className="px-4 mt-6 max-w-2xl mx-auto pb-10 space-y-4">
+        <Card className="p-4 space-y-3 rounded-xl border">
           <div className="flex items-center gap-2">
             <Ticket className="h-4 w-4 text-primary" />
             <div className="text-sm font-semibold">Invite code</div>
@@ -394,7 +390,7 @@ function CoachInvitePanel({
           </div>
         </Card>
 
-        <Card className="p-4 text-sm text-muted-foreground space-y-1">
+        <Card className="p-4 text-sm text-muted-foreground space-y-1 rounded-xl border">
           <div className="font-medium text-foreground">What's next</div>
           <ul className="list-disc pl-5 space-y-1">
             <li>Add more saved locations from Settings → Saved locations.</li>
@@ -406,126 +402,5 @@ function CoachInvitePanel({
         <Button onClick={onContinue} className="w-full h-11">Continue to dashboard</Button>
       </div>
     </div>
-  );
-}
-
-function InviteCodeRedeem({
-  busy, setBusy, refresh, navigate,
-}: {
-  busy: boolean;
-  setBusy: (v: boolean) => void;
-  refresh: () => Promise<void>;
-  navigate: ReturnType<typeof useNavigate>;
-}) {
-  const [code, setCode] = useState("");
-  const [error, setError] = useState<{ title: string; detail: string } | null>(null);
-
-  // Pre-fill from ?invite=... or a code stashed during signup.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const fromQuery = new URLSearchParams(window.location.search).get("invite");
-    const fromStash = sessionStorage.getItem("pending_invite_code");
-    const found = (fromQuery || fromStash || "").toUpperCase();
-    if (found) {
-      setCode(found);
-      sessionStorage.removeItem("pending_invite_code");
-    }
-  }, []);
-
-  // IRB-XXXXXXXX — 3 letters, dash, 8 chars from our alphabet.
-  const CODE_RE = /^IRB-[A-HJ-NP-Z2-9]{8}$/;
-
-  const showError = (title: string, detail: string) => {
-    setError({ title, detail });
-    toast.error(title);
-  };
-
-  const onRedeem = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    const trimmed = code.trim().toUpperCase();
-
-    if (!trimmed) {
-      showError("Enter an invite code", "Invite codes look like IRB-XXXXXXXX. Ask a coach or admin from your club to share theirs.");
-      return;
-    }
-    if (!CODE_RE.test(trimmed)) {
-      showError(
-        "That code doesn't look right",
-        "Invite codes are formatted as IRB- followed by 8 letters and numbers. Double-check what was shared with you, or try a different code.",
-      );
-      return;
-    }
-
-    setBusy(true);
-    const { data: clubId, error: rpcError } = await supabase.rpc("redeem_club_invite_code", { _code: trimmed });
-    setBusy(false);
-
-    if (rpcError || !clubId) {
-      const rawMsg: string = rpcError ? String(rpcError.message ?? "") : "";
-      const msg = rawMsg.toLowerCase();
-      if (msg.includes("not authenticated")) {
-        showError("You're signed out", "Sign in again, then re-enter your invite code.");
-      } else if (msg.includes("invalid") || msg.includes("inactive") || !clubId) {
-        showError(
-          "Invite code not recognised",
-          "This code is either incorrect, expired, or has been deactivated by the club. Try another code, or create a new club to get started.",
-        );
-      } else {
-        showError("Couldn't redeem code", rawMsg || "Please try again in a moment.");
-      }
-      return;
-    }
-
-    toast.success("You're in!");
-    if (typeof window !== "undefined" && clubId) {
-      sessionStorage.setItem("pending_coach_onboarding_club", String(clubId));
-    }
-    await refresh();
-    navigate({ to: "/onboarding/coach", replace: true });
-  };
-
-  const inputId = "invite-code";
-  const errorId = "invite-code-error";
-
-  return (
-    <form onSubmit={onRedeem} className="space-y-3" noValidate>
-      {/* Top-of-form summary, announced to screen readers. */}
-      <div role="alert" aria-live="assertive" aria-atomic="true">
-        {error && (
-          <div className="rounded-md border border-destructive/40 bg-destructive/10 text-destructive px-3 py-2 text-sm">
-            <div className="font-medium">{error.title}</div>
-            <div className="opacity-90">{error.detail}</div>
-          </div>
-        )}
-      </div>
-
-      <Label htmlFor={inputId}>Invite code</Label>
-      <Input
-        id={inputId}
-        value={code}
-        onChange={(e) => {
-          setCode(e.target.value.toUpperCase());
-          if (error) setError(null);
-        }}
-        placeholder="IRB-XXXXXXXX"
-        className={`font-mono tracking-wider ${error ? "border-destructive focus-visible:ring-destructive" : ""}`}
-        autoComplete="off"
-        aria-invalid={!!error}
-        aria-describedby={error ? errorId : undefined}
-      />
-      {error && (
-        <p id={errorId} className="text-xs text-destructive" aria-live="polite">
-          {error.detail}
-        </p>
-      )}
-
-      <Button type="submit" disabled={busy} className="w-full h-11">
-        {busy ? "Checking…" : "Join with code"}
-      </Button>
-      <p className="text-xs text-muted-foreground">
-        Ask a coach or admin from your club for the invite code, or create your own club from the Create tab.
-      </p>
-    </form>
   );
 }
