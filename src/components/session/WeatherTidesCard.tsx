@@ -13,6 +13,7 @@ type WeatherData = {
 
 type TidePoint = { time: string; height: number };
 type TidesData = { highs: TidePoint[]; lows: TidePoint[] };
+type TidesResult = { data: TidesData; approx: boolean };
 
 function degreesToCompass(deg: number): string {
   return ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(deg / 45) % 8];
@@ -94,19 +95,24 @@ async function fetchWeather(lat: number, lng: number, date: string): Promise<Wea
   return null;
 }
 
-async function fetchTides(lat: number, lng: number, date: string): Promise<TidesData | null> {
+async function fetchTidesOnce(lat: number, lng: number, date: string): Promise<TidesData | null> {
   const url =
     `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lng}` +
     `&hourly=wave_height&timezone=auto&start_date=${date}&end_date=${date}`;
-  console.log("[WeatherTidesCard] fetchTides: fetching", url);
+  console.log("[WeatherTidesCard] fetchTidesOnce: fetching", url);
   try {
     const res = await fetch(url);
     const d = await res.json();
-    console.log("[WeatherTidesCard] fetchTides: response", d);
+    console.log("[WeatherTidesCard] fetchTidesOnce: response", d);
     const heights: (number | null)[] = d?.hourly?.wave_height ?? [];
     const times: string[] = d?.hourly?.time ?? [];
     if (heights.length < 3) {
-      console.warn("[WeatherTidesCard] fetchTides: insufficient data points", heights.length);
+      console.warn("[WeatherTidesCard] fetchTidesOnce: insufficient data points", heights.length);
+      return null;
+    }
+    // Check all values are null (inland location returns all-null array)
+    if (heights.every((h) => h == null)) {
+      console.warn("[WeatherTidesCard] fetchTidesOnce: all wave heights null — inland location");
       return null;
     }
 
@@ -122,15 +128,27 @@ async function fetchTides(lat: number, lng: number, date: string): Promise<Tides
     highs.sort((a, b) => b.height - a.height);
     lows.sort((a, b) => a.height - b.height);
     if (highs.length === 0 && lows.length === 0) {
-      console.warn("[WeatherTidesCard] fetchTides: no highs or lows found");
+      console.warn("[WeatherTidesCard] fetchTidesOnce: no highs or lows found");
       return null;
     }
     const result = { highs: highs.slice(0, 2), lows: lows.slice(0, 2) };
-    console.log("[WeatherTidesCard] fetchTides: result", result);
+    console.log("[WeatherTidesCard] fetchTidesOnce: result", result);
     return result;
   } catch (err) {
-    console.error("[WeatherTidesCard] fetchTides: error", err);
+    console.error("[WeatherTidesCard] fetchTidesOnce: error", err);
   }
+  return null;
+}
+
+async function fetchTides(lat: number, lng: number, date: string): Promise<TidesResult | null> {
+  const data = await fetchTidesOnce(lat, lng, date);
+  if (data) return { data, approx: false };
+
+  // Inland location — shift longitude +0.5° east toward the ocean and retry once
+  console.log("[WeatherTidesCard] fetchTides: retrying with lng offset +0.5 for coastal lookup");
+  const shiftedData = await fetchTidesOnce(lat, lng + 0.5, date);
+  if (shiftedData) return { data: shiftedData, approx: true };
+
   return null;
 }
 
@@ -147,7 +165,7 @@ export function WeatherTidesCard({
 }) {
   const [loading, setLoading] = useState(true);
   const [weather, setWeather] = useState<WeatherData | null>(null);
-  const [tides, setTides] = useState<TidesData | null>(null);
+  const [tides, setTides] = useState<TidesResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -164,7 +182,15 @@ export function WeatherTidesCard({
     const cached = sessionStorage.getItem(cacheKey);
     if (cached) {
       try {
-        const { weather: w, tides: t } = JSON.parse(cached);
+        const parsed = JSON.parse(cached);
+        // Support old cache format (tides was TidesData) and new format (tides is TidesResult)
+        const w = parsed.weather ?? null;
+        const t: TidesResult | null =
+          parsed.tides && "data" in parsed.tides
+            ? parsed.tides
+            : parsed.tides
+            ? { data: parsed.tides, approx: false }
+            : null;
         setWeather(w);
         setTides(t);
         setLoading(false);
@@ -236,8 +262,8 @@ export function WeatherTidesCard({
   const tideSegments: string[] = [];
   if (tides) {
     const allPoints = [
-      ...tides.highs.map((h) => ({ ...h, type: "High" as const })),
-      ...tides.lows.map((l) => ({ ...l, type: "Low" as const })),
+      ...tides.data.highs.map((h) => ({ ...h, type: "High" as const })),
+      ...tides.data.lows.map((l) => ({ ...l, type: "Low" as const })),
     ].sort((a, b) => a.time.localeCompare(b.time));
     for (const pt of allPoints) {
       tideSegments.push(`${pt.type} ~${pt.height}m at ${formatHour(pt.time)}`);
@@ -254,7 +280,7 @@ export function WeatherTidesCard({
         )}
         {tideSegments.length > 0 && (
           <div className="text-muted-foreground">
-            🌊 {tideSegments.join(" · ")}
+            🌊 {tides?.approx ? "Approx. surf conditions" : "Surf conditions"}: {tideSegments.join(" · ")}
           </div>
         )}
       </div>
