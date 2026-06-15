@@ -17,6 +17,14 @@ type WaveData = {
   approx: boolean;
 };
 
+function daysUntilSession(startsAt: string): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const sessionDate = new Date(startsAt);
+  sessionDate.setHours(0, 0, 0, 0);
+  return Math.round((sessionDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
 function degreesToCompass(deg: number): string {
   return ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(deg / 45) % 8];
 }
@@ -147,9 +155,13 @@ async function fetchWaveOnce(
   lng: number,
   date: string,
   timezone: string,
+  useArchive = false,
 ): Promise<{ times: string[]; heights: (number | null)[] } | null> {
+  const baseUrl = useArchive
+    ? "https://archive-api.open-meteo.com/v1/archive"
+    : "https://marine-api.open-meteo.com/v1/marine";
   const url =
-    `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lng}` +
+    `${baseUrl}?latitude=${lat}&longitude=${lng}` +
     `&hourly=wave_height&timezone=${encodeURIComponent(timezone)}&start_date=${date}&end_date=${date}`;
   console.log("[WeatherTidesCard] fetchWaveOnce: fetching", url);
   try {
@@ -178,10 +190,11 @@ async function fetchWaves(
   lng: number,
   date: string,
   timezone: string,
+  useArchive = false,
 ): Promise<WaveData | null> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const shiftedLng = Math.round((lng + attempt * 0.3) * 10000) / 10000;
-    const result = await fetchWaveOnce(lat, shiftedLng, date, timezone);
+    const result = await fetchWaveOnce(lat, shiftedLng, date, timezone, useArchive);
     if (result) return { ...result, approx: attempt > 0 };
     if (attempt < 2) {
       console.log(
@@ -203,6 +216,11 @@ export function WeatherTidesCard({
   startsAt: string;
   canManage?: boolean;
 }) {
+  const daysUntil = daysUntilSession(startsAt);
+  const tooFarForWaves = daysUntil > 7;
+  const tooFarForWeather = daysUntil > 16;
+  const useArchive = daysUntil <= 0;
+
   const [loading, setLoading] = useState(true);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [waves, setWaves] = useState<WaveData | null>(null);
@@ -218,7 +236,11 @@ export function WeatherTidesCard({
       return;
     }
 
-    console.log("[WeatherTidesCard] starting fetch for location:", location, "date:", date);
+    // Nothing to fetch if both are out of range
+    if (tooFarForWeather && tooFarForWaves) {
+      setLoading(false);
+      return;
+    }
 
     const cached = sessionStorage.getItem(cacheKey);
     if (cached) {
@@ -233,21 +255,23 @@ export function WeatherTidesCard({
       } catch { /* bad cache */ }
     }
 
+    console.log("[WeatherTidesCard] starting fetch for location:", location, "date:", date, "daysUntil:", daysUntil);
+
     (async () => {
       try {
         const coords = await geocode(location);
         console.log("[WeatherTidesCard] using coords", coords);
         const tz = getTimezone(coords.lat, coords.lng);
         const [w, wv] = await Promise.all([
-          fetchWeather(coords.lat, coords.lng, date, tz),
-          fetchWaves(coords.lat, coords.lng, date, tz),
+          tooFarForWeather ? Promise.resolve(null) : fetchWeather(coords.lat, coords.lng, date, tz),
+          tooFarForWaves ? Promise.resolve(null) : fetchWaves(coords.lat, coords.lng, date, tz, useArchive),
         ]);
         setWeather(w);
         setWaves(wv);
         setTimezone(tz);
         sessionStorage.setItem(cacheKey, JSON.stringify({ weather: w, waves: wv, timezone: tz }));
         console.log("[WeatherTidesCard] fetch complete", { weather: w, waves: wv, timezone: tz });
-        if (!w && !wv) {
+        if (!w && !wv && !tooFarForWeather && !tooFarForWaves) {
           setError("Weather and wave data unavailable for this location.");
         }
       } catch (err) {
@@ -285,7 +309,22 @@ export function WeatherTidesCard({
     );
   }
 
-  if (!weather && !waves) {
+  // Both weather and wave forecasts are out of range (> 16 days out)
+  if (tooFarForWeather && tooFarForWaves) {
+    return (
+      <Card className="mt-4 p-4">
+        <div className="space-y-0.5 text-sm text-muted-foreground">
+          <p>Weather forecast not yet available.</p>
+          <p className="text-xs">Surf forecast available 7 days before session.</p>
+        </div>
+      </Card>
+    );
+  }
+
+  // Fetch was attempted for both expected data types but nothing came back
+  const weatherFailed = !tooFarForWeather && !weather;
+  const wavesFailed = !tooFarForWaves && !waves;
+  if (weatherFailed && wavesFailed) {
     return (
       <Card className="mt-4 p-4">
         <p className="text-sm text-destructive">
@@ -300,16 +339,21 @@ export function WeatherTidesCard({
   return (
     <Card className="mt-4 p-4">
       <div className="space-y-1.5 text-sm">
-        {weather && (
+        {tooFarForWeather ? (
+          <p className="text-xs text-muted-foreground">Weather forecast not yet available.</p>
+        ) : weather ? (
           <div>
             {weather.emoji} {weather.label} · {weather.maxTemp}°C · {weather.windDir} {weather.windSpeed} km/h
           </div>
-        )}
-        {waveSegments.length > 0 && (
+        ) : null}
+        {!tooFarForWaves && waveSegments.length > 0 && (
           <div className="text-muted-foreground">
             🌊 Wave {waveSegments.map((s) => `~${s.height}m (${s.label})`).join(" · ")}
             {waves?.approx ? " (approx.)" : ""}
           </div>
+        )}
+        {tooFarForWaves && (
+          <p className="text-xs text-muted-foreground">Surf forecast available 7 days before session.</p>
         )}
       </div>
     </Card>
