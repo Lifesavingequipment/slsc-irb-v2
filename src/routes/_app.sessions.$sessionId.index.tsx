@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { WavePanel } from "@/components/session/WavePanel";
 import { SurveyEditor, SurveyRunner, SurveyResults, usePretrainingSurveyStatus } from "@/components/session/SurveyPanel";
 import { TrainingPlanView, TrainingPlanEditor } from "@/components/session/TrainingPlanPanel";
+import { WeatherTidesCard } from "@/components/session/WeatherTidesCard";
 import { useCoachPermissions } from "@/lib/coach-permissions";
 import { buildNameMap, memberFullName } from "@/lib/names";
 import { invalidateSessionsCache, removeSessionFromCache } from "./_app.sessions.index";
@@ -421,6 +422,13 @@ function SessionDetail() {
           )}
         </div>
       </Card>
+
+      <WeatherTidesCard
+        sessionId={sessionId}
+        location={session.location}
+        startsAt={session.starts_at}
+        canManage={canManage}
+      />
 
       <Tabs defaultValue="rsvp" className="mt-4">
         <TabsList className="grid w-full grid-cols-6">
