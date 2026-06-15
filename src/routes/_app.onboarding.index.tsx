@@ -116,11 +116,12 @@ function Onboarding() {
     if (memberError) { setBusy(false); toast.error(`Membership insert failed: ${memberError.message}`); return; }
 
     // Grant owner role in user_roles so the Members page displays "Owner" badge
-    await supabase.from("user_roles").insert({
+    const { error: roleError } = await supabase.from("user_roles").insert({
       user_id: user.id,
       club_id: clubRow.id,
       role: "owner",
-    }).throwOnError().catch((e: Error) => toast.error(`Role insert failed: ${e.message}`));
+    });
+    if (roleError) { setBusy(false); toast.error(`Role insert failed: ${roleError.message}`); return; }
 
     // Optional primary venue → saved location
     if (parsed.data.venue_name) {
