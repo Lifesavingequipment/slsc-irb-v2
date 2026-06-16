@@ -460,14 +460,14 @@ function SessionDetail() {
       </Card>
 
       <Tabs defaultValue="rsvp" className="mt-4">
-        <TabsList className="grid grid-flow-col auto-cols-fr w-full">
-          <TabsTrigger value="rsvp">RSVPs</TabsTrigger>
-          <TabsTrigger value="plan">Plan</TabsTrigger>
-          {session.survey_enabled && <TabsTrigger value="survey">Survey</TabsTrigger>}
-          <TabsTrigger value="waves">Waves</TabsTrigger>
-          <TabsTrigger value="gear">Gear</TabsTrigger>
-          {(session.carpool_enabled || canManage) && <TabsTrigger value="carpool">Carpool</TabsTrigger>}
-          <TabsTrigger value="attendance">Attendance</TabsTrigger>
+        <TabsList className="flex overflow-x-auto w-full h-auto">
+          <TabsTrigger value="rsvp" className="text-xs flex-shrink-0">RSVPs</TabsTrigger>
+          <TabsTrigger value="plan" className="text-xs flex-shrink-0">Plan</TabsTrigger>
+          {session.survey_enabled && <TabsTrigger value="survey" className="text-xs flex-shrink-0">Survey</TabsTrigger>}
+          <TabsTrigger value="waves" className="text-xs flex-shrink-0">Waves</TabsTrigger>
+          <TabsTrigger value="gear" className="text-xs flex-shrink-0">Gear</TabsTrigger>
+          {(session.carpool_enabled || canManage) && <TabsTrigger value="carpool" className="text-xs flex-shrink-0">Carpool</TabsTrigger>}
+          <TabsTrigger value="attendance" className="text-xs flex-shrink-0">Attend</TabsTrigger>
         </TabsList>
 
         <TabsContent value="rsvp" className="space-y-4 mt-4">
