@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { AddressAutocomplete } from "@/components/settings/AddressAutocomplete";
 
 export type VehicleDraft = { name: string; seats: number; pickup: string; can_tow: boolean };
 export type CoachSavedLocation = { id: string; name: string; address: string | null };
@@ -82,10 +83,11 @@ export function CoachSetupSection({
         {pickups.map((stop, i) => (
           <div key={i} className="space-y-1">
             <div className="flex gap-2">
-              <Input
+              <AddressAutocomplete
+                className="flex-1"
                 value={stop}
                 placeholder={`Stop ${i + 1} e.g. Kurrawa SLSC (5:00pm)`}
-                onChange={(e) => onPickupsChange(pickups.map((s, idx) => idx === i ? e.target.value : s))}
+                onChange={(v) => onPickupsChange(pickups.map((s, idx) => idx === i ? v : s))}
               />
               <Button
                 type="button" variant="ghost" size="icon"
@@ -192,10 +194,10 @@ export function CoachSetupSection({
               value={newVehicle.seats}
               onChange={(e) => onNewVehicleChange({ ...newVehicle, seats: Number(e.target.value) })}
             />
-            <Input
+            <AddressAutocomplete
               placeholder="Pickup (optional)"
               value={newVehicle.pickup}
-              onChange={(e) => onNewVehicleChange({ ...newVehicle, pickup: e.target.value })}
+              onChange={(v) => onNewVehicleChange({ ...newVehicle, pickup: v })}
             />
           </div>
           <SavedLocationPicker

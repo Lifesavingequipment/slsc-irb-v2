@@ -15,6 +15,7 @@ import {
 import { Waves, LogOut, CalendarPlus, MapPin, SkipForward } from "lucide-react";
 import { toast } from "sonner";
 import { DateTimePicker } from "@/components/ui/datetime-picker";
+import { AddressAutocomplete } from "@/components/settings/AddressAutocomplete";
 
 export const Route = createFileRoute("/_app/onboarding/coach")({
   head: () => ({ meta: [{ title: "Set up your first session — IRB Coaching" }] }),
@@ -211,9 +212,9 @@ function CoachOnboarding() {
               </SelectContent>
             </Select>
             {locationId === "custom" ? (
-              <Input
+              <AddressAutocomplete
                 value={customLocation}
-                onChange={(e) => setCustomLocation(e.target.value)}
+                onChange={setCustomLocation}
                 placeholder="Type address or place name"
               />
             ) : (

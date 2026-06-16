@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { DateTimeFields } from "@/components/ui/date-time-fields";
 import { CarpoolEditor, validateCarpoolDrafts, emptyCarpoolDraft, type CarpoolDraft } from "@/components/session/CarpoolEditor";
 import { CoachSetupSection, type VehicleDraft, type ExistingVehicle } from "@/components/session/CoachSetupSection";
+import { AddressAutocomplete } from "@/components/settings/AddressAutocomplete";
 import { invalidateSessionsCache } from "./_app.sessions.index";
 
 export const Route = createFileRoute("/_app/sessions/$sessionId/edit")({
@@ -384,9 +385,9 @@ function EditSession() {
             </Select>
             {locationId === "custom" && (
               <>
-                <Input
+                <AddressAutocomplete
                   value={customLocation}
-                  onChange={(e) => setCustomLocation(e.target.value)}
+                  onChange={setCustomLocation}
                   placeholder="Type address or place name"
                 />
                 {customLocation.trim() && (

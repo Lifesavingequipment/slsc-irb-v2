@@ -18,6 +18,7 @@ import { ChevronLeft, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { DateTimeFields } from "@/components/ui/date-time-fields";
 import { CarpoolEditor, validateCarpoolDrafts, emptyCarpoolDraft, type CarpoolDraft } from "@/components/session/CarpoolEditor";
+import { AddressAutocomplete } from "@/components/settings/AddressAutocomplete";
 import { CoachSetupSection, type VehicleDraft } from "@/components/session/CoachSetupSection";
 import { invalidateSessionsCache } from "./_app.sessions.index";
 import { addDays, addMonths, addWeeks, format as fmt } from "date-fns";
@@ -405,9 +406,9 @@ function NewSession() {
             )}
             {locationId === "custom" && (
               <>
-                <Input
+                <AddressAutocomplete
                   value={customLocation}
-                  onChange={(e) => setCustomLocation(e.target.value)}
+                  onChange={setCustomLocation}
                   placeholder="Type address or place name"
                 />
                 {customLocation.trim() && (

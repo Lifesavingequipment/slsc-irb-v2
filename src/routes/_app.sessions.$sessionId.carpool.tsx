@@ -19,6 +19,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
+import { AddressAutocomplete } from "@/components/settings/AddressAutocomplete";
 import {
   ChevronLeft, Car, Users, MapPin, Clock, Plus, Trash2, Pencil,
   AlertTriangle, UserPlus, HandHelping, CheckCircle2, Settings, Sparkles, Bus, Wrench,
@@ -816,8 +817,8 @@ function OfferRideDialog({ open, onOpenChange, onSubmit, busy, defaultLocation, 
               </div>
             ) : null}
             {(pickups.length === 0 || !pickups.includes(form.departure_location)) && (
-              <Input className={pickups.length > 0 ? "mt-2" : ""} value={form.departure_location} maxLength={200}
-                onChange={(e) => setForm({ ...form, departure_location: e.target.value })} />
+              <AddressAutocomplete className={pickups.length > 0 ? "mt-2" : ""} value={form.departure_location}
+                onChange={(v) => setForm({ ...form, departure_location: v })} />
             )}
             <SavedLocationPicker
               locations={savedLocations}
@@ -914,9 +915,9 @@ function RequestRideDialog({ open, onOpenChange, onSubmit, busy, existing, picku
               </div>
             ) : null}
             {(pickups.length === 0 || !pickups.includes(form.pickup_location)) && (
-              <Input className={pickups.length > 0 ? "mt-2" : ""} value={form.pickup_location} maxLength={200}
+              <AddressAutocomplete className={pickups.length > 0 ? "mt-2" : ""} value={form.pickup_location}
                 placeholder="Where can a driver collect you?"
-                onChange={(e) => setForm({ ...form, pickup_location: e.target.value })} />
+                onChange={(v) => setForm({ ...form, pickup_location: v })} />
             )}
             <SavedLocationPicker
               locations={savedLocations}
@@ -1022,10 +1023,11 @@ function CoachSetupDialog({
             {pickups.map((stop, i) => (
               <div key={i} className="space-y-1">
                 <div className="flex gap-2">
-                  <Input
+                  <AddressAutocomplete
+                    className="flex-1"
                     value={stop}
                     placeholder={`Stop ${i + 1} e.g. Kurrawa SLSC (5:00pm)`}
-                    onChange={(e) => setPickups(pickups.map((s, idx) => idx === i ? e.target.value : s))}
+                    onChange={(v) => setPickups(pickups.map((s, idx) => idx === i ? v : s))}
                   />
                   <Button variant="ghost" size="icon" onClick={() =>
                     setPickups(pickups.filter((_, idx) => idx !== i))
@@ -1095,8 +1097,8 @@ function CoachSetupDialog({
               <div className="grid grid-cols-2 gap-2">
                 <Input type="number" min={1} max={50} placeholder="Seats" value={newVehicle.seats}
                   onChange={(e) => setNewVehicle({ ...newVehicle, seats: Number(e.target.value) })} />
-                <Input placeholder="Pickup (optional)" value={newVehicle.pickup}
-                  onChange={(e) => setNewVehicle({ ...newVehicle, pickup: e.target.value })} />
+                <AddressAutocomplete placeholder="Pickup (optional)" value={newVehicle.pickup}
+                  onChange={(v) => setNewVehicle({ ...newVehicle, pickup: v })} />
               </div>
               <SavedLocationPicker
                 locations={savedLocations}
@@ -1206,7 +1208,7 @@ function EditRideDialog({ carpool, onOpenChange, onSave, busy }: {
           </div>
           <div>
             <Label>Departure location</Label>
-            <Input className="h-11" value={departureLocation} onChange={(e) => setDepartureLocation(e.target.value)} maxLength={200} />
+            <AddressAutocomplete value={departureLocation} onChange={setDepartureLocation} />
           </div>
           <div>
             <Label>Available seats</Label>

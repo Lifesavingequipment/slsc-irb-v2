@@ -13,6 +13,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Waves, LogOut, Clock, CheckCircle2, Copy, Mail, Share2, Ticket, UserCog } from "lucide-react";
 import { toast } from "sonner";
 import { SupportRequestDialog } from "@/components/SupportRequestDialog";
+import { AddressAutocomplete } from "@/components/settings/AddressAutocomplete";
 
 export const Route = createFileRoute("/_app/onboarding/")({
   head: () => ({ meta: [{ title: "Get started — IRB Coaching" }] }),
@@ -303,7 +304,7 @@ function Onboarding() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="loc">Location</Label>
-                  <Input id="loc" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Sydney, NSW" />
+                  <AddressAutocomplete id="loc" value={location} onChange={setLocation} placeholder="Sydney, NSW" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="desc">Description</Label>
@@ -325,7 +326,7 @@ function Onboarding() {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="venueAddress">Address</Label>
-                    <Input id="venueAddress" value={venueAddress} onChange={(e) => setVenueAddress(e.target.value)} placeholder="80 Pacific Ave, Miami QLD 4220" />
+                    <AddressAutocomplete id="venueAddress" value={venueAddress} onChange={setVenueAddress} placeholder="80 Pacific Ave, Miami QLD 4220" />
                   </div>
                 </div>
 

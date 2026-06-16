@@ -12,6 +12,7 @@ import {
 import { DateTimeFields } from "@/components/ui/date-time-fields";
 import { Plus, Trash2, Car, MapPin } from "lucide-react";
 import { memberFullName } from "@/lib/names";
+import { AddressAutocomplete } from "@/components/settings/AddressAutocomplete";
 
 type SavedLocation = { id: string; name: string; address: string | null };
 
@@ -168,9 +169,9 @@ export function CarpoolEditor({
 
           <div className="space-y-1.5">
             <Label>Departure location</Label>
-            <Input
+            <AddressAutocomplete
               value={row.departure_location}
-              onChange={(e) => update(i, { departure_location: e.target.value })}
+              onChange={(v) => update(i, { departure_location: v })}
               placeholder="Clubhouse car park"
             />
             <SavedLocationPicker
