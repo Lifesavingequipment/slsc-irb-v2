@@ -81,8 +81,8 @@ const DEFAULT_PREFS: Prefs = {
   notify_carpool_pending: true,
 };
 
-type SectionKey = "profile" | "email" | "password" | "notifications" | "emergency" | "medical" | "clubs" | "locations";
-const DEFAULT_ORDER: SectionKey[] = ["profile", "email", "password", "notifications", "emergency", "medical", "clubs", "locations"];
+type SectionKey = "profile" | "email" | "password" | "notifications" | "emergency" | "medical" | "clubs" | "locations" | "roles" | "templates" | "feedback";
+const DEFAULT_ORDER: SectionKey[] = ["roles", "templates", "feedback", "profile", "email", "password", "notifications", "emergency", "medical", "clubs", "locations"];
 
 function SettingsPage() {
   const { user, signOut } = useAuth();
@@ -127,7 +127,9 @@ function SettingsPage() {
   const [open, setOpen] = useState<Record<SectionKey, boolean>>({
     profile: false, email: false, password: false, notifications: false,
     emergency: false, medical: false, clubs: false, locations: false,
+    roles: false, templates: false, feedback: false,
   });
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [dragKey, setDragKey] = useState<SectionKey | null>(null);
 
   const approvedClubIds = memberships.filter((m) => m.status === "approved").map((m) => m.club_id);
@@ -183,11 +185,11 @@ function SettingsPage() {
       });
   }, [user?.id, activeClubId]);
 
-  // Load preferences (order + notification toggles)
+  // Load notification preferences from Supabase
   useEffect(() => {
     if (!user) return;
     supabase.from("member_preferences")
-      .select("settings_section_order, notify_session_reminders, notify_new_sessions, notify_carpool_updates, notify_equipment, notify_join_requests, notify_fault_reports, notify_carpool_pending")
+      .select("notify_session_reminders, notify_new_sessions, notify_carpool_updates, notify_equipment, notify_join_requests, notify_fault_reports, notify_carpool_pending")
       .eq("user_id", user.id).maybeSingle()
       .then(({ data }) => {
         if (!data) return;
@@ -200,20 +202,23 @@ function SettingsPage() {
           notify_fault_reports: data.notify_fault_reports,
           notify_carpool_pending: data.notify_carpool_pending,
         });
-        const saved = (data.settings_section_order as string[]) ?? [];
-        if (saved.length) {
-          // Merge: keep saved order, append any new sections not yet stored
-          const filtered = saved.filter((k): k is SectionKey => (DEFAULT_ORDER as string[]).includes(k));
-          const missing = DEFAULT_ORDER.filter((k) => !filtered.includes(k));
-          setOrder([...filtered, ...missing]);
-        }
       });
   }, [user?.id]);
 
-  const persistOrder = async (next: SectionKey[]) => {
-    if (!user) return;
-    await supabase.from("member_preferences")
-      .upsert({ user_id: user.id, settings_section_order: next }, { onConflict: "user_id" });
+  // Load section order from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("settings-section-order");
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved) as string[];
+      const filtered = parsed.filter((k): k is SectionKey => (DEFAULT_ORDER as string[]).includes(k));
+      const missing = DEFAULT_ORDER.filter((k) => !filtered.includes(k));
+      setOrder([...filtered, ...missing]);
+    } catch {}
+  }, []);
+
+  const persistOrder = (next: SectionKey[]) => {
+    localStorage.setItem("settings-section-order", JSON.stringify(next));
   };
 
   const persistPrefs = async (next: Prefs) => {
@@ -419,7 +424,10 @@ function SettingsPage() {
     persistOrder(next);
   };
 
-  const sectionMeta: Record<SectionKey, { title: string; icon: React.ReactNode; subtitle?: string }> = useMemo(() => ({
+  const sectionMeta: Record<SectionKey, { title: string; icon: React.ReactNode; subtitle?: string; desc?: string }> = useMemo(() => ({
+    roles: { title: "Roles & Permissions", icon: <ShieldAlert className="h-4 w-4 text-primary" />, desc: "Assign club admins and coaches, and configure what coaches can do." },
+    templates: { title: "Templates", icon: <ShieldAlert className="h-4 w-4 text-primary" />, desc: "Saved carpool setups, surveys, training plans and drills." },
+    feedback: { title: "Send Feedback", icon: <MessageSquare className="h-4 w-4 text-primary" />, desc: "Report a bug, suggest a feature, or ask a question." },
     profile: { title: "Profile", icon: <User className="h-4 w-4 text-primary" /> },
     email: { title: "Email", icon: <Mail className="h-4 w-4 text-primary" /> },
     password: { title: "Password", icon: <KeyRound className="h-4 w-4 text-primary" /> },
@@ -436,6 +444,49 @@ function SettingsPage() {
 
   const renderSection = (key: SectionKey) => {
     const meta = sectionMeta[key];
+
+    // Nav / action sections — no collapsible, just a tappable row that navigates or opens a dialog
+    if (key === "roles" || key === "templates" || key === "feedback") {
+      const onClick =
+        key === "roles" ? () => navigate({ to: "/settings/roles" })
+        : key === "templates" ? () => navigate({ to: "/settings/templates" })
+        : () => setFeedbackOpen(true);
+      return (
+        <Card
+          key={key}
+          className={`p-0 overflow-hidden transition-opacity ${dragKey === key ? "opacity-50" : ""}`}
+          onDragOver={onDragOver}
+          onDrop={onDrop(key)}
+        >
+          <div className="flex items-center gap-1 px-2 py-2">
+            <button
+              type="button"
+              draggable
+              onDragStart={onDragStart(key)}
+              className="p-2 -ml-1 cursor-grab active:cursor-grabbing touch-none text-muted-foreground hover:text-foreground"
+              aria-label="Drag to reorder"
+              title="Drag to reorder"
+            >
+              <GripVertical className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={onClick}
+              className="flex-1 flex items-center gap-2 py-2 pr-2 text-left"
+            >
+              {meta.icon}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold truncate">{meta.title}</div>
+                {meta.desc && <div className="text-xs text-muted-foreground truncate">{meta.desc}</div>}
+              </div>
+              <ChevronDown className="h-4 w-4 -rotate-90 text-muted-foreground" />
+            </button>
+          </div>
+        </Card>
+      );
+    }
+
+    // Collapsible sections
     return (
       <Card
         key={key}
@@ -471,14 +522,15 @@ function SettingsPage() {
             </CollapsibleTrigger>
           </div>
           <CollapsibleContent>
-            <div className="px-4 pb-4 pt-1">{renderBody(key)}</div>
+            <div className="px-4 pb-4 pt-1">{renderBody(key as CollapsibleKey)}</div>
           </CollapsibleContent>
         </Collapsible>
       </Card>
     );
   };
 
-  const renderBody = (key: SectionKey) => {
+  type CollapsibleKey = Exclude<SectionKey, "roles" | "templates" | "feedback">;
+  const renderBody = (key: CollapsibleKey) => {
     switch (key) {
       case "profile":
         return (
@@ -768,6 +820,11 @@ function SettingsPage() {
   const isClubAdmin = activeClub?.roles.some((r) => r === "owner" || r === "club_admin") ?? false;
   const showRolesLink = isClubAdmin || isPlatformOwner;
 
+  const visibleOrder = order.filter((key) => {
+    if (key === "roles") return showRolesLink;
+    if (key === "templates") return canManage;
+    return true;
+  });
 
   return (
     <AppShell>
@@ -776,49 +833,16 @@ function SettingsPage() {
         Tap a section to expand. Drag <GripVertical className="inline h-3 w-3" /> to reorder — your layout is saved.
       </p>
 
-      {showRolesLink && (
-        <Card className="p-3 mb-3">
-          <button
-            type="button"
-            onClick={() => navigate({ to: "/settings/roles" })}
-            className="flex w-full items-center gap-3 text-left"
-          >
-            <ShieldAlert className="h-4 w-4 text-primary" />
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold">Roles & Permissions</div>
-              <div className="text-xs text-muted-foreground">
-                Assign club admins and coaches, and configure what coaches can do.
-              </div>
-            </div>
-            <ChevronDown className="h-4 w-4 -rotate-90 text-muted-foreground" />
-          </button>
-        </Card>
-      )}
-
-      {canManage && (
-        <Card className="p-3 mb-3">
-          <button
-            type="button"
-            onClick={() => navigate({ to: "/settings/templates" })}
-            className="flex w-full items-center gap-3 text-left"
-          >
-            <ShieldAlert className="h-4 w-4 text-primary" />
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold">Templates</div>
-              <div className="text-xs text-muted-foreground">
-                Saved carpool setups, surveys, training plans and drills.
-              </div>
-            </div>
-            <ChevronDown className="h-4 w-4 -rotate-90 text-muted-foreground" />
-          </button>
-        </Card>
-      )}
-
-      <FeedbackCard clubId={activeClubId ?? null} userId={user?.id ?? null} />
-
       <div className="space-y-3">
-        {order.map((key) => renderSection(key))}
+        {visibleOrder.map((key) => renderSection(key))}
       </div>
+
+      <FeedbackDialog
+        open={feedbackOpen}
+        onOpenChange={setFeedbackOpen}
+        clubId={activeClubId ?? null}
+        userId={user?.id ?? null}
+      />
 
       <SignOutButton onConfirm={signOut} />
     </AppShell>
@@ -828,8 +852,12 @@ function SettingsPage() {
 
 type FeedbackCategory = "bug" | "suggestion" | "question";
 
-function FeedbackCard({ clubId, userId }: { clubId: string | null; userId: string | null }) {
-  const [open, setOpen] = useState(false);
+function FeedbackDialog({ open, onOpenChange, clubId, userId }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  clubId: string | null;
+  userId: string | null;
+}) {
   const [category, setCategory] = useState<FeedbackCategory>("suggestion");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -849,77 +877,60 @@ function FeedbackCard({ clubId, userId }: { clubId: string | null; userId: strin
     setSubmitting(false);
     if (error) { toast.error(error.message); return; }
     toast.success("Feedback sent — thank you!");
-    setOpen(false);
+    onOpenChange(false);
     setMessage("");
     setCategory("suggestion");
   };
 
   return (
-    <>
-      <Card className="p-3 mb-3">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="flex w-full items-center gap-3 text-left"
-        >
-          <MessageSquare className="h-4 w-4 text-primary" />
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold">Send Feedback</div>
-            <div className="text-xs text-muted-foreground">Report a bug, suggest a feature, or ask a question.</div>
-          </div>
-          <ChevronDown className="h-4 w-4 -rotate-90 text-muted-foreground" />
-        </button>
-      </Card>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Send Feedback</DialogTitle>
-            <DialogDescription>We read every submission. Thank you for helping improve the app.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 pt-1">
-            <div className="space-y-1.5">
-              <Label>Category</Label>
-              <div className="flex gap-2">
-                {(["bug", "suggestion", "question"] as FeedbackCategory[]).map((c) => {
-                  const emoji = c === "bug" ? "🐛" : c === "suggestion" ? "💡" : "❓";
-                  const label = c.charAt(0).toUpperCase() + c.slice(1);
-                  return (
-                    <Button
-                      key={c}
-                      type="button"
-                      variant={category === c ? "default" : "outline"}
-                      className="flex-1 gap-1"
-                      onClick={() => setCategory(c)}
-                    >
-                      {emoji} {label}
-                    </Button>
-                  );
-                })}
-              </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Send Feedback</DialogTitle>
+          <DialogDescription>We read every submission. Thank you for helping improve the app.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 pt-1">
+          <div className="space-y-1.5">
+            <Label>Category</Label>
+            <div className="flex gap-2">
+              {(["bug", "suggestion", "question"] as FeedbackCategory[]).map((c) => {
+                const emoji = c === "bug" ? "🐛" : c === "suggestion" ? "💡" : "❓";
+                const label = c.charAt(0).toUpperCase() + c.slice(1);
+                return (
+                  <Button
+                    key={c}
+                    type="button"
+                    variant={category === c ? "default" : "outline"}
+                    className="flex-1 gap-1"
+                    onClick={() => setCategory(c)}
+                  >
+                    {emoji} {label}
+                  </Button>
+                );
+              })}
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="fb-msg">Message</Label>
-              <Textarea
-                id="fb-msg"
-                rows={4}
-                placeholder="Describe your bug, idea, or question… (min 20 characters)"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-              />
-              <p className="text-[11px] text-muted-foreground">{message.trim().length} / 20 characters minimum</p>
-            </div>
-            <Button
-              className="w-full"
-              disabled={submitting || message.trim().length < 20}
-              onClick={submit}
-            >
-              {submitting ? "Sending…" : "Submit feedback"}
-            </Button>
           </div>
-        </DialogContent>
-      </Dialog>
-    </>
+          <div className="space-y-1.5">
+            <Label htmlFor="fb-msg">Message</Label>
+            <Textarea
+              id="fb-msg"
+              rows={4}
+              placeholder="Describe your bug, idea, or question… (min 20 characters)"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+            />
+            <p className="text-[11px] text-muted-foreground">{message.trim().length} / 20 characters minimum</p>
+          </div>
+          <Button
+            className="w-full"
+            disabled={submitting || message.trim().length < 20}
+            onClick={submit}
+          >
+            {submitting ? "Sending…" : "Submit feedback"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
