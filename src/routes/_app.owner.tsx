@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Building2, MessageSquare, Users, CalendarDays, Mail, ExternalLink, HelpCircle } from "lucide-react";
+import { Building2, MessageSquare, Users, CalendarDays, Mail, ExternalLink, HelpCircle, ChevronDown, ChevronRight, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/owner")({
@@ -34,6 +34,16 @@ function OwnerPage() {
 }
 
 type RoleCount = { club_admin: number; coach: number; member: number; owner: number };
+
+type ClubMember = {
+  membership_id: string;
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  role: string;
+  status: string;
+};
 
 type Club = {
   id: string;
@@ -240,6 +250,9 @@ function OwnerDashboard() {
         </div>
       )}
 
+      {/* Club Members Management */}
+      <ClubMembersSection clubs={clubs} />
+
       {/* Support Requests */}
       <Card className="p-4 space-y-3 mb-6">
         <div className="flex items-center gap-2">
@@ -325,6 +338,193 @@ function OwnerDashboard() {
         )}
       </Card>
     </AppShell>
+  );
+}
+
+function ClubMembersSection({ clubs }: { clubs: Club[] }) {
+  return (
+    <div className="mb-6">
+      <div className="mb-2 flex items-center gap-2">
+        <ShieldAlert className="h-4 w-4 text-primary" />
+        <h2 className="font-semibold">Club Members</h2>
+        <span className="ml-auto text-xs text-muted-foreground">Manage roles &amp; statuses</span>
+      </div>
+      {clubs.length === 0 ? (
+        <Card className="p-4">
+          <EmptyState title="No clubs yet" description="Club member management will appear here." />
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {clubs.map((c) => <ClubMembersCard key={c.id} club={c} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ClubMembersCard({ club }: { club: Club }) {
+  const [open, setOpen] = useState(false);
+  const [members, setMembers] = useState<ClubMember[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  const load = async () => {
+    if (loaded) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("club_memberships")
+      .select("id, user_id, role, status")
+      .eq("club_id", club.id)
+      .order("status");
+
+    if (error) { toast.error(error.message); setLoading(false); return; }
+
+    const userIds = (data ?? []).map((m) => m.user_id);
+    if (userIds.length === 0) { setMembers([]); setLoaded(true); setLoading(false); return; }
+
+    const [{ data: memberData }, { data: profileData }] = await Promise.all([
+      supabase.from("members").select("auth_user_id, first_name, last_name").in("auth_user_id", userIds),
+      supabase.from("profiles").select("id, email").in("id", userIds),
+    ]);
+
+    const memberMap: Record<string, { first_name: string; last_name: string }> = {};
+    (memberData ?? []).forEach((m) => { memberMap[m.auth_user_id] = { first_name: m.first_name, last_name: m.last_name }; });
+
+    const emailMap: Record<string, string> = {};
+    (profileData ?? []).forEach((p) => { if (p.email) emailMap[p.id] = p.email; });
+
+    setMembers(
+      (data ?? []).map((m) => ({
+        membership_id: m.id,
+        user_id: m.user_id,
+        first_name: memberMap[m.user_id]?.first_name ?? "Unknown",
+        last_name: memberMap[m.user_id]?.last_name ?? "",
+        email: emailMap[m.user_id] ?? "—",
+        role: m.role,
+        status: m.status,
+      })),
+    );
+    setLoaded(true);
+    setLoading(false);
+  };
+
+  const toggle = () => {
+    if (!open) load();
+    setOpen((v) => !v);
+  };
+
+  const updateMember = async (membershipId: string, patch: { role?: string; status?: string }) => {
+    const update: Record<string, string> = {};
+    if (patch.role) update.role = patch.role;
+    if (patch.status) {
+      update.status = patch.status;
+      if (patch.status === "approved") update.approved_at = new Date().toISOString();
+    }
+    const { error } = await supabase.from("club_memberships").update(update).eq("id", membershipId);
+    if (error) { toast.error(error.message); return; }
+    setMembers((prev) =>
+      prev.map((m) => m.membership_id === membershipId ? { ...m, ...patch } : m),
+    );
+    toast.success("Member updated");
+  };
+
+  return (
+    <Card className="overflow-hidden">
+      <button
+        onClick={toggle}
+        className="w-full flex items-center gap-3 p-3 text-left hover:bg-muted/50 transition-colors"
+      >
+        {open ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" /> : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
+        <span className="font-medium text-sm">{club.club_name}</span>
+        <Badge variant="secondary" className="ml-auto text-xs">{club.member_count} members</Badge>
+      </button>
+
+      {open && (
+        <div className="border-t">
+          {loading ? (
+            <div className="p-4 text-sm text-muted-foreground text-center">Loading members…</div>
+          ) : members.length === 0 ? (
+            <div className="p-4 text-sm text-muted-foreground text-center">No members found.</div>
+          ) : (
+            <div className="divide-y">
+              {members.map((m) => (
+                <MemberRow key={m.membership_id} member={m} onSave={(patch) => updateMember(m.membership_id, patch)} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+const ROLES = ["member", "coach", "club_admin"] as const;
+const STATUSES = ["pending", "approved", "rejected"] as const;
+
+function MemberRow({ member, onSave }: { member: ClubMember; onSave: (patch: { role?: string; status?: string }) => Promise<void> }) {
+  const [role, setRole] = useState(member.role);
+  const [status, setStatus] = useState(member.status);
+  const [saving, setSaving] = useState(false);
+
+  const dirty = role !== member.role || status !== member.status;
+
+  const save = async () => {
+    setSaving(true);
+    const patch: { role?: string; status?: string } = {};
+    if (role !== member.role) patch.role = role;
+    if (status !== member.status) patch.status = status;
+    await onSave(patch);
+    setSaving(false);
+  };
+
+  const statusColor: Record<string, string> = {
+    approved: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+    pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
+    rejected: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 p-3">
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium truncate">{member.first_name} {member.last_name}</div>
+        <div className="text-xs text-muted-foreground truncate">{member.email}</div>
+      </div>
+
+      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${statusColor[member.status] ?? "bg-gray-100 text-gray-700"}`}>
+        {member.status}
+      </span>
+
+      <Select value={role} onValueChange={setRole}>
+        <SelectTrigger className="h-7 w-[110px] text-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {ROLES.map((r) => (
+            <SelectItem key={r} value={r} className="text-xs">{r === "club_admin" ? "Admin" : r.charAt(0).toUpperCase() + r.slice(1)}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select value={status} onValueChange={setStatus}>
+        <SelectTrigger className="h-7 w-[100px] text-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {STATUSES.map((s) => (
+            <SelectItem key={s} value={s} className="text-xs">{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Button
+        size="sm"
+        className="h-7 px-3 text-xs"
+        disabled={!dirty || saving}
+        onClick={save}
+      >
+        {saving ? "Saving…" : "Save"}
+      </Button>
+    </div>
   );
 }
 
