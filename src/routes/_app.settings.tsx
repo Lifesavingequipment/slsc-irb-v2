@@ -20,7 +20,7 @@ import {
 import { LocationsSection } from "@/components/settings/LocationsSection";
 import {
   LogOut, Plus, Trash2, ShieldAlert, HeartPulse, User, Mail, KeyRound,
-  Bell, MapPin, GripVertical, ChevronDown, MessageSquare,
+  Bell, MapPin, ChevronDown, MessageSquare,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -82,7 +82,8 @@ const DEFAULT_PREFS: Prefs = {
 };
 
 type SectionKey = "profile" | "email" | "password" | "notifications" | "clubs" | "locations" | "roles" | "templates" | "feedback";
-const DEFAULT_ORDER: SectionKey[] = ["roles", "templates", "feedback", "profile", "email", "password", "notifications", "clubs", "locations"];
+// Fixed section order for all users. Visibility/permission rules still apply (see visibleOrder).
+const SECTION_ORDER: SectionKey[] = ["profile", "email", "password", "notifications", "clubs", "locations", "roles", "templates", "feedback"];
 
 function SettingsPage() {
   const { user, signOut } = useAuth();
@@ -122,7 +123,6 @@ function SettingsPage() {
 
   // Preferences
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
-  const [order, setOrder] = useState<SectionKey[]>(DEFAULT_ORDER);
   // All sections collapsed by default for a cleaner Settings landing.
   const [open, setOpen] = useState<Record<SectionKey, boolean>>({
     profile: false, email: false, password: false, notifications: false,
@@ -130,7 +130,6 @@ function SettingsPage() {
     roles: false, templates: false, feedback: false,
   });
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [dragKey, setDragKey] = useState<SectionKey | null>(null);
 
   const approvedClubIds = memberships.filter((m) => m.status === "approved").map((m) => m.club_id);
   const activeClubId = activeClub?.club_id ?? approvedClubIds[0];
@@ -204,22 +203,6 @@ function SettingsPage() {
         });
       });
   }, [user?.id]);
-
-  // Load section order from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem("settings-section-order");
-    if (!saved) return;
-    try {
-      const parsed = JSON.parse(saved) as string[];
-      const filtered = parsed.filter((k): k is SectionKey => (DEFAULT_ORDER as string[]).includes(k));
-      const missing = DEFAULT_ORDER.filter((k) => !filtered.includes(k));
-      setOrder([...filtered, ...missing]);
-    } catch {}
-  }, []);
-
-  const persistOrder = (next: SectionKey[]) => {
-    localStorage.setItem("settings-section-order", JSON.stringify(next));
-  };
 
   const persistPrefs = async (next: Prefs) => {
     if (!user) return;
@@ -402,28 +385,6 @@ function SettingsPage() {
     toast.success("Medical info saved");
   };
 
-  // Drag-and-drop helpers (native HTML5 DnD)
-  const onDragStart = (key: SectionKey) => (e: React.DragEvent) => {
-    setDragKey(key);
-    e.dataTransfer.effectAllowed = "move";
-  };
-  const onDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-  };
-  const onDrop = (target: SectionKey) => (e: React.DragEvent) => {
-    e.preventDefault();
-    if (!dragKey || dragKey === target) { setDragKey(null); return; }
-    const next = [...order];
-    const from = next.indexOf(dragKey);
-    const to = next.indexOf(target);
-    next.splice(from, 1);
-    next.splice(to, 0, dragKey);
-    setOrder(next);
-    setDragKey(null);
-    persistOrder(next);
-  };
-
   const sectionMeta: Record<SectionKey, { title: string; icon: React.ReactNode; subtitle?: string }> = useMemo(() => ({
     roles: { title: "Roles & Permissions", icon: <ShieldAlert className="h-4 w-4 text-primary" /> },
     templates: { title: "Templates", icon: <ShieldAlert className="h-4 w-4 text-primary" /> },
@@ -446,27 +407,12 @@ function SettingsPage() {
         : key === "templates" ? () => navigate({ to: "/settings/templates" })
         : () => setFeedbackOpen(true);
       return (
-        <Card
-          key={key}
-          className={`p-0 overflow-hidden transition-opacity ${dragKey === key ? "opacity-50" : ""}`}
-          onDragOver={onDragOver}
-          onDrop={onDrop(key)}
-        >
+        <Card key={key} className="p-0 overflow-hidden">
           <div className="flex items-center gap-1 px-2 py-2">
             <button
               type="button"
-              draggable
-              onDragStart={onDragStart(key)}
-              className="p-2 -ml-1 cursor-grab active:cursor-grabbing touch-none text-muted-foreground hover:text-foreground"
-              aria-label="Drag to reorder"
-              title="Drag to reorder"
-            >
-              <GripVertical className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
               onClick={onClick}
-              className="flex-1 flex items-center gap-2 py-2 pr-2 text-left"
+              className="flex-1 flex items-center gap-2 py-2 px-2 text-left"
             >
               {meta.icon}
               <div className="flex-1 min-w-0">
@@ -481,25 +427,10 @@ function SettingsPage() {
 
     // Collapsible sections
     return (
-      <Card
-        key={key}
-        className={`p-0 overflow-hidden transition-opacity ${dragKey === key ? "opacity-50" : ""}`}
-        onDragOver={onDragOver}
-        onDrop={onDrop(key)}
-      >
+      <Card key={key} className="p-0 overflow-hidden">
         <Collapsible open={open[key]} onOpenChange={(v) => setOpen((p) => ({ ...p, [key]: v }))}>
           <div className="flex items-center gap-1 px-2 py-2">
-            <button
-              type="button"
-              draggable
-              onDragStart={onDragStart(key)}
-              className="p-2 -ml-1 cursor-grab active:cursor-grabbing touch-none text-muted-foreground hover:text-foreground"
-              aria-label="Drag to reorder"
-              title="Drag to reorder"
-            >
-              <GripVertical className="h-4 w-4" />
-            </button>
-            <CollapsibleTrigger className="flex-1 flex items-center gap-2 py-2 pr-2 text-left">
+            <CollapsibleTrigger className="flex-1 flex items-center gap-2 py-2 px-2 text-left">
               {meta.icon}
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold truncate">
@@ -840,7 +771,7 @@ function SettingsPage() {
   const isClubAdmin = activeClub?.roles.some((r) => r === "owner" || r === "club_admin") ?? false;
   const showRolesLink = isClubAdmin || isPlatformOwner;
 
-  const visibleOrder = order.filter((key) => {
+  const visibleOrder = SECTION_ORDER.filter((key) => {
     if (key === "roles") return showRolesLink;
     if (key === "templates") return canManage;
     return true;
@@ -850,7 +781,7 @@ function SettingsPage() {
     <AppShell>
       <h1 className="text-2xl font-bold mb-1">Settings</h1>
       <p className="text-xs text-muted-foreground mb-4">
-        Tap a section to expand. Drag <GripVertical className="inline h-3 w-3" /> to reorder — your layout is saved.
+        Tap a section to expand.
       </p>
 
       <div className="space-y-3">
