@@ -8,19 +8,24 @@ import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, Plus, Users } from "lucide-react";
+import { Calendar, MapPin, Plus, Users, X } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useRefetchOnFocus } from "@/hooks/use-refetch-on-focus";
 import { SessionsCalendar } from "@/components/session/SessionsCalendar";
 
 export const Route = createFileRoute("/_app/sessions/")({
   head: () => ({ meta: [{ title: "Sessions — IRB Coaching" }] }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    filter: search.filter === "surveys-pending" || search.filter === "rsvp-pending"
+      ? (search.filter as "surveys-pending" | "rsvp-pending")
+      : undefined,
+  }),
   component: SessionsList,
 });
 
 type Row = {
   id: string; title: string; starts_at: string; location: string | null;
-  session_type: string; format: string | null;
+  session_type: string; format: string | null; survey_enabled: boolean;
 };
 
 // Module-level cache keyed by `${clubId}:${tab}` so navigating back/forward
@@ -71,6 +76,7 @@ function SessionsList() {
   const { activeClub } = useClub();
   const { user } = useAuth();
   const canManage = useCanManage();
+  const { filter } = Route.useSearch();
   const [tab, setTab] = useState<TabKey>("upcoming");
   // Cache only "upcoming" and "past" — the week views derive from upcoming rows in memory.
   const fetchTab: "upcoming" | "past" = tab === "past" ? "past" : "upcoming";
@@ -87,7 +93,7 @@ function SessionsList() {
     const nowIso = new Date().toISOString();
     const base = supabase
       .from("sessions")
-      .select("id, title, starts_at, location, session_type, format, ends_at")
+      .select("id, title, starts_at, location, session_type, format, ends_at, survey_enabled")
       .eq("club_id", activeClub.club_id);
     const { data } = fetchTab === "upcoming"
       ? await base
@@ -159,6 +165,14 @@ function SessionsList() {
     });
   }, [rows, tab]);
 
+  // Apply filter from URL search params on top of the tab-derived list.
+  const filteredRows = useMemo(() => {
+    if (!filter) return visibleRows;
+    if (filter === "rsvp-pending") return visibleRows.filter((r) => !myRsvps[r.id]);
+    if (filter === "surveys-pending") return visibleRows.filter((r) => r.survey_enabled);
+    return visibleRows;
+  }, [visibleRows, filter, myRsvps]);
+
 
   return (
     <AppShell
@@ -169,6 +183,18 @@ function SessionsList() {
       ) : undefined}
     >
       <h1 className="text-2xl font-bold mb-3">Sessions</h1>
+
+      {filter && (
+        <div className="mb-4 flex items-center gap-2 px-3 py-2.5 rounded-lg bg-muted text-sm">
+          <span className="flex-1 font-medium">
+            {filter === "surveys-pending" ? "Showing sessions with pending surveys" : "Showing sessions with pending RSVPs"}
+          </span>
+          <Link to="/sessions" search={{}} className="shrink-0 text-muted-foreground hover:text-foreground transition-colors">
+            <X className="h-4 w-4" />
+          </Link>
+        </div>
+      )}
+
       <div className="flex gap-1 overflow-x-auto -mx-1 px-1 mb-4 pb-1">
         {(Object.keys(TAB_LABELS) as TabKey[]).map((t) => (
           <button
@@ -183,25 +209,29 @@ function SessionsList() {
 
       {tab === "calendar" ? (
         <SessionsCalendar rows={rows} />
-      ) : !loaded && visibleRows.length === 0 ? (
+      ) : !loaded && filteredRows.length === 0 ? (
         <div className="space-y-3" aria-busy="true">
           {[0, 1, 2].map((i) => (
             <Card key={i} className="p-4 h-24 animate-pulse bg-muted/30" />
           ))}
         </div>
-      ) : visibleRows.length === 0 ? (
+      ) : filteredRows.length === 0 ? (
         <EmptyState
           icon={<Calendar className="h-5 w-5" />}
           title={
-            tab === "past" ? "No past sessions"
+            filter === "surveys-pending" ? "No sessions with pending surveys"
+              : filter === "rsvp-pending" ? "No sessions with pending RSVPs"
+              : tab === "past" ? "No past sessions"
               : tab === "this_week" ? "Nothing on this week"
               : tab === "next_week" ? "Nothing on next week"
               : "No upcoming sessions"
           }
-          description={tab === "upcoming" || tab === "this_week" || tab === "next_week"
+          description={filter
+            ? "Nothing matched this filter."
+            : tab === "upcoming" || tab === "this_week" || tab === "next_week"
             ? "Sessions are how crews coordinate training, races, and patrols. Schedule one so members can RSVP and sort carpools."
             : "Completed sessions will show up here once they've finished."}
-          action={tab !== "past" && canManage ? (
+          action={!filter && tab !== "past" && canManage ? (
             <Button asChild>
               <Link to="/sessions/new">
                 <Plus className="h-4 w-4 mr-1" /> Schedule a session
@@ -211,7 +241,7 @@ function SessionsList() {
         />
       ) : (
         <div className="space-y-3">
-          {visibleRows.map((s) => (
+          {filteredRows.map((s) => (
             <Link key={s.id} to="/sessions/$sessionId" params={{ sessionId: s.id }}>
               <Card className="p-4 hover:border-accent transition-colors">
                 <div className="flex items-center gap-2 mb-1">

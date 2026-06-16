@@ -132,18 +132,22 @@ function Dashboard() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-4">
-        <Card className="p-4 bg-white border border-[#e5e7eb] shadow-none">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
-            <Users className="h-3.5 w-3.5" /> Members
-          </div>
-          <div className="mt-1 text-2xl font-bold">{memberCount ?? "—"}</div>
-        </Card>
-        <Card className="p-4 bg-white border border-[#e5e7eb] shadow-none">
-          <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
-            <Calendar className="h-3.5 w-3.5" /> Upcoming
-          </div>
-          <div className="mt-1 text-2xl font-bold">{loaded ? upcoming.length : "—"}</div>
-        </Card>
+        <Link to="/members">
+          <Card className="p-4 bg-white border border-[#e5e7eb] shadow-none hover:border-accent transition-colors cursor-pointer">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
+              <Users className="h-3.5 w-3.5" /> Members
+            </div>
+            <div className="mt-1 text-2xl font-bold">{memberCount ?? "—"}</div>
+          </Card>
+        </Link>
+        <Link to="/sessions">
+          <Card className="p-4 bg-white border border-[#e5e7eb] shadow-none hover:border-accent transition-colors cursor-pointer">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
+              <Calendar className="h-3.5 w-3.5" /> Upcoming
+            </div>
+            <div className="mt-1 text-2xl font-bold">{loaded ? upcoming.length : "—"}</div>
+          </Card>
+        </Link>
       </div>
 
       <div className="mb-6">
@@ -155,6 +159,7 @@ function Dashboard() {
             count={next7.surveysPending}
             cta="Complete Surveys"
             to="/sessions"
+            search={{ filter: "surveys-pending" }}
             tone={next7.surveysPending > 0 ? "warning" : "muted"}
           />
           <DashAction
@@ -163,6 +168,7 @@ function Dashboard() {
             count={next7.rsvpsPending}
             cta="Complete RSVPs"
             to="/sessions"
+            search={{ filter: "rsvp-pending" }}
             tone={next7.rsvpsPending > 0 ? "warning" : "muted"}
           />
           <DashAction
@@ -266,12 +272,13 @@ function Dashboard() {
   );
 }
 
-function DashAction({ icon, label, count, cta, to, tone }: {
+function DashAction({ icon, label, count, cta, to, search, tone }: {
   icon: React.ReactNode;
   label: string;
   count: number;
   cta: string;
   to: string;
+  search?: Record<string, string>;
   tone: "warning" | "muted";
 }) {
   return (
@@ -282,7 +289,8 @@ function DashAction({ icon, label, count, cta, to, tone }: {
         <div className="text-2xl font-bold leading-tight">{count}</div>
       </div>
       <Button asChild size="sm" variant={tone === "warning" && count > 0 ? "default" : "outline"}>
-        <Link to={to as "/sessions"}>{cta}</Link>
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        <Link to={to as "/sessions"} search={search as any}>{cta}</Link>
       </Button>
     </Card>
   );
