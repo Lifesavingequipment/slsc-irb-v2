@@ -15,7 +15,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Send, MessageSquare, ArrowLeft } from "lucide-react";
+import { Plus, Send, MessageSquare, ArrowLeft, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/ui/empty-state";
 
@@ -77,6 +77,8 @@ function ChatPage() {
   const [loading, setLoading] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
   const realtimeRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [actionMenu, setActionMenu] = useState<{ msgId: string; x: number; y: number } | null>(null);
 
   // Load self
   useEffect(() => {
@@ -245,13 +247,52 @@ function ChatPage() {
           void loadChannels();
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "chat_messages", filter: `channel_id=eq.${channelId}` },
+        (payload) => {
+          const oldId = (payload.old as { id?: string }).id;
+          if (!oldId) return;
+          setMessages((prev) => prev.filter((m) => m.id !== oldId));
+          void loadChannels();
+        },
+      )
       .subscribe();
     realtimeRef.current = ch;
   }, [loadMessages, markRead, loadChannels]);
 
   useEffect(() => {
-    return () => { if (realtimeRef.current) void supabase.removeChannel(realtimeRef.current); };
+    return () => {
+      if (realtimeRef.current) void supabase.removeChannel(realtimeRef.current);
+      if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    };
   }, []);
+
+  const startLongPress = useCallback((e: React.PointerEvent, msgId: string, canDelete: boolean) => {
+    if (!canDelete) return;
+    const x = e.clientX;
+    const y = e.clientY;
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    longPressTimer.current = setTimeout(() => {
+      setActionMenu({ msgId, x, y });
+    }, 500);
+  }, []);
+
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+  }, []);
+
+  const deleteMessage = useCallback(async (id: string) => {
+    setActionMenu(null);
+    setMessages((prev) => prev.filter((m) => m.id !== id));
+    const { error } = await supabase.from("chat_messages").delete().eq("id", id);
+    if (error) {
+      toast.error(error.message);
+      if (activeChannelId) void loadMessages(activeChannelId);
+      return;
+    }
+    void loadChannels();
+  }, [activeChannelId, loadMessages, loadChannels]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -419,6 +460,7 @@ function ChatPage() {
                   )}
                   {messages.map((msg) => {
                     const isMe = msg.sender_id === myMemberId;
+                    const canDelete = isMe || canManage;
                     return (
                       <div key={msg.id} className={`flex gap-2 ${isMe ? "flex-row-reverse" : ""}`}>
                         {!isMe && (
@@ -431,7 +473,12 @@ function ChatPage() {
                             <span className="text-[10px] text-muted-foreground mb-0.5 px-1">{msg.senderName}</span>
                           )}
                           <div
-                            className={`rounded-2xl px-3 py-2 text-sm break-words ${
+                            onPointerDown={(e) => startLongPress(e, msg.id, canDelete)}
+                            onPointerUp={cancelLongPress}
+                            onPointerLeave={cancelLongPress}
+                            onPointerMove={cancelLongPress}
+                            onContextMenu={(e) => { if (canDelete) e.preventDefault(); }}
+                            className={`rounded-2xl px-3 py-2 text-sm break-words select-none ${
                               isMe
                                 ? "bg-[#E63329] text-white rounded-tr-sm"
                                 : "bg-muted text-foreground rounded-tl-sm"
@@ -555,6 +602,28 @@ function ChatPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Long-press message action menu */}
+      {actionMenu && (
+        <>
+          <div className="fixed inset-0 z-50" onClick={() => setActionMenu(null)} />
+          <div
+            className="fixed z-50 min-w-[140px] rounded-lg border bg-popover text-popover-foreground shadow-md py-1 animate-in fade-in-0 zoom-in-95"
+            style={{
+              left: Math.max(8, Math.min(actionMenu.x, window.innerWidth - 156)),
+              top: Math.max(8, Math.min(actionMenu.y, window.innerHeight - 60)),
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => void deleteMessage(actionMenu.msgId)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-accent/60 transition-colors"
+            >
+              <Trash2 className="h-4 w-4" /> Delete
+            </button>
+          </div>
+        </>
+      )}
     </AppShell>
   );
 }
