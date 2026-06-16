@@ -81,8 +81,8 @@ const DEFAULT_PREFS: Prefs = {
   notify_carpool_pending: true,
 };
 
-type SectionKey = "profile" | "email" | "password" | "notifications" | "emergency" | "medical" | "clubs" | "locations" | "roles" | "templates" | "feedback";
-const DEFAULT_ORDER: SectionKey[] = ["roles", "templates", "feedback", "profile", "email", "password", "notifications", "emergency", "medical", "clubs", "locations"];
+type SectionKey = "profile" | "email" | "password" | "notifications" | "clubs" | "locations" | "roles" | "templates" | "feedback";
+const DEFAULT_ORDER: SectionKey[] = ["roles", "templates", "feedback", "profile", "email", "password", "notifications", "clubs", "locations"];
 
 function SettingsPage() {
   const { user, signOut } = useAuth();
@@ -126,7 +126,7 @@ function SettingsPage() {
   // All sections collapsed by default for a cleaner Settings landing.
   const [open, setOpen] = useState<Record<SectionKey, boolean>>({
     profile: false, email: false, password: false, notifications: false,
-    emergency: false, medical: false, clubs: false, locations: false,
+    clubs: false, locations: false,
     roles: false, templates: false, feedback: false,
   });
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -424,23 +424,17 @@ function SettingsPage() {
     persistOrder(next);
   };
 
-  const sectionMeta: Record<SectionKey, { title: string; icon: React.ReactNode; subtitle?: string; desc?: string }> = useMemo(() => ({
-    roles: { title: "Roles & Permissions", icon: <ShieldAlert className="h-4 w-4 text-primary" />, desc: "Assign club admins and coaches, and configure what coaches can do." },
-    templates: { title: "Templates", icon: <ShieldAlert className="h-4 w-4 text-primary" />, desc: "Saved carpool setups, surveys, training plans and drills." },
-    feedback: { title: "Send Feedback", icon: <MessageSquare className="h-4 w-4 text-primary" />, desc: "Report a bug, suggest a feature, or ask a question." },
+  const sectionMeta: Record<SectionKey, { title: string; icon: React.ReactNode; subtitle?: string }> = useMemo(() => ({
+    roles: { title: "Roles & Permissions", icon: <ShieldAlert className="h-4 w-4 text-primary" /> },
+    templates: { title: "Templates", icon: <ShieldAlert className="h-4 w-4 text-primary" /> },
+    feedback: { title: "Send Feedback", icon: <MessageSquare className="h-4 w-4 text-primary" /> },
     profile: { title: "Profile", icon: <User className="h-4 w-4 text-primary" /> },
     email: { title: "Email", icon: <Mail className="h-4 w-4 text-primary" /> },
     password: { title: "Password", icon: <KeyRound className="h-4 w-4 text-primary" /> },
     notifications: { title: "Notifications", icon: <Bell className="h-4 w-4 text-primary" /> },
-    emergency: { title: "Emergency contacts", icon: <ShieldAlert className="h-4 w-4 text-destructive" /> },
-    medical: {
-      title: "Medical info",
-      icon: <HeartPulse className="h-4 w-4 text-primary" />,
-      subtitle: activeClub?.club.name,
-    },
     clubs: { title: "Clubs", icon: <User className="h-4 w-4 text-primary" /> },
     locations: { title: "Saved locations", icon: <MapPin className="h-4 w-4 text-primary" /> },
-  }), [activeClub?.club.name]);
+  }), []);
 
   const renderSection = (key: SectionKey) => {
     const meta = sectionMeta[key];
@@ -477,7 +471,6 @@ function SettingsPage() {
               {meta.icon}
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold truncate">{meta.title}</div>
-                {meta.desc && <div className="text-xs text-muted-foreground truncate">{meta.desc}</div>}
               </div>
               <ChevronDown className="h-4 w-4 -rotate-90 text-muted-foreground" />
             </button>
@@ -529,71 +522,174 @@ function SettingsPage() {
     );
   };
 
+  const renderEmergency = () => (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs text-muted-foreground">Used by coaches in case of an incident.</p>
+        <Button type="button" variant="outline" size="sm" onClick={addContact} disabled={!activeClubId}>
+          <Plus className="h-4 w-4 mr-1" /> Add
+        </Button>
+      </div>
+      {contacts.length === 0 && (
+        <p className="text-sm text-muted-foreground">No emergency contacts yet.</p>
+      )}
+      <div className="space-y-4">
+        {contacts.map((c) => (
+          <div key={c.id} className="rounded-lg border p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs text-muted-foreground truncate">
+                {memberships.find((m) => m.club_id === c.club_id)?.club.name ?? "Club"}
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+                  <input
+                    type="radio"
+                    name={`primary-${c.club_id}`}
+                    checked={c.is_primary}
+                    onChange={() => setPrimary(c.id)}
+                    className="h-3.5 w-3.5 accent-primary"
+                    aria-label="Set as primary contact"
+                  />
+                  Primary
+                </label>
+                <Button type="button" variant="ghost" size="sm" onClick={() => removeContact(c.id)} aria-label="Remove contact">
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Input placeholder="Name" value={c.name} onChange={(e) => updateContact(c.id, { name: e.target.value })} />
+              <Input placeholder="Phone" type="tel" value={c.phone} onChange={(e) => updateContact(c.id, { phone: e.target.value })} />
+              <Input placeholder="Relationship" value={c.relationship ?? ""} onChange={(e) => updateContact(c.id, { relationship: e.target.value })} />
+              <Input placeholder="Email (optional)" type="email" value={c.email ?? ""} onChange={(e) => updateContact(c.id, { email: e.target.value })} />
+            </div>
+          </div>
+        ))}
+      </div>
+      {contacts.length > 0 && (
+        <Button className="mt-3" onClick={saveContacts} disabled={savingContacts}>
+          {savingContacts ? "Saving…" : "Save contacts"}
+        </Button>
+      )}
+    </div>
+  );
+
+  const renderMedical = () => medical ? (
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <Label htmlFor="allergies">Allergies</Label>
+        <Input id="allergies" value={medical.allergies} onChange={(e) => setMedical({ ...medical, allergies: e.target.value })} />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="meds">Medications</Label>
+        <Input id="meds" value={medical.medications} onChange={(e) => setMedical({ ...medical, medications: e.target.value })} />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="notes">Notes</Label>
+        <Textarea id="notes" rows={3} value={medical.notes} onChange={(e) => setMedical({ ...medical, notes: e.target.value })} />
+      </div>
+      <Button onClick={saveMedical} disabled={savingMedical}>
+        {savingMedical ? "Saving…" : "Save medical info"}
+      </Button>
+    </div>
+  ) : (
+    <p className="text-sm text-muted-foreground">Join a club to add medical info.</p>
+  );
+
   type CollapsibleKey = Exclude<SectionKey, "roles" | "templates" | "feedback">;
   const renderBody = (key: CollapsibleKey) => {
     switch (key) {
       case "profile":
         return (
-          <form onSubmit={saveProfile} className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="name">Full name</Label>
-              <Input id="name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="dob">Date of birth</Label>
-                <Input id="dob" type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="gender">Gender</Label>
-                <Select value={gender || "__none"} onValueChange={(v) => setGender(v === "__none" ? "" : v)}>
-                  <SelectTrigger id="gender"><SelectValue placeholder="Select…" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none">Prefer not to say</SelectItem>
-                    <SelectItem value="male">Male</SelectItem>
-                    <SelectItem value="female">Female</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="age">Age division</Label>
-                <Select
-                  value={ageDivision || "__none"}
-                  onValueChange={(v) => setAgeDivision(v === "__none" ? "" : (v as AgeDivision))}
-                >
-                  <SelectTrigger id="age"><SelectValue placeholder="Select…" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none">Not set</SelectItem>
-                    {(Object.keys(AGE_LABELS) as AgeDivision[]).map((k) => (
-                      <SelectItem key={k} value={k}>{AGE_LABELS[k]}</SelectItem>
+          <div className="space-y-6">
+            {/* Personal Info */}
+            <section>
+              <h3 className="text-sm font-semibold mb-3">Personal Info</h3>
+              <form onSubmit={saveProfile} className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="name">Full name</Label>
+                  <Input id="name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="dob">Date of birth</Label>
+                    <Input id="dob" type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="gender">Gender</Label>
+                    <Select value={gender || "__none"} onValueChange={(v) => setGender(v === "__none" ? "" : v)}>
+                      <SelectTrigger id="gender"><SelectValue placeholder="Select…" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none">Prefer not to say</SelectItem>
+                        <SelectItem value="male">Male</SelectItem>
+                        <SelectItem value="female">Female</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="age">Age division</Label>
+                    <Select
+                      value={ageDivision || "__none"}
+                      onValueChange={(v) => setAgeDivision(v === "__none" ? "" : (v as AgeDivision))}
+                    >
+                      <SelectTrigger id="age"><SelectValue placeholder="Select…" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none">Not set</SelectItem>
+                        {(Object.keys(AGE_LABELS) as AgeDivision[]).map((k) => (
+                          <SelectItem key={k} value={k}>{AGE_LABELS[k]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Preferred roles</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {ROLE_OPTIONS.map((r) => (
+                      <Button
+                        key={r.value}
+                        type="button"
+                        variant={preferredRoles.includes(r.value) ? "default" : "outline"}
+                        onClick={() => toggleRole(r.value)}
+                        className="h-10"
+                      >
+                        {r.label}
+                      </Button>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </div>
+                </div>
+                <Button type="submit" disabled={savingProfile}>{savingProfile ? "Saving..." : "Save profile"}</Button>
+              </form>
+            </section>
+
+            {/* Emergency Contacts */}
+            <section className="pt-5 border-t">
+              <div className="flex items-center gap-2 mb-3">
+                <ShieldAlert className="h-4 w-4 text-destructive shrink-0" />
+                <h3 className="text-sm font-semibold">Emergency contacts</h3>
               </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Preferred roles</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {ROLE_OPTIONS.map((r) => (
-                  <Button
-                    key={r.value}
-                    type="button"
-                    variant={preferredRoles.includes(r.value) ? "default" : "outline"}
-                    onClick={() => toggleRole(r.value)}
-                    className="h-10"
-                  >
-                    {r.label}
-                  </Button>
-                ))}
+              {renderEmergency()}
+            </section>
+
+            {/* Medical Info */}
+            <section className="pt-5 border-t">
+              <div className="flex items-center gap-2 mb-3">
+                <HeartPulse className="h-4 w-4 text-primary shrink-0" />
+                <h3 className="text-sm font-semibold">
+                  Medical info
+                  {activeClub?.club.name && (
+                    <span className="text-xs text-muted-foreground font-normal ml-1">({activeClub.club.name})</span>
+                  )}
+                </h3>
               </div>
-            </div>
-            <Button type="submit" disabled={savingProfile}>{savingProfile ? "Saving..." : "Save profile"}</Button>
-          </form>
+              {renderMedical()}
+            </section>
+          </div>
         );
 
       case "email":
@@ -707,82 +803,6 @@ function SettingsPage() {
               Preferences save automatically. Push delivery rolls out separately.
             </p>
           </div>
-        );
-
-      case "emergency":
-        return (
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs text-muted-foreground">Used by coaches in case of an incident.</p>
-              <Button type="button" variant="outline" size="sm" onClick={addContact} disabled={!activeClubId}>
-                <Plus className="h-4 w-4 mr-1" /> Add
-              </Button>
-            </div>
-            {contacts.length === 0 && (
-              <p className="text-sm text-muted-foreground">No emergency contacts yet.</p>
-            )}
-            <div className="space-y-4">
-              {contacts.map((c) => (
-                <div key={c.id} className="rounded-lg border p-3 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-xs text-muted-foreground truncate">
-                      {memberships.find((m) => m.club_id === c.club_id)?.club.name ?? "Club"}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
-                        <input
-                          type="radio"
-                          name={`primary-${c.club_id}`}
-                          checked={c.is_primary}
-                          onChange={() => setPrimary(c.id)}
-                          className="h-3.5 w-3.5 accent-primary"
-                          aria-label="Set as primary contact"
-                        />
-                        Primary
-                      </label>
-                      <Button type="button" variant="ghost" size="sm" onClick={() => removeContact(c.id)} aria-label="Remove contact">
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <Input placeholder="Name" value={c.name} onChange={(e) => updateContact(c.id, { name: e.target.value })} />
-                    <Input placeholder="Phone" type="tel" value={c.phone} onChange={(e) => updateContact(c.id, { phone: e.target.value })} />
-                    <Input placeholder="Relationship" value={c.relationship ?? ""} onChange={(e) => updateContact(c.id, { relationship: e.target.value })} />
-                    <Input placeholder="Email (optional)" type="email" value={c.email ?? ""} onChange={(e) => updateContact(c.id, { email: e.target.value })} />
-                  </div>
-                </div>
-              ))}
-            </div>
-            {contacts.length > 0 && (
-              <Button className="mt-3" onClick={saveContacts} disabled={savingContacts}>
-                {savingContacts ? "Saving…" : "Save contacts"}
-              </Button>
-            )}
-          </div>
-        );
-
-      case "medical":
-        return medical ? (
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="allergies">Allergies</Label>
-              <Input id="allergies" value={medical.allergies} onChange={(e) => setMedical({ ...medical, allergies: e.target.value })} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="meds">Medications</Label>
-              <Input id="meds" value={medical.medications} onChange={(e) => setMedical({ ...medical, medications: e.target.value })} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea id="notes" rows={3} value={medical.notes} onChange={(e) => setMedical({ ...medical, notes: e.target.value })} />
-            </div>
-            <Button onClick={saveMedical} disabled={savingMedical}>
-              {savingMedical ? "Saving…" : "Save medical info"}
-            </Button>
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">Join a club to add medical info.</p>
         );
 
       case "clubs":
