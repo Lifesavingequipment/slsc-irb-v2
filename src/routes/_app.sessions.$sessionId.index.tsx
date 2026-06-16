@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import {
-  Calendar, MapPin, ChevronLeft, Users, Trash2, Clock, Plus, Share2, Lock, Pencil, RotateCw,
+  Calendar, MapPin, ExternalLink, ChevronLeft, Users, Trash2, Clock, Plus, Share2, Lock, Pencil, RotateCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { WavePanel } from "@/components/session/WavePanel";
@@ -414,7 +414,18 @@ function SessionDetail() {
             {session.ends_at && <>– {format(new Date(session.ends_at), "h:mma")}</>}
           </div>
           {session.location && (
-            <div className="flex items-center gap-2"><MapPin className="h-4 w-4" /> {session.location}</div>
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 shrink-0" />
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(session.location)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline decoration-dotted underline-offset-2 hover:text-blue-500 transition-colors"
+              >
+                {session.location}
+              </a>
+              <ExternalLink className="h-3 w-3 shrink-0 opacity-50" />
+            </div>
           )}
           {session.rsvp_deadline && (
             <div className="flex items-center gap-2">
