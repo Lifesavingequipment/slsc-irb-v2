@@ -12,8 +12,9 @@ type WeatherData = {
 };
 
 type WaveData = {
-  times: string[];
-  heights: (number | null)[];
+  heightMax: number | null;
+  periodMax: number | null;
+  directionDominant: number | null;
   approx: boolean;
 };
 
@@ -40,51 +41,10 @@ function weatherCodeInfo(code: number): { emoji: string; label: string } {
   return { emoji: "🌡️", label: "Cloudy" };
 }
 
-function hourLabel(hour: number): string {
-  if (hour < 12) return "morning";
-  if (hour < 14) return "midday";
-  if (hour < 18) return "afternoon";
-  if (hour < 21) return "evening";
-  return "night";
-}
-
 function getTimezone(lat: number, lng: number): string {
   if (lat >= -44 && lat <= -10 && lng >= 113 && lng <= 154) return "Australia/Brisbane";
   if (lat >= -47 && lat <= -34 && lng >= 166 && lng <= 178) return "Pacific/Auckland";
   return "auto";
-}
-
-function getLocalHour(dateStr: string, timezone: string): number {
-  const date = new Date(dateStr);
-  if (timezone === "auto") return date.getHours();
-  try {
-    const fmt = new Intl.DateTimeFormat("en-AU", { timeZone: timezone, hour: "numeric", hour12: false });
-    const h = parseInt(fmt.format(date), 10);
-    return isNaN(h) ? date.getHours() : h;
-  } catch {
-    return date.getHours();
-  }
-}
-
-function buildWaveSegments(
-  waves: WaveData,
-  startsAt: string,
-  timezone: string,
-): { height: number; label: string }[] {
-  const startHour = getLocalHour(startsAt, timezone);
-  const segments: { height: number; label: string }[] = [];
-  for (const offset of [0, 2]) {
-    const targetHour = (startHour + offset) % 24;
-    const timeStr = `T${targetHour.toString().padStart(2, "0")}:00`;
-    const idx = waves.times.findIndex((t) => t.includes(timeStr));
-    if (idx !== -1 && waves.heights[idx] != null) {
-      segments.push({
-        height: Math.round((waves.heights[idx] as number) * 10) / 10,
-        label: hourLabel(targetHour),
-      });
-    }
-  }
-  return segments;
 }
 
 const GOLD_COAST_FALLBACK = { lat: -28.0167, lng: 153.4 };
@@ -154,31 +114,30 @@ async function fetchWaveOnce(
   lat: number,
   lng: number,
   date: string,
-  timezone: string,
   useArchive = false,
-): Promise<{ times: string[]; heights: (number | null)[] } | null> {
+): Promise<{ heightMax: number | null; periodMax: number | null; directionDominant: number | null } | null> {
   const baseUrl = useArchive
     ? "https://archive-api.open-meteo.com/v1/archive"
     : "https://marine-api.open-meteo.com/v1/marine";
   const url =
     `${baseUrl}?latitude=${lat}&longitude=${lng}` +
-    `&hourly=wave_height&timezone=${encodeURIComponent(timezone)}&start_date=${date}&end_date=${date}`;
-  console.log("[WeatherTidesCard] fetchWaveOnce: fetching", url);
+    `&daily=wave_height_max,wave_period_max,wave_direction_dominant` +
+    `&timezone=auto&start_date=${date}&end_date=${date}`;
+  console.log("[WeatherTidesCard] marine API URL:", url);
   try {
     const res = await fetch(url);
     const d = await res.json();
-    console.log("[WeatherTidesCard] fetchWaveOnce: response", d);
-    const heights: (number | null)[] = d?.hourly?.wave_height ?? [];
-    const times: string[] = d?.hourly?.time ?? [];
-    if (heights.length < 3) {
-      console.warn("[WeatherTidesCard] fetchWaveOnce: insufficient data points", heights.length);
+    console.log("[WeatherTidesCard] marine API response:", d);
+    if (!d?.daily) {
+      console.warn("[WeatherTidesCard] fetchWaveOnce: no daily data in response");
       return null;
     }
-    if (heights.every((h) => h == null)) {
-      console.warn("[WeatherTidesCard] fetchWaveOnce: all wave heights null — inland location, lng:", lng);
-      return null;
-    }
-    return { times, heights };
+    const heightMax: number | null = d.daily.wave_height_max?.[0] ?? null;
+    const periodMax: number | null = d.daily.wave_period_max?.[0] ?? null;
+    const directionDominant: number | null = d.daily.wave_direction_dominant?.[0] ?? null;
+    console.log("[WeatherTidesCard] fetchWaveOnce: parsed values", { heightMax, periodMax, directionDominant });
+    // Return data even when values are null — UI shows "—" rather than hiding the section
+    return { heightMax, periodMax, directionDominant };
   } catch (err) {
     console.error("[WeatherTidesCard] fetchWaveOnce: error", err);
   }
@@ -189,16 +148,15 @@ async function fetchWaves(
   lat: number,
   lng: number,
   date: string,
-  timezone: string,
   useArchive = false,
 ): Promise<WaveData | null> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const shiftedLng = Math.round((lng + attempt * 0.3) * 10000) / 10000;
-    const result = await fetchWaveOnce(lat, shiftedLng, date, timezone, useArchive);
+    const result = await fetchWaveOnce(lat, shiftedLng, date, useArchive);
     if (result) return { ...result, approx: attempt > 0 };
     if (attempt < 2) {
       console.log(
-        `[WeatherTidesCard] fetchWaves: attempt ${attempt + 1} failed, shifting lng +0.3 to ${shiftedLng + 0.3}`,
+        `[WeatherTidesCard] fetchWaves: attempt ${attempt + 1} failed, retrying with lng ${shiftedLng + 0.3}`,
       );
     }
   }
@@ -264,7 +222,7 @@ export function WeatherTidesCard({
         const tz = getTimezone(coords.lat, coords.lng);
         const [w, wv] = await Promise.all([
           tooFarForWeather ? Promise.resolve(null) : fetchWeather(coords.lat, coords.lng, date, tz),
-          tooFarForWaves ? Promise.resolve(null) : fetchWaves(coords.lat, coords.lng, date, tz, useArchive),
+          tooFarForWaves ? Promise.resolve(null) : fetchWaves(coords.lat, coords.lng, date, useArchive),
         ]);
         setWeather(w);
         setWaves(wv);
@@ -321,21 +279,6 @@ export function WeatherTidesCard({
     );
   }
 
-  // Fetch was attempted for both expected data types but nothing came back
-  const weatherFailed = !tooFarForWeather && !weather;
-  const wavesFailed = !tooFarForWaves && !waves;
-  if (weatherFailed && wavesFailed) {
-    return (
-      <Card className="mt-4 p-4">
-        <p className="text-sm text-destructive">
-          ⚠️ {error ?? "No weather or wave data returned. Check console for details."}
-        </p>
-      </Card>
-    );
-  }
-
-  const waveSegments = waves ? buildWaveSegments(waves, startsAt, timezone) : [];
-
   return (
     <Card className="mt-4 p-4">
       <div className="space-y-1.5 text-sm">
@@ -345,10 +288,19 @@ export function WeatherTidesCard({
           <div>
             {weather.emoji} {weather.label} · {weather.maxTemp}°C · {weather.windDir} {weather.windSpeed} km/h
           </div>
-        ) : null}
-        {!tooFarForWaves && waveSegments.length > 0 && (
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            {error ?? "Weather data unavailable for this location."}
+          </p>
+        )}
+        {!tooFarForWaves && (
           <div className="text-muted-foreground">
-            🌊 Wave {waveSegments.map((s) => `~${s.height}m (${s.label})`).join(" · ")}
+            🌊 Surf:{" "}
+            {waves?.heightMax != null
+              ? `~${Math.round(waves.heightMax * 10) / 10}m`
+              : "—"}
+            {waves?.periodMax != null ? ` · ${Math.round(waves.periodMax)}s period` : ""}
+            {waves?.directionDominant != null ? ` · ${degreesToCompass(waves.directionDominant)}` : ""}
             {waves?.approx ? " (approx.)" : ""}
           </div>
         )}
