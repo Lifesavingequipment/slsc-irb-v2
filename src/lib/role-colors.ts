@@ -2,7 +2,7 @@
 export function roleBadgeClass(role: string): string {
   const r = role.toLowerCase();
   if (r === "owner" || r === "club_admin" || r === "admin") {
-    return "bg-[#E63329] text-white hover:bg-[#c0392b]";
+    return "bg-[#FF6600] text-white hover:bg-[#E65C00]";
   }
   if (r === "coach") {
     return "bg-blue-600 text-white hover:bg-blue-700";

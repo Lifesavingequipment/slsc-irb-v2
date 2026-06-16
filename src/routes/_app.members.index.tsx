@@ -725,7 +725,7 @@ function MemberRow({ row, displayName, partnerName, roles, canManage, canRemove,
                 key={role}
                 size="sm"
                 variant="outline"
-                className={`flex-1 h-8 text-xs ${active ? "border-red-500 text-red-600 bg-red-50 hover:bg-red-100" : ""}`}
+                className={`flex-1 h-8 text-xs ${active ? "border-orange-500 text-orange-600 bg-orange-50 hover:bg-orange-100" : ""}`}
                 disabled={saving}
                 onClick={() => toggle(role)}
               >

@@ -2,7 +2,7 @@
   "name": "IRB Training",
   "short_name": "IRB",
   "description": "IRB Training Management for Surf Life Saving Clubs",
-  "theme_color": "#E63329",
+  "theme_color": "#FF6600",
   "background_color": "#ffffff",
   "display": "standalone",
   "orientation": "portrait",

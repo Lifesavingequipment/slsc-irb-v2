@@ -443,7 +443,7 @@ function ChatPage() {
                     activeChannelId === ch.id ? "bg-muted/60" : ""
                   }`}
                 >
-                  <div className="h-9 w-9 rounded-full bg-[#E63329]/10 flex items-center justify-center shrink-0 text-[#E63329]">
+                  <div className="h-9 w-9 rounded-full bg-[#FF6600]/10 flex items-center justify-center shrink-0 text-[#FF6600]">
                     <MessageSquare className="h-4 w-4" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -458,7 +458,7 @@ function ChatPage() {
                         {ch.lastMessage ?? "No messages yet"}
                       </span>
                       {ch.unread > 0 && (
-                        <Badge className="shrink-0 h-4 min-w-4 text-[10px] px-1 bg-[#E63329] text-white">
+                        <Badge className="shrink-0 h-4 min-w-4 text-[10px] px-1 bg-[#FF6600] text-white">
                           {ch.unread}
                         </Badge>
                       )}
@@ -522,7 +522,7 @@ function ChatPage() {
                             onContextMenu={(e) => { if (canDelete) e.preventDefault(); }}
                             className={`rounded-2xl px-3 py-2 text-sm break-words select-none ${
                               isMe
-                                ? "bg-[#E63329] text-white rounded-tr-sm"
+                                ? "bg-[#FF6600] text-white rounded-tr-sm"
                                 : "bg-muted text-foreground rounded-tl-sm"
                             }`}
                           >
@@ -550,7 +550,7 @@ function ChatPage() {
                 />
                 <Button
                   size="icon"
-                  className="h-10 w-10 bg-[#E63329] hover:bg-[#c42b22] shrink-0"
+                  className="h-10 w-10 bg-[#FF6600] hover:bg-[#E65C00] shrink-0"
                   onClick={() => void sendMessage()}
                   disabled={sending || !body.trim()}
                 >
@@ -621,7 +621,7 @@ function ChatPage() {
                       <AvatarFallback className="text-[10px]">{initials(m.name)}</AvatarFallback>
                     </Avatar>
                     <span className="flex-1 truncate">{m.name}</span>
-                    {selected && <span className="text-[#E63329] text-xs font-medium">✓</span>}
+                    {selected && <span className="text-[#FF6600] text-xs font-medium">✓</span>}
                   </button>
                 );
               })}
@@ -637,7 +637,7 @@ function ChatPage() {
             <Button
               onClick={() => void createChat()}
               disabled={creating || selectedMembers.length === 0}
-              className="bg-[#E63329] hover:bg-[#c42b22]"
+              className="bg-[#FF6600] hover:bg-[#E65C00]"
             >
               {creating ? "Creating…" : "Create"}
             </Button>

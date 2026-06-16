@@ -47,7 +47,7 @@ export function AppShell({ title, action, children }: {
         {/* Logo row */}
         <div className="flex items-center gap-3 px-4 py-5 border-b border-white/10 shrink-0">
           <div className="h-9 w-9 rounded-lg overflow-hidden shrink-0">
-            <img src="/prop-logo.png" alt="Logo" className="h-9 w-9 object-cover rounded-lg" />
+            <img src="/irb-logo.png" alt="Logo" className="h-9 w-9 object-cover rounded-lg" />
           </div>
           <div className="min-w-0">
             <div className="text-white font-bold text-sm">IRB Training</div>
@@ -93,14 +93,14 @@ export function AppShell({ title, action, children }: {
                 to={item.to}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   active
-                    ? "bg-[#E63329] text-white"
+                    ? "bg-[#FF6600] text-white"
                     : "text-white/70 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <Icon className="h-5 w-5 shrink-0" />
                 <span className="flex-1">{item.label}</span>
                 {badge > 0 && (
-                  <span className="h-5 min-w-5 rounded-full bg-white text-[#E63329] text-[10px] font-bold flex items-center justify-center px-1">
+                  <span className="h-5 min-w-5 rounded-full bg-white text-[#FF6600] text-[10px] font-bold flex items-center justify-center px-1">
                     {badge}
                   </span>
                 )}
@@ -112,7 +112,7 @@ export function AppShell({ title, action, children }: {
         {/* User + sign out */}
         <div className="shrink-0 px-3 pb-4 pt-4 border-t border-white/10">
           <div className="flex items-center gap-3 px-3 py-2 mb-1">
-            <div className="h-8 w-8 rounded-full bg-[#E63329] flex items-center justify-center text-white text-sm font-semibold shrink-0">
+            <div className="h-8 w-8 rounded-full bg-[#FF6600] flex items-center justify-center text-white text-sm font-semibold shrink-0">
               {userInitial}
             </div>
             <div className="flex-1 min-w-0">
@@ -132,12 +132,12 @@ export function AppShell({ title, action, children }: {
       {/* ── Content column ── */}
       <div className="flex flex-col flex-1 md:ml-60 min-h-screen w-0">
         {/* Top header */}
-        <header className="safe-top sticky top-0 z-20 bg-[#E63329] text-white shadow-md shrink-0">
+        <header className="safe-top sticky top-0 z-20 bg-[#FF6600] text-white shadow-md shrink-0">
           <div className="px-4 pt-3 pb-3 flex items-center gap-3">
             {/* Mobile: waves + club name/switcher */}
             <div className="flex items-center gap-3 flex-1 min-w-0 md:hidden">
               <div className="h-9 w-9 rounded-lg overflow-hidden shrink-0">
-                <img src="/prop-logo.png" alt="Logo" className="h-9 w-9 object-cover rounded-lg" />
+                <img src="/irb-logo.png" alt="Logo" className="h-9 w-9 object-cover rounded-lg" />
               </div>
               <div className="min-w-0">
                 {activeClub && approved.length > 1 ? (
@@ -239,13 +239,13 @@ export function AppShell({ title, action, children }: {
                   key={item.to}
                   to={item.to}
                   className={`flex flex-col items-center gap-1 py-2.5 text-xs font-medium transition-colors min-h-[56px] justify-center relative ${
-                    active ? "text-[#FFD700]" : "text-white/60"
+                    active ? "text-white" : "text-white/60"
                   }`}
                 >
                   <div className="relative">
                     <Icon className={`h-5 w-5 ${active ? "stroke-[2.3]" : ""}`} />
                     {badge > 0 && (
-                      <span className="absolute -top-1.5 -right-2 h-4 min-w-4 rounded-full bg-[#E63329] text-white text-[9px] font-bold flex items-center justify-center px-1">
+                      <span className="absolute -top-1.5 -right-2 h-4 min-w-4 rounded-full bg-[#FF6600] text-white text-[9px] font-bold flex items-center justify-center px-1">
                         {badge}
                       </span>
                     )}

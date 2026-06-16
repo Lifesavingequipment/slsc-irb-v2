@@ -312,7 +312,7 @@ function RolesPageInner({ clubId }: { clubId: string }) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={transferAdmin} className="bg-[#E63329] text-white hover:bg-[#c0392b]">
+            <AlertDialogAction onClick={transferAdmin} className="bg-[#FF6600] text-white hover:bg-[#E65C00]">
               Transfer
             </AlertDialogAction>
           </AlertDialogFooter>

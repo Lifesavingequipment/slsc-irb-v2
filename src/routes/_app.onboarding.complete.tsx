@@ -110,9 +110,9 @@ function CompleteProfile() {
 
   return (
     <div className="min-h-screen bg-[#f9fafb]">
-      <div className="sticky top-0 z-10 bg-[#E63329] text-white px-4 py-3 flex items-center justify-between">
+      <div className="sticky top-0 z-10 bg-[#FF6600] text-white px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img src="/prop-logo.png" alt="Logo" className="h-9 w-9 rounded-lg object-cover" />
+          <img src="/irb-logo.png" alt="Logo" className="h-9 w-9 rounded-lg object-cover" />
           <div className="font-semibold">IRB Coaching</div>
         </div>
         <button onClick={signOut} className="text-sm text-white/90 hover:text-white flex items-center gap-1.5">

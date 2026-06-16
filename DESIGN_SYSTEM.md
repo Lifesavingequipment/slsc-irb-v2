@@ -13,10 +13,10 @@ Defined in `src/styles.css` on `:root`.
 
 | Token | Value | Notes |
 |-------|-------|-------|
-| `--primary` | `#E63329` | Brand red — buttons, active nav, focus rings |
+| `--primary` | `#FF6600` | Brand orange — buttons, active nav, focus rings |
 | `--primary-foreground` | `oklch(0.99 0 0)` | White |
 | `--secondary` | `oklch(0.96 0.01 25)` | Light beige |
-| `--secondary-foreground` | `#E63329` | Red text on secondary |
+| `--secondary-foreground` | `#FF6600` | Orange text on secondary |
 | `--accent` | `oklch(0.88 0.18 85)` | Golden yellow ≈ `#FFD700` |
 | `--accent-foreground` | `oklch(0.18 0.04 250)` | Dark text on accent |
 | `--background` | `oklch(1 0 0)` | White page background |
@@ -29,7 +29,7 @@ Defined in `src/styles.css` on `:root`.
 | `--muted-foreground` | `oklch(0.5 0.03 250)` | Medium gray |
 | `--border` | `oklch(0.91 0.015 240)` | Very light gray/blue border |
 | `--input` | `oklch(0.91 0.015 240)` | Same as border |
-| `--ring` | `#E63329` | Focus ring color |
+| `--ring` | `#FF6600` | Focus ring color |
 | `--destructive` | `oklch(0.58 0.22 25)` | Dark red/orange |
 | `--destructive-foreground` | `oklch(0.99 0.005 240)` | White |
 | `--success` | `oklch(0.62 0.14 160)` | Green |
@@ -42,7 +42,7 @@ Defined in `src/styles.css` on `:root`.
 | Token | Value | Usage |
 |-------|-------|-------|
 | `--surf-deep` | `oklch(0.22 0.04 250)` | Dark navy — matches sidebar |
-| `--surf-mid` | `#E63329` | Brand red |
+| `--surf-mid` | `#FF6600` | Brand orange |
 | `--surf-foam` | `oklch(0.96 0.02 220)` | Light blue-gray |
 | `--sand` | `oklch(0.96 0.025 85)` | Cream/sand |
 
@@ -56,7 +56,7 @@ Applied via `.dark` class.
 | `--foreground` | `oklch(0.97 0.01 240)` — near white |
 | `--card` | `oklch(0.22 0.05 250)` — dark card bg |
 | `--card-foreground` | `oklch(0.97 0.01 240)` |
-| `--primary` | `oklch(0.62 0.22 25)` — lighter red |
+| `--primary` | `#FF6600` — brand orange |
 | `--primary-foreground` | `oklch(0.99 0 0)` |
 | `--secondary` | `oklch(0.28 0.06 250)` — dark gray |
 | `--secondary-foreground` | `oklch(0.97 0.01 240)` |
@@ -66,7 +66,7 @@ Applied via `.dark` class.
 | `--accent-foreground` | `oklch(0.99 0.005 240)` |
 | `--border` | `oklch(1 0 0 / 10%)` — white 10% |
 | `--input` | `oklch(1 0 0 / 12%)` — white 12% |
-| `--ring` | `oklch(0.62 0.22 25)` — lighter red |
+| `--ring` | `#FF6600` — brand orange |
 
 ### Hardcoded Hex Values
 
@@ -74,9 +74,9 @@ Used directly in `AppShell.tsx` and `AuthShell.tsx` — not via CSS variables.
 
 | Value | Usage |
 |-------|-------|
-| `#E63329` | Sidebar active nav, header bg, logo icon bg, avatar bg, focus ring |
+| `#FF6600` | Sidebar active nav, header bg, logo icon bg, avatar bg, focus ring |
 | `#1e293b` | Sidebar bg, mobile bottom nav bg (slate-800 equivalent) |
-| `#FFD700` | Mobile bottom nav active icon color (gold) |
+| `#FFFFFF` | Mobile bottom nav active icon color (white) |
 | `#f9fafb` | Light gray background (auth shell area) |
 
 ### Gradient
@@ -85,7 +85,7 @@ Used directly in `AppShell.tsx` and `AuthShell.tsx` — not via CSS variables.
 .bg-surf-gradient {
   background-image: linear-gradient(160deg, var(--surf-deep) 0%, var(--surf-mid) 100%);
 }
-/* Dark navy → Brand red */
+/* Dark navy → Brand orange */
 ```
 
 ---
@@ -371,7 +371,7 @@ Action:      pt-1 flex justify-center
 | Sidebar background | `bg-[#1e293b]` (slate-800) |
 | Sidebar position | `fixed inset-y-0 left-0` |
 | Content left margin (desktop) | `md:ml-60` = 240px |
-| Header background | `bg-[#E63329]` (brand red) |
+| Header background | `bg-[#FF6600]` (brand orange) |
 | Header position | `sticky top-0 z-20` |
 | Header padding | `px-4 pt-3 pb-3` |
 | Mobile nav height | `min-h-[56px]` + `safe-bottom` padding |
@@ -414,7 +414,7 @@ Tailwind default breakpoints (mobile-first):
 ```
 Base:     flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
 
-Active:   bg-[#E63329] text-white
+Active:   bg-[#FF6600] text-white
 
 Inactive: text-white/70 hover:bg-white/10 hover:text-white
 ```
@@ -422,7 +422,7 @@ Inactive: text-white/70 hover:bg-white/10 hover:text-white
 Notification badge on desktop nav item:
 
 ```
-h-5 min-w-5 rounded-full bg-white text-[#E63329] text-[10px] font-bold
+h-5 min-w-5 rounded-full bg-white text-[#FF6600] text-[10px] font-bold
 ```
 
 ### Mobile Bottom Tab Bar
@@ -438,14 +438,14 @@ Inactive: text-white/60
 Notification badge on mobile nav item:
 
 ```
-h-4 min-w-4 rounded-full bg-[#E63329] text-white text-[9px] font-bold absolute -top-1.5 -right-2
+h-4 min-w-4 rounded-full bg-[#FF6600] text-white text-[9px] font-bold absolute -top-1.5 -right-2
 ```
 
 ### Sidebar Logo Section
 
 ```
 Container: flex items-center gap-3 px-4 py-5 border-b border-white/10
-Icon:      h-9 w-9 rounded-lg bg-[#E63329] (red square with waves icon)
+Icon:      h-9 w-9 rounded-lg bg-[#FF6600] (orange square with logo icon)
 Title:     text-white font-bold text-sm
 Subtitle:  text-white/50 text-xs
 ```
@@ -463,7 +463,7 @@ Chevron:   ChevronDown h-4 w-4 text-white/50
 
 ```
 Container:    px-3 pb-4 pt-4 border-t border-white/10
-Avatar:       h-8 w-8 rounded-full bg-[#E63329] text-white text-sm font-semibold
+Avatar:       h-8 w-8 rounded-full bg-[#FF6600] text-white text-sm font-semibold
 Email:        text-white text-xs font-medium
 Sign out:     flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white/70 hover:bg-white/10 hover:text-white
 ```
@@ -472,7 +472,7 @@ Sign out:     flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white/
 
 ```
 Button:  h-10 w-10 rounded-full bg-white/15 hover:bg-white/25 transition-colors flex items-center justify-center
-Badge:   min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold absolute -top-0.5 -right-0.5
+Badge:   min-w-[18px] h-[18px] rounded-full bg-[#FF6600] text-white text-[10px] font-bold absolute -top-0.5 -right-0.5
 Panel:   w-[min(400px,calc(100vw-2rem))] max-h-[70vh] overflow-y-auto rounded-xl border border-border bg-background shadow-xl
 Item:    px-4 py-3 flex gap-3 hover:bg-accent/60 transition-colors border-b border-border/50
 Dot:     h-2 w-2 rounded-full bg-blue-500
@@ -561,7 +561,7 @@ Handshake, TrendingUp, AlertTriangle
 ```
 shrink-0                     — prevent compression in flex layouts
 text-white                   — on dark backgrounds
-text-primary                 — brand red
+text-primary                 — brand orange
 text-accent                  — gold
 text-muted-foreground        — dimmed/secondary icons
 [&_svg]:size-4 [&_svg]:shrink-0  — Button component children
@@ -795,12 +795,12 @@ Applied on:
 
 | Property | Value |
 |----------|-------|
-| Brand color | `#E63329` (red) |
+| Brand color | `#FF6600` (orange) |
 | Gold accent | `#FFD700` (mobile active nav) |
 | Sidebar color | `#1e293b` (slate-800) |
 | Sidebar width | `240px` (`w-60`) |
 | Mobile nav height | `56px+` |
-| Header color | `#E63329` |
+| Header color | `#FF6600` |
 | Content max width | `896px` (`max-w-4xl`) |
 | Mobile content padding | `px-4 pt-4` |
 | Desktop content padding | `px-6 pt-6` |
@@ -812,7 +812,7 @@ Applied on:
 | Body text size | `text-sm` |
 | Default input height | `h-9` (36px) |
 | Default button height | `h-9` (36px) |
-| Focus ring | `ring-1 ring-[#E63329]` |
+| Focus ring | `ring-1 ring-[#FF6600]` |
 | Animation duration | `200ms` |
 | Icon library | lucide-react `0.575.0` |
 | Standard icon size | `h-4 w-4` (16px) |
