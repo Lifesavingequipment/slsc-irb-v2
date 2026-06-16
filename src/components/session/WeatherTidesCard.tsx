@@ -150,16 +150,24 @@ async function fetchWaves(
   date: string,
   useArchive = false,
 ): Promise<WaveData | null> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const shiftedLng = Math.round((lng + attempt * 0.3) * 10000) / 10000;
-    const result = await fetchWaveOnce(lat, shiftedLng, date, useArchive);
-    if (result) return { ...result, approx: attempt > 0 };
-    if (attempt < 2) {
-      console.log(
-        `[WeatherTidesCard] fetchWaves: attempt ${attempt + 1} failed, retrying with lng ${shiftedLng + 0.3}`,
-      );
+  let lastResult: { heightMax: number | null; periodMax: number | null; directionDominant: number | null } | null = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const shiftedLng = Math.round((lng + attempt * 0.5) * 10000) / 10000;
+    const shiftedLat = attempt >= 2 ? Math.round((lat - 0.1) * 10000) / 10000 : lat;
+    console.log(`[WeatherTidesCard] fetchWaves: attempt ${attempt + 1}/5, coords`, { lat: shiftedLat, lng: shiftedLng });
+    const result = await fetchWaveOnce(shiftedLat, shiftedLng, date, useArchive);
+    if (result) {
+      lastResult = result;
+      if (result.heightMax != null) {
+        return { ...result, approx: attempt > 0 };
+      }
+      console.log(`[WeatherTidesCard] fetchWaves: attempt ${attempt + 1} returned null heightMax, retrying...`);
+    } else {
+      console.log(`[WeatherTidesCard] fetchWaves: attempt ${attempt + 1} returned no data, retrying...`);
     }
   }
+  // All retries exhausted; return last response (with null heightMax) so UI can show fallback
+  if (lastResult) return { ...lastResult, approx: true };
   return null;
 }
 
@@ -298,7 +306,9 @@ export function WeatherTidesCard({
             🌊 Surf:{" "}
             {waves?.heightMax != null
               ? `~${Math.round(waves.heightMax * 10) / 10}m`
-              : "—"}
+              : waves != null
+                ? "Approx. surf — coastal data unavailable"
+                : "—"}
             {waves?.periodMax != null ? ` · ${Math.round(waves.periodMax)}s period` : ""}
             {waves?.directionDominant != null ? ` · ${degreesToCompass(waves.directionDominant)}` : ""}
             {waves?.approx ? " (approx.)" : ""}
