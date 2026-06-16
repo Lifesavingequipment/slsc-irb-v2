@@ -10,7 +10,8 @@ import { Card } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Waves, ChevronLeft, Save } from "lucide-react";
+import { LogOut, ChevronLeft, Save } from "lucide-react";
+import { signOutAndRedirect } from "@/lib/sign-out";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/onboarding/profile")({
@@ -126,27 +127,35 @@ function PendingProfile() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-screen items-center justify-center bg-[#f9fafb]">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="bg-white border-b safe-top px-6 pt-10 pb-6">
-        <div className="flex items-center gap-3 max-w-2xl mx-auto">
-          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Waves className="h-5 w-5 text-primary" />
+    <div className="min-h-screen bg-[#f9fafb]">
+      <header className="safe-top sticky top-0 z-20 bg-[#E63329] text-white shadow-md">
+        <div className="px-4 pt-3 pb-3 flex items-center gap-3 max-w-2xl mx-auto">
+          <div className="h-9 w-9 rounded-lg overflow-hidden shrink-0">
+            <img src="/prop-logo.png" alt="Logo" className="h-9 w-9 object-cover rounded-lg" />
           </div>
-          <div className="font-semibold text-foreground">IRB Coaching</div>
+          <div className="font-bold text-sm flex-1 min-w-0">IRB Training</div>
+          <button
+            onClick={() => void signOutAndRedirect()}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm text-white/90 hover:bg-white/15 transition-colors"
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            Sign out
+          </button>
         </div>
-        <div className="max-w-2xl mx-auto mt-6">
-          <h1 className="text-2xl font-bold text-foreground">Finish your profile</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Fill this in while you wait for approval — you'll be ready to go the moment an admin lets you in.
-          </p>
-        </div>
+      </header>
+
+      <div className="max-w-2xl mx-auto px-4 pt-6">
+        <h1 className="text-2xl font-bold text-foreground">Finish your profile</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Fill this in while you wait for approval — you'll be ready to go the moment an admin lets you in.
+        </p>
       </div>
 
       <div className="px-4 mt-6 max-w-2xl mx-auto pb-10">

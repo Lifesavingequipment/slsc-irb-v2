@@ -389,11 +389,14 @@ function ClubDetailView({ club, onBack }: { club: Club; onBack: () => void }) {
 
         {club.admin_email && (
           <div className="mt-3">
-            <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8" asChild>
-              <a href={`mailto:${club.admin_email}`}>
-                <Mail className="h-3.5 w-3.5" />
-                Email admin
-              </a>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 text-xs h-8"
+              onClick={() => { window.location.href = `mailto:${club.admin_email}`; }}
+            >
+              <Mail className="h-3.5 w-3.5" />
+              Email admin
             </Button>
           </div>
         )}
@@ -676,12 +679,10 @@ function ClubCard({ club, onViewClub }: { club: Club; onViewClub: () => void }) 
               size="sm"
               variant="outline"
               className="gap-1.5 text-xs h-8"
-              asChild
+              onClick={() => { window.location.href = `mailto:${club.admin_email}`; }}
             >
-              <a href={`mailto:${club.admin_email}`}>
-                <Mail className="h-3.5 w-3.5" />
-                Email admin
-              </a>
+              <Mail className="h-3.5 w-3.5" />
+              Email admin
             </Button>
           ) : (
             <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8" disabled>
