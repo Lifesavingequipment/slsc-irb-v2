@@ -47,7 +47,7 @@ export function AppShell({ title, action, children }: {
         {/* Logo row */}
         <div className="flex items-center gap-3 px-4 py-5 border-b border-white/10 shrink-0">
           <div className="h-9 w-9 rounded-lg overflow-hidden shrink-0">
-            <img src="/irb-logo.png" alt="Logo" className="h-9 w-9 object-cover rounded-lg" />
+            <img src="/irb-logo.png" alt="Logo" className="h-9 w-9 object-contain rounded-lg bg-[#FF6600]" />
           </div>
           <div className="min-w-0">
             <div className="text-white font-bold text-sm">IRB Training</div>
@@ -137,7 +137,7 @@ export function AppShell({ title, action, children }: {
             {/* Mobile: waves + club name/switcher */}
             <div className="flex items-center gap-3 flex-1 min-w-0 md:hidden">
               <div className="h-9 w-9 rounded-lg overflow-hidden shrink-0">
-                <img src="/irb-logo.png" alt="Logo" className="h-9 w-9 object-cover rounded-lg" />
+                <img src="/irb-logo.png" alt="Logo" className="h-9 w-9 object-contain rounded-lg bg-[#FF6600]" />
               </div>
               <div className="min-w-0">
                 {activeClub && approved.length > 1 ? (
