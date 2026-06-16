@@ -3,21 +3,12 @@
   "short_name": "IRB",
   "description": "IRB Training Management for Surf Life Saving Clubs",
   "theme_color": "#FF6600",
-  "background_color": "#ffffff",
+  "background_color": "#FF6600",
   "display": "standalone",
   "orientation": "portrait",
   "start_url": "/",
   "icons": [
-    {
-      "src": "/icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "/irb-icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/irb-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ]
 }

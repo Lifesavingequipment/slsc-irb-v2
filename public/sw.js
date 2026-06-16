@@ -1,9 +1,11 @@
-const CACHE_NAME = 'irb-training-v1';
+const CACHE_NAME = 'irb-training-v2';
 const STATIC_ASSETS = [
   '/',
   '/manifest.webmanifest',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
+  '/irb-logo.png',
+  '/irb-icon-192.png',
+  '/irb-icon-512.png',
+  '/apple-touch-icon.png',
 ];
 
 self.addEventListener('install', (event) => {

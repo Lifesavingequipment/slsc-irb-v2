@@ -138,7 +138,7 @@ function PendingProfile() {
       <header className="safe-top sticky top-0 z-20 bg-[#FF6600] text-white shadow-md">
         <div className="px-4 pt-3 pb-3 flex items-center gap-3 max-w-2xl mx-auto">
           <div className="h-9 w-9 rounded-lg overflow-hidden shrink-0">
-            <img src="/irb-logo.png" alt="Logo" className="h-9 w-9 object-contain rounded-lg bg-[#FF6600]" />
+            <img src="/irb-logo.png" alt="Logo" className="h-9 w-9 rounded-lg object-cover" />
           </div>
           <div className="font-bold text-sm flex-1 min-w-0">IRB Training</div>
           <button
