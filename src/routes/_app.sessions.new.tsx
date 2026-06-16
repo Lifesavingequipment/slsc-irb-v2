@@ -22,7 +22,7 @@ import { AddressAutocomplete } from "@/components/settings/AddressAutocomplete";
 import { CoachSetupSection, type VehicleDraft } from "@/components/session/CoachSetupSection";
 import { invalidateSessionsCache } from "./_app.sessions.index";
 import { addDays, addMonths, addWeeks, format as fmt } from "date-fns";
-import { notifyAllClubMembers } from "@/lib/notify";
+import { notifyNewSession, currentMemberId } from "@/lib/notify";
 import { Badge } from "@/components/ui/badge";
 
 type QType = "yes_no" | "text" | "single_choice";
@@ -315,16 +315,16 @@ function NewSession() {
     invalidateSessionsCache(activeClub.club_id);
     toast.success(insertedSessions.length > 1 ? `${insertedSessions.length} sessions created` : "Session created");
 
-    // Notify all active club members about the new session(s)
-    for (const s of insertedSessions) {
-      void notifyAllClubMembers({
-        club_id: activeClub.club_id,
-        type: "session_created",
-        title: `New session: ${parsed.data.title}`,
-        body: fmt(new Date(s.starts_at), "EEE d MMM 'at' h:mma"),
-        link: `/sessions/${s.id}`,
-      });
-    }
+    // Notify all approved club members about the new session(s), excluding the creator.
+    void (async () => {
+      const creatorMemberId = await currentMemberId(activeClub.club_id);
+      for (const s of insertedSessions) {
+        await notifyNewSession(
+          { id: s.id, club_id: activeClub.club_id, title: parsed.data.title, starts_at: s.starts_at },
+          creatorMemberId,
+        );
+      }
+    })();
 
     navigate({ to: "/sessions" });
   };

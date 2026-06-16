@@ -6,11 +6,10 @@ export type AppNotification = {
   id: string;
   club_id: string | null;
   member_id: string | null;
-  type: string;
-  title: string;
-  body: string | null;
-  link: string | null;
-  read_at: string | null;
+  notification_type: string;
+  message: string;
+  related_id: string | null;
+  is_read: boolean | null;
   created_at: string;
 };
 
@@ -57,22 +56,20 @@ export function useNotifications() {
 
   const markAllRead = useCallback(async () => {
     if (!memberId) return;
-    const now = new Date().toISOString();
     await supabase
       .from("notifications")
-      .update({ read_at: now })
+      .update({ is_read: true })
       .eq("member_id", memberId)
-      .is("read_at", null);
-    setNotifications((prev) => prev.map((n) => ({ ...n, read_at: n.read_at ?? now })));
+      .eq("is_read", false);
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
   }, [memberId]);
 
   const markRead = useCallback(async (id: string) => {
-    const now = new Date().toISOString();
-    await supabase.from("notifications").update({ read_at: now }).eq("id", id).is("read_at", null);
-    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read_at: n.read_at ?? now } : n));
+    await supabase.from("notifications").update({ is_read: true }).eq("id", id);
+    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, is_read: true } : n));
   }, []);
 
-  const unreadCount = notifications.filter((n) => !n.read_at).length;
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   return { notifications, unreadCount, markAllRead, markRead };
 }

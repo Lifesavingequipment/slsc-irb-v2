@@ -4,6 +4,26 @@ import { useNavigate } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
 import { useNotifications } from "@/hooks/useNotifications";
 
+/** Derive the in-app destination for a notification from its type + related entity id. */
+function linkFor(type: string, relatedId: string | null): string | null {
+  if (!relatedId) return null;
+  switch (type) {
+    case "new_session":
+    case "session_updated":
+      return `/sessions/${relatedId}`;
+    case "carpool_update":
+      return `/sessions/${relatedId}/carpool`;
+    case "wave_draw_published":
+      return `/sessions/${relatedId}?tab=waves`;
+    case "member_approved":
+    case "member_request":
+    case "partner_assigned":
+      return `/members/${relatedId}`;
+    default:
+      return null;
+  }
+}
+
 export function NotificationBell() {
   const { notifications, unreadCount, markAllRead, markRead } = useNotifications();
   const [open, setOpen] = useState(false);
@@ -59,21 +79,18 @@ export function NotificationBell() {
                 {notifications.map((n) => (
                   <li key={n.id}>
                     <button
-                      onClick={() => handleNotificationClick(n.id, n.link)}
+                      onClick={() => handleNotificationClick(n.id, linkFor(n.notification_type, n.related_id))}
                       className="w-full text-left px-4 py-3 flex gap-3 hover:bg-accent/60 transition-colors border-b border-border/50 last:border-b-0"
                     >
                       <div className="mt-1.5 shrink-0">
-                        {!n.read_at ? (
+                        {!n.is_read ? (
                           <span className="block h-2 w-2 rounded-full bg-blue-500" />
                         ) : (
                           <span className="block h-2 w-2" />
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-semibold leading-tight">{n.title}</div>
-                        {n.body && (
-                          <div className="text-xs text-muted-foreground mt-0.5 leading-snug">{n.body}</div>
-                        )}
+                        <div className="text-sm leading-snug">{n.message}</div>
                         <div className="text-[10px] text-muted-foreground/70 mt-1">
                           {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
                         </div>

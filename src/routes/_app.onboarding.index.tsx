@@ -14,6 +14,7 @@ import { Waves, LogOut, Clock, CheckCircle2, Copy, Mail, Share2, Ticket, UserCog
 import { toast } from "sonner";
 import { SupportRequestDialog } from "@/components/SupportRequestDialog";
 import { AddressAutocomplete } from "@/components/settings/AddressAutocomplete";
+import { notifyJoinRequest } from "@/lib/notify";
 
 export const Route = createFileRoute("/_app/onboarding/")({
   head: () => ({ meta: [{ title: "Get started — IRB Coaching" }] }),
@@ -165,11 +166,13 @@ function Onboarding() {
       .eq("club_id", clubId)
       .maybeSingle();
     let error = null;
+    let requested = false;
     if (!existing) {
       const res = await supabase.from("club_memberships").insert({
         user_id: user.id, club_id: clubId, status: "pending", role: "member",
       });
       error = res.error;
+      requested = !res.error;
     } else if (existing.status === "rejected") {
       const res = await supabase
         .from("club_memberships")
@@ -177,6 +180,7 @@ function Onboarding() {
         .eq("user_id", user.id)
         .eq("club_id", clubId);
       error = res.error;
+      requested = !res.error;
     }
     if (!error) {
       // Ensure a members row exists so the admin's Pending tab can show this request
@@ -199,6 +203,17 @@ function Onboarding() {
           email: user.email ?? "",
           membership_status: "pending",
         });
+      }
+
+      // Notify club admins of the new join request.
+      if (requested) {
+        const { data: m } = await supabase
+          .from("members")
+          .select("id, first_name, last_name")
+          .eq("auth_user_id", user.id)
+          .eq("club_id", clubId)
+          .maybeSingle();
+        if (m) void notifyJoinRequest(clubId, m);
       }
     }
     setBusy(false);

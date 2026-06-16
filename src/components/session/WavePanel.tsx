@@ -403,10 +403,9 @@ export function WavePanel({
     if (canManage && goingIds.length > 0) {
       void notifyMembers(goingIds, {
         club_id: clubId,
-        type: "wave_draw_published",
-        title: "Wave draw is ready",
-        body: `${sessionTitle} — tap to see your wave`,
-        link: `/sessions/${sessionId}?tab=waves`,
+        notification_type: "wave_draw_published",
+        message: `Wave draw ready: ${sessionTitle}`,
+        related_id: sessionId,
       });
     }
   };

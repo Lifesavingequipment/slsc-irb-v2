@@ -189,10 +189,9 @@ function CarpoolPage() {
 
     void notifyGoingMembers(sessionId, {
       club_id: session.club_id,
-      type: "carpool_update",
-      title: "Carpool updated",
-      body: session.title,
-      link: `/sessions/${sessionId}/carpool`,
+      notification_type: "carpool_update",
+      message: `Carpool updated: ${session.title}`,
+      related_id: sessionId,
     });
   };
 
@@ -220,10 +219,9 @@ function CarpoolPage() {
 
     void notifyGoingMembers(sessionId, {
       club_id: session.club_id,
-      type: "carpool_update",
-      title: "Carpool updated",
-      body: session.title,
-      link: `/sessions/${sessionId}/carpool`,
+      notification_type: "carpool_update",
+      message: `Carpool updated: ${session.title}`,
+      related_id: sessionId,
     });
   };
 

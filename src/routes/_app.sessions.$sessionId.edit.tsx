@@ -20,6 +20,7 @@ import { DateTimeFields } from "@/components/ui/date-time-fields";
 import { CarpoolEditor, validateCarpoolDrafts, emptyCarpoolDraft, type CarpoolDraft } from "@/components/session/CarpoolEditor";
 import { CoachSetupSection, type VehicleDraft, type ExistingVehicle } from "@/components/session/CoachSetupSection";
 import { AddressAutocomplete } from "@/components/settings/AddressAutocomplete";
+import { notifySessionUpdated, currentMemberId } from "@/lib/notify";
 import { invalidateSessionsCache } from "./_app.sessions.index";
 
 export const Route = createFileRoute("/_app/sessions/$sessionId/edit")({
@@ -308,6 +309,23 @@ function EditSession() {
     setBusy(false);
     invalidateSessionsCache(targetClubId);
     toast.success("Session updated");
+
+    // Notify members RSVP'd 'going', excluding the updater.
+    if (targetClubId) {
+      void (async () => {
+        const updaterMemberId = await currentMemberId(targetClubId);
+        await notifySessionUpdated(
+          {
+            id: sessionId,
+            club_id: targetClubId,
+            title: parsed.data.title,
+            starts_at: parseLocalDateTime(parsed.data.starts_at).toISOString(),
+          },
+          updaterMemberId,
+        );
+      })();
+    }
+
     navigate({ to: "/sessions/$sessionId", params: { sessionId } });
   };
 
