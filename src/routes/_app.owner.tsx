@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Building2, MessageSquare, Users, CalendarDays, Mail, ExternalLink } from "lucide-react";
+import { Building2, MessageSquare, Users, CalendarDays, Mail, ExternalLink, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/owner")({
@@ -64,9 +64,18 @@ type FeedbackRow = {
 
 type Stats = { clubs: number; members: number; sessions: number; open_feedback: number };
 
+type SupportRequest = {
+  id: string;
+  name: string;
+  email: string;
+  message: string;
+  created_at: string;
+};
+
 function OwnerDashboard() {
   const [clubs, setClubs] = useState<Club[]>([]);
   const [feedback, setFeedback] = useState<FeedbackRow[]>([]);
+  const [supportRequests, setSupportRequests] = useState<SupportRequest[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -80,6 +89,7 @@ function OwnerDashboard() {
       const [
         { data: clubData },
         { data: fbData },
+        { data: srData },
         { count: clubCount },
         { count: memberCount },
         { count: sessionCount },
@@ -91,6 +101,7 @@ function OwnerDashboard() {
       ] = await Promise.all([
         supabase.from("clubs").select("id, club_name, state_region, address, created_at").order("created_at", { ascending: false }),
         supabase.from("feedback").select("id, club_id, submitted_by, category, message, status, admin_notes, created_at").order("created_at", { ascending: false }),
+        supabase.from("onboarding_support_requests").select("id, name, email, message, created_at").order("created_at", { ascending: false }),
         supabase.from("clubs").select("id", { count: "exact", head: true }),
         supabase.from("club_memberships").select("id", { count: "exact", head: true }).eq("status", "approved"),
         supabase.from("sessions").select("id", { count: "exact", head: true }),
@@ -180,6 +191,8 @@ function OwnerDashboard() {
         open_feedback: openFeedbackCount ?? 0,
       });
 
+      setSupportRequests(srData ?? []);
+
       setLoading(false);
     })();
   }, []);
@@ -226,6 +239,35 @@ function OwnerDashboard() {
           {clubs.map((c) => <ClubCard key={c.id} club={c} />)}
         </div>
       )}
+
+      {/* Support Requests */}
+      <Card className="p-4 space-y-3 mb-6">
+        <div className="flex items-center gap-2">
+          <HelpCircle className="h-4 w-4 text-primary" />
+          <h2 className="font-semibold">Support Requests</h2>
+          <Badge variant="secondary" className="ml-auto">{supportRequests.length}</Badge>
+        </div>
+        {supportRequests.length === 0 ? (
+          <EmptyState title="No support requests" description="Onboarding help requests will appear here." />
+        ) : (
+          <div className="space-y-3">
+            {supportRequests.map((sr) => (
+              <div key={sr.id} className="rounded-xl border p-4 space-y-1.5">
+                <div className="flex items-start justify-between gap-2 flex-wrap">
+                  <div>
+                    <div className="font-medium text-sm">{sr.name}</div>
+                    <a href={`mailto:${sr.email}`} className="text-xs text-primary underline">{sr.email}</a>
+                  </div>
+                  <div className="text-xs text-muted-foreground shrink-0">
+                    {new Date(sr.created_at).toLocaleString()}
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">{sr.message}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
       {/* Feedback inbox */}
       <Card className="p-4 space-y-3">

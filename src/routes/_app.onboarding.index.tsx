@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Waves, LogOut, Clock, CheckCircle2, Copy, Mail, Share2, Ticket, UserCog } from "lucide-react";
+import { Waves, LogOut, Clock, CheckCircle2, Copy, Mail, Share2, Ticket, UserCog, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/onboarding/")({
@@ -335,8 +335,62 @@ function Onboarding() {
             </TabsContent>
           </Tabs>
         </Card>
+
+        <NeedHelpForm />
       </div>
     </div>
+  );
+}
+
+function NeedHelpForm() {
+  const [helpName, setHelpName] = useState("");
+  const [helpEmail, setHelpEmail] = useState("");
+  const [helpMessage, setHelpMessage] = useState("");
+  const [helpBusy, setHelpBusy] = useState(false);
+
+  const onHelpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = helpName.trim();
+    const email = helpEmail.trim();
+    const message = helpMessage.trim();
+    if (!name || !email || !message) { toast.error("Please fill in all fields."); return; }
+    setHelpBusy(true);
+    const { error } = await supabase.from("onboarding_support_requests").insert({ name, email, message });
+    setHelpBusy(false);
+    if (error) { toast.error(`Could not send message: ${error.message}`); return; }
+    toast.success("Message sent! We'll get back to you shortly.");
+    setHelpName("");
+    setHelpEmail("");
+    setHelpMessage("");
+  };
+
+  return (
+    <Card className="p-4 rounded-xl border">
+      <div className="flex items-center gap-2 mb-3">
+        <HelpCircle className="h-4 w-4 text-primary" />
+        <h2 className="font-semibold">Need help?</h2>
+      </div>
+      <p className="text-sm text-muted-foreground mb-4">
+        If your club already exists or you're having trouble, send us a message.
+      </p>
+      <form onSubmit={onHelpSubmit} className="space-y-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="help-name">Name</Label>
+          <Input id="help-name" value={helpName} onChange={(e) => setHelpName(e.target.value)} placeholder="Your name" required />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="help-email">Email</Label>
+          <Input id="help-email" type="email" value={helpEmail} onChange={(e) => setHelpEmail(e.target.value)} placeholder="you@example.com" required />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="help-message">Message</Label>
+          <Textarea id="help-message" rows={3} value={helpMessage} onChange={(e) => setHelpMessage(e.target.value)} placeholder="Describe what you need help with…" required />
+        </div>
+        <Button type="submit" disabled={helpBusy} className="w-full h-11 bg-primary text-primary-foreground hover:bg-primary/90">
+          {helpBusy ? "Sending…" : "Send message"}
+        </Button>
+      </form>
+    </Card>
   );
 }
 
