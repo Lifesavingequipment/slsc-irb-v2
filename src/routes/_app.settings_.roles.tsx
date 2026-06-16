@@ -160,22 +160,23 @@ function RolesPageInner({ clubId }: { clubId: string }) {
 
   const setRole = async (userId: string, role: ClubRole, on: boolean) => {
     setBusyId(userId + role);
-    if (on) {
-      const { error } = await supabase.from("club_roles").upsert(
-        { club_id: clubId, user_id: userId, role },
-        { onConflict: "club_id,user_id,role" },
-      );
-      if (error) { toast.error(error.message); setBusyId(null); return; }
-    } else {
-      const { error } = await supabase.from("club_roles")
-        .delete()
-        .eq("club_id", clubId)
-        .eq("user_id", userId)
-        .eq("role", role);
-      if (error) { toast.error(error.message); setBusyId(null); return; }
-    }
+    // One role per (user, club): turning a role on replaces any existing role
+    // (radio behavior); turning the active role off falls back to plain member.
+    const newRole: ClubRole = on ? role : "member";
+    // Optimistically reflect the radio behavior so the other toggles flip off.
+    const prevRows = rows;
+    setRows((rs) => rs.map((r) => (r.user_id === userId ? { ...r, roles: [newRole] } : r)));
+    const { error } = await supabase.from("club_roles").upsert(
+      { club_id: clubId, user_id: userId, role: newRole },
+      { onConflict: "user_id,club_id" },
+    );
     setBusyId(null);
-    toast.success(on ? `Granted ${roleLabel(role)}` : `Revoked ${roleLabel(role)}`);
+    if (error) {
+      setRows(prevRows);
+      toast.error(error.message);
+      return;
+    }
+    toast.success(on ? `Granted ${roleLabel(role)}` : "Set to Member");
     load();
   };
 
@@ -188,7 +189,7 @@ function RolesPageInner({ clubId }: { clubId: string }) {
     if (e1) { toast.error(e1.message); return; }
     await supabase.from("club_roles").upsert(
       { club_id: clubId, user_id: transferTarget.user_id, role: "club_admin", is_primary_admin: true },
-      { onConflict: "club_id,user_id,role" },
+      { onConflict: "user_id,club_id" },
     );
     toast.success(`Primary admin transferred to ${dn(transferTarget.user_id)}`);
     setTransferOpen(false);
