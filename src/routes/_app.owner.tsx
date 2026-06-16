@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Building2, MessageSquare, Users, CalendarDays, Mail, ExternalLink, HelpCircle, ChevronDown, ChevronRight, ShieldAlert } from "lucide-react";
+import { Building2, MessageSquare, Users, CalendarDays, Mail, ExternalLink, HelpCircle, ChevronDown, ChevronRight, ShieldAlert, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/owner")({
@@ -88,6 +88,7 @@ function OwnerDashboard() {
   const [supportRequests, setSupportRequests] = useState<SupportRequest[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedClub, setSelectedClub] = useState<Club | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -221,6 +222,10 @@ function OwnerDashboard() {
     );
   }
 
+  if (selectedClub) {
+    return <ClubDetailView club={selectedClub} onBack={() => setSelectedClub(null)} />;
+  }
+
   return (
     <AppShell title="Owner Dashboard">
       {/* Stats — 2×2 mobile, 4-col desktop */}
@@ -246,12 +251,9 @@ function OwnerDashboard() {
         </Card>
       ) : (
         <div className="space-y-4 mb-6">
-          {clubs.map((c) => <ClubCard key={c.id} club={c} />)}
+          {clubs.map((c) => <ClubCard key={c.id} club={c} onViewClub={() => setSelectedClub(c)} />)}
         </div>
       )}
-
-      {/* Club Members Management */}
-      <ClubMembersSection clubs={clubs} />
 
       {/* Support Requests */}
       <Card className="p-4 space-y-3 mb-6">
@@ -341,26 +343,79 @@ function OwnerDashboard() {
   );
 }
 
-function ClubMembersSection({ clubs }: { clubs: Club[] }) {
+function ClubDetailView({ club, onBack }: { club: Club; onBack: () => void }) {
+  const memberSince = new Date(club.created_at).toLocaleDateString("en-AU", { month: "short", year: "numeric" });
+  const lastSessionLabel = club.last_session_at
+    ? `Last training: ${new Date(club.last_session_at).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}`
+    : "No sessions yet";
+
   return (
-    <div className="mb-6">
+    <AppShell title={club.club_name}>
+      <div className="mb-4">
+        <Button variant="ghost" size="sm" className="gap-1.5 -ml-2 text-muted-foreground" onClick={onBack}>
+          <ArrowLeft className="h-4 w-4" />
+          Back to Owner Dashboard
+        </Button>
+      </div>
+
+      {/* Club header */}
+      <Card className="p-4 mb-4">
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {club.state_region && (
+            <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+              {club.state_region}
+            </span>
+          )}
+          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+            Member since {memberSince}
+          </span>
+          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
+            Active
+          </span>
+        </div>
+
+        {club.address && (
+          <div className="text-sm text-muted-foreground flex items-start gap-1.5 mb-3">
+            <span className="font-medium text-foreground shrink-0">Address:</span>
+            <span>{club.address}</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <div className="rounded-lg bg-muted/50 p-2.5 text-center">
+            <div className="text-lg font-bold">{club.session_total}</div>
+            <div className="text-[11px] text-muted-foreground">Total sessions</div>
+          </div>
+          <div className="rounded-lg bg-muted/50 p-2.5 text-center">
+            <div className="text-lg font-bold">{club.sessions_this_month}</div>
+            <div className="text-[11px] text-muted-foreground">This month</div>
+          </div>
+        </div>
+        <div className="text-xs text-muted-foreground">{lastSessionLabel}</div>
+
+        {club.admin_email && (
+          <div className="mt-3">
+            <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8" asChild>
+              <a href={`mailto:${club.admin_email}`}>
+                <Mail className="h-3.5 w-3.5" />
+                Email admin
+              </a>
+            </Button>
+          </div>
+        )}
+      </Card>
+
+      {/* Manage Members */}
       <div className="mb-2 flex items-center gap-2">
         <ShieldAlert className="h-4 w-4 text-primary" />
-        <h2 className="font-semibold">Club Members</h2>
-        <span className="ml-auto text-xs text-muted-foreground">Manage roles &amp; statuses</span>
+        <h2 className="font-semibold">Manage Members</h2>
+        <Badge variant="secondary" className="ml-auto">{club.member_count}</Badge>
       </div>
-      {clubs.length === 0 ? (
-        <Card className="p-4">
-          <EmptyState title="No clubs yet" description="Club member management will appear here." />
-        </Card>
-      ) : (
-        <div className="space-y-2">
-          {clubs.map((c) => <ClubMembersCard key={c.id} club={c} />)}
-        </div>
-      )}
-    </div>
+      <ClubMembersCard club={club} />
+    </AppShell>
   );
 }
+
 
 function ClubMembersCard({ club }: { club: Club }) {
   const [open, setOpen] = useState(false);
@@ -384,25 +439,34 @@ function ClubMembersCard({ club }: { club: Club }) {
 
     const [{ data: memberData }, { data: profileData }] = await Promise.all([
       supabase.from("members").select("auth_user_id, first_name, last_name").in("auth_user_id", userIds),
-      supabase.from("profiles").select("id, email").in("id", userIds),
+      supabase.from("profiles").select("id, email, full_name").in("id", userIds),
     ]);
 
     const memberMap: Record<string, { first_name: string; last_name: string }> = {};
     (memberData ?? []).forEach((m) => { memberMap[m.auth_user_id] = { first_name: m.first_name, last_name: m.last_name }; });
 
     const emailMap: Record<string, string> = {};
-    (profileData ?? []).forEach((p) => { if (p.email) emailMap[p.id] = p.email; });
+    const profileNameMap: Record<string, string> = {};
+    (profileData ?? []).forEach((p) => {
+      if (p.email) emailMap[p.id] = p.email;
+      if (p.full_name) profileNameMap[p.id] = p.full_name;
+    });
 
     setMembers(
-      (data ?? []).map((m) => ({
-        membership_id: m.id,
-        user_id: m.user_id,
-        first_name: memberMap[m.user_id]?.first_name ?? "Unknown",
-        last_name: memberMap[m.user_id]?.last_name ?? "",
-        email: emailMap[m.user_id] ?? "—",
-        role: m.role,
-        status: m.status,
-      })),
+      (data ?? []).map((m) => {
+        const fromMembers = memberMap[m.user_id];
+        const profileFull = profileNameMap[m.user_id];
+        const [profileFirst, ...profileRest] = profileFull ? profileFull.split(" ") : [];
+        return {
+          membership_id: m.id,
+          user_id: m.user_id,
+          first_name: fromMembers?.first_name ?? profileFirst ?? "Unknown",
+          last_name: fromMembers?.last_name ?? profileRest.join(" ") ?? "",
+          email: emailMap[m.user_id] ?? "—",
+          role: m.role,
+          status: m.status,
+        };
+      }),
     );
     setLoaded(true);
     setLoading(false);
@@ -537,7 +601,7 @@ function StatCard({ value, label }: { value: number; label: string }) {
   );
 }
 
-function ClubCard({ club }: { club: Club }) {
+function ClubCard({ club, onViewClub }: { club: Club; onViewClub: () => void }) {
   const memberSince = new Date(club.created_at).toLocaleDateString("en-AU", { month: "short", year: "numeric" });
 
   const lastSessionLabel = club.last_session_at
@@ -631,7 +695,7 @@ function ClubCard({ club }: { club: Club }) {
               No admin email
             </Button>
           )}
-          <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8" disabled>
+          <Button size="sm" variant="outline" className="gap-1.5 text-xs h-8" onClick={onViewClub}>
             <ExternalLink className="h-3.5 w-3.5" />
             View club
           </Button>
