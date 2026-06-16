@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { SupportRequestDialog } from "@/components/SupportRequestDialog";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Sign in — IRB Coaching" }] }),
@@ -23,6 +24,7 @@ function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [supportOpen, setSupportOpen] = useState(false);
 
   useEffect(() => {
     if (user) navigate({ to: "/dashboard", replace: true });
@@ -72,10 +74,19 @@ function LoginPage() {
   };
 
   return (
+    <>
     <AuthShell
       title="Welcome back"
       subtitle="Sign in to manage your IRB team."
-      footer={<>No account? <Link to="/signup" className="text-accent font-medium">Create one</Link></>}
+      footer={
+        <>
+          No account? <Link to="/signup" className="text-accent font-medium">Create one</Link>
+          <span className="mx-2 text-muted-foreground">·</span>
+          <button type="button" onClick={() => setSupportOpen(true)} className="text-muted-foreground hover:text-foreground text-sm">
+            Need help?
+          </button>
+        </>
+      }
     >
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-1.5">
@@ -122,5 +133,7 @@ function LoginPage() {
         )}
       </form>
     </AuthShell>
+    <SupportRequestDialog open={supportOpen} onOpenChange={setSupportOpen} />
+    </>
   );
 }
