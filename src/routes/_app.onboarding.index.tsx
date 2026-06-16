@@ -92,14 +92,17 @@ function Onboarding() {
     const spaceIdx = fullName.indexOf(" ");
     const firstName = spaceIdx > 0 ? fullName.slice(0, spaceIdx) : fullName || "Unknown";
     const lastName = spaceIdx > 0 ? fullName.slice(spaceIdx + 1) : "Unknown";
-    const { error: memberProfileError } = await supabase.from("members").insert({
-      club_id: clubRow.id,
-      auth_user_id: user.id,
-      first_name: firstName,
-      last_name: lastName,
-      email: user.email ?? "",
-    });
-    if (memberProfileError) { setBusy(false); toast.error(`Member profile insert failed: ${memberProfileError.message}`); return; }
+    const { data: existingMemberProfile } = await supabase.from("members").select("id").eq("auth_user_id", user.id).maybeSingle();
+    if (!existingMemberProfile) {
+      const { error: memberProfileError } = await supabase.from("members").insert({
+        club_id: clubRow.id,
+        auth_user_id: user.id,
+        first_name: firstName,
+        last_name: lastName,
+        email: user.email ?? "",
+      });
+      if (memberProfileError) { setBusy(false); toast.error(`Member profile insert failed: ${memberProfileError.message}`); return; }
+    }
 
     const { error: memberError } = await supabase.from("club_memberships").insert({
       user_id: user.id,
