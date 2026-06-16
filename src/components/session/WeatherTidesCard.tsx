@@ -16,6 +16,12 @@ type WaveData = {
   approx: boolean;
 };
 
+export type TideExtreme = {
+  time: string;
+  type: "High" | "Low";
+  height: number;
+};
+
 function daysUntilSession(startsAt: string): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -169,10 +175,58 @@ async function fetchWaves(
   return null;
 }
 
+// WorldTides returns dates like "2026-06-20T06:23+10:00" — already in local
+// time for the queried location, so we read the wall-clock time straight out
+// of the string rather than letting the browser reinterpret it in its own zone.
+function formatTideTime(isoWithOffset: string): string {
+  const m = isoWithOffset.match(/T(\d{2}):(\d{2})/);
+  if (!m) return "";
+  const minutes = m[2];
+  let hours = parseInt(m[1], 10);
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+  return `${hours}:${minutes} ${ampm}`;
+}
+
+async function fetchTides(lat: number, lng: number, date: string): Promise<TideExtreme[] | null> {
+  const apiKey = import.meta.env.VITE_WORLDTIDES_API_KEY;
+  if (!apiKey) {
+    console.warn("[WeatherTidesCard] fetchTides: VITE_WORLDTIDES_API_KEY not set, skipping");
+    return null;
+  }
+  const url = `https://www.worldtides.info/api/v3?extremes&lat=${lat}&lon=${lng}&key=${apiKey}&days=2&date=${date}`;
+  console.log("[WeatherTidesCard] fetchTides: fetching", url);
+  try {
+    const res = await fetch(url);
+    const d = await res.json();
+    console.log("[WeatherTidesCard] fetchTides: response", d);
+    if (!Array.isArray(d?.extremes)) {
+      console.warn("[WeatherTidesCard] fetchTides: no extremes in response");
+      return null;
+    }
+    const sameDay = d.extremes.filter(
+      (e: { date?: string }) => typeof e.date === "string" && e.date.startsWith(date),
+    );
+    const result: TideExtreme[] = sameDay
+      .slice(0, 4)
+      .map((e: { date: string; type: string; height: number }) => ({
+        time: formatTideTime(e.date),
+        type: e.type === "Low" ? "Low" : "High",
+        height: e.height,
+      }));
+    console.log("[WeatherTidesCard] fetchTides: result", result);
+    return result;
+  } catch (err) {
+    console.error("[WeatherTidesCard] fetchTides: error", err);
+  }
+  return null;
+}
+
 export type WeatherTidesState = {
   loading: boolean;
   weather: WeatherData | null;
   waves: WaveData | null;
+  tides: TideExtreme[] | null;
   tooFarForWeather: boolean;
   tooFarForWaves: boolean;
   error: string | null;
@@ -195,6 +249,7 @@ export function useWeatherTidesData({
   const [loading, setLoading] = useState(true);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [waves, setWaves] = useState<WaveData | null>(null);
+  const [tides, setTides] = useState<TideExtreme[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -217,6 +272,7 @@ export function useWeatherTidesData({
         const parsed = JSON.parse(cached);
         setWeather(parsed.weather ?? null);
         setWaves(parsed.waves ?? null);
+        setTides(parsed.tides ?? null);
         setLoading(false);
         return;
       } catch { /* bad cache */ }
@@ -226,13 +282,15 @@ export function useWeatherTidesData({
       try {
         const coords = await geocode(location);
         const tz = getTimezone(coords.lat, coords.lng);
-        const [w, wv] = await Promise.all([
+        const [w, wv, td] = await Promise.all([
           tooFarForWeather ? Promise.resolve(null) : fetchWeather(coords.lat, coords.lng, date, tz),
           tooFarForWaves ? Promise.resolve(null) : fetchWaves(coords.lat, coords.lng, date, useArchive),
+          fetchTides(coords.lat, coords.lng, date),
         ]);
         setWeather(w);
         setWaves(wv);
-        sessionStorage.setItem(cacheKey, JSON.stringify({ weather: w, waves: wv }));
+        setTides(td);
+        sessionStorage.setItem(cacheKey, JSON.stringify({ weather: w, waves: wv, tides: td }));
         if (!w && !wv && !tooFarForWeather && !tooFarForWaves) {
           setError("Weather data unavailable for this location.");
         }
@@ -244,7 +302,7 @@ export function useWeatherTidesData({
     })();
   }, [sessionId, location, startsAt]);
 
-  return { loading, weather, waves, tooFarForWeather, tooFarForWaves, error };
+  return { loading, weather, waves, tides, tooFarForWeather, tooFarForWaves, error };
 }
 
 export { degreesToCompass };

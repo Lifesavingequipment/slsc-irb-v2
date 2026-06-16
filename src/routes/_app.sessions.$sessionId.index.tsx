@@ -439,7 +439,7 @@ function SessionDetail() {
 
         {session.notes && <p className="mt-3 text-sm whitespace-pre-wrap">{session.notes}</p>}
 
-        {!weatherData.loading && (weatherData.weather || (!weatherData.tooFarForWaves && weatherData.waves)) && (
+        {!weatherData.loading && (weatherData.weather || (!weatherData.tooFarForWaves && weatherData.waves) || (weatherData.tides && weatherData.tides.length > 0)) && (
           <div className="mt-3 pt-3 border-t space-y-1 text-sm text-muted-foreground">
             {!weatherData.tooFarForWeather && weatherData.weather && (
               <div>
@@ -455,6 +455,15 @@ function SessionDetail() {
                 {weatherData.waves.periodMax != null ? ` · ${Math.round(weatherData.waves.periodMax)}s period` : ""}
                 {weatherData.waves.directionDominant != null ? ` · ${degreesToCompass(weatherData.waves.directionDominant)}` : ""}
                 {weatherData.waves.approx ? " (approx.)" : ""}
+              </div>
+            )}
+            {weatherData.tides && weatherData.tides.length > 0 && (
+              <div className="flex flex-col gap-0.5">
+                {weatherData.tides.map((t, i) => (
+                  <div key={i}>
+                    🌊 {t.type === "High" ? "High" : "Low"} tide: {t.time} · {Math.round(t.height * 10) / 10}m
+                  </div>
+                ))}
               </div>
             )}
           </div>
