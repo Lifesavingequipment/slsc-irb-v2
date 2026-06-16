@@ -1,6 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import {
-  Home, Calendar, Users, Settings, Waves,
+  Home, Calendar, Users, Settings,
   ChevronDown, Wrench, LogOut, User as UserIcon, MessageSquare,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -46,8 +46,8 @@ export function AppShell({ title, action, children }: {
       <aside className="hidden md:flex flex-col fixed inset-y-0 left-0 w-60 bg-[#1e293b] z-30">
         {/* Logo row */}
         <div className="flex items-center gap-3 px-4 py-5 border-b border-white/10 shrink-0">
-          <div className="h-9 w-9 rounded-lg bg-[#E63329] flex items-center justify-center shrink-0">
-            <Waves className="h-4 w-4 text-white" />
+          <div className="h-9 w-9 rounded-lg overflow-hidden shrink-0">
+            <img src="/prop-logo.png" alt="Logo" className="h-9 w-9 object-cover rounded-lg" />
           </div>
           <div className="min-w-0">
             <div className="text-white font-bold text-sm">IRB Training</div>
@@ -136,8 +136,8 @@ export function AppShell({ title, action, children }: {
           <div className="px-4 pt-3 pb-3 flex items-center gap-3">
             {/* Mobile: waves + club name/switcher */}
             <div className="flex items-center gap-3 flex-1 min-w-0 md:hidden">
-              <div className="h-9 w-9 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
-                <Waves className="h-4 w-4" />
+              <div className="h-9 w-9 rounded-lg overflow-hidden shrink-0">
+                <img src="/prop-logo.png" alt="Logo" className="h-9 w-9 object-cover rounded-lg" />
               </div>
               <div className="min-w-0">
                 {activeClub && approved.length > 1 ? (
