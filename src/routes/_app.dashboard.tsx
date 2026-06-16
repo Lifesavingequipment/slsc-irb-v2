@@ -47,7 +47,7 @@ function Dashboard() {
     if (!activeClub || !user) return;
     const nowIso = new Date().toISOString();
     const in7Iso = addDays(new Date(), 7).toISOString();
-    const [sess, members, pending, rsvps, next7Sess] = await Promise.all([
+    const [sess, members, memberRows, clubMems, rsvps, next7Sess] = await Promise.all([
       supabase.from("sessions")
         .select("id, title, starts_at, location, session_type, ends_at")
         .eq("club_id", activeClub.club_id)
@@ -56,8 +56,15 @@ function Dashboard() {
         .limit(5),
       supabase.from("members").select("id", { count: "exact", head: true })
         .eq("club_id", activeClub.club_id).eq("membership_status", "active"),
-      supabase.from("members").select("id", { count: "exact", head: true })
-        .eq("club_id", activeClub.club_id).eq("membership_status", "pending"),
+      // Pending count must mirror the Members page Pending tab exactly. The
+      // authoritative status lives in club_memberships; members.membership_status
+      // can be stale (e.g. an approved member whose members row still says
+      // "pending"). So we derive the effective status the same way the Members
+      // page does, instead of counting members.membership_status directly.
+      supabase.from("members").select("id, auth_user_id, membership_status")
+        .eq("club_id", activeClub.club_id),
+      supabase.from("club_memberships").select("id, user_id, status")
+        .eq("club_id", activeClub.club_id),
       supabase.from("session_rsvps").select("session_id, status").eq("user_id", user.id),
       supabase.from("sessions")
         .select("id, session_type, survey_enabled, starts_at")
@@ -66,7 +73,23 @@ function Dashboard() {
     ]);
     setUpcoming((sess.data ?? []) as Upcoming[]);
     setMemberCount(members.count ?? 0);
-    setPendingCount(pending.count ?? 0);
+
+    // Effective status = club_memberships.status (matched by auth_user_id)
+    // ?? members.membership_status ?? "approved" — identical to the Members page.
+    const cmByUser = new Map((clubMems.data ?? []).map((m) => [m.user_id, m]));
+    const representedUserIds = new Set<string>();
+    let pendingCountNext = 0;
+    for (const m of memberRows.data ?? []) {
+      const cm = m.auth_user_id ? cmByUser.get(m.auth_user_id) : undefined;
+      const status = cm?.status ?? m.membership_status ?? "approved";
+      representedUserIds.add(m.auth_user_id ?? m.id);
+      if (status === "pending") pendingCountNext++;
+    }
+    // Also count pending memberships that have no members row (Members page fallback).
+    for (const cm of clubMems.data ?? []) {
+      if (cm.status === "pending" && !representedUserIds.has(cm.user_id)) pendingCountNext++;
+    }
+    setPendingCount(pendingCountNext);
     const map: Record<string, string> = {};
     (rsvps.data ?? []).forEach((r) => { map[r.session_id] = r.status; });
     setMyRsvps(map);
