@@ -216,50 +216,92 @@ function ChatPage() {
     );
   }, [myMemberId]);
 
+  // Subscribe to realtime changes for a channel. Uses a wildcard event ('*') so
+  // INSERT/UPDATE/DELETE are all captured, a unique channel name per chat channel
+  // to avoid websocket conflicts, and logs the subscription status to the console.
+  const subscribeToChannel = useCallback((channelId: string) => {
+    if (realtimeRef.current) {
+      void supabase.removeChannel(realtimeRef.current);
+      realtimeRef.current = null;
+    }
+
+    const ch = supabase
+      .channel(`chat-${channelId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "chat_messages", filter: `channel_id=eq.${channelId}` },
+        async (payload) => {
+          if (payload.eventType === "INSERT") {
+            const msg = payload.new as { id: string; sender_id: string | null; body: string; created_at: string };
+            let senderName = "Unknown";
+            if (msg.sender_id) {
+              const { data: s } = await supabase
+                .from("members")
+                .select("first_name, last_name, preferred_name")
+                .eq("id", msg.sender_id)
+                .maybeSingle();
+              if (s) senderName = s.preferred_name || [s.first_name, s.last_name].filter(Boolean).join(" ") || "Unknown";
+            }
+            setMessages((prev) =>
+              prev.some((m) => m.id === msg.id) ? prev : [...prev, { ...msg, senderName }]
+            );
+            void markRead(channelId);
+            void loadChannels();
+          } else if (payload.eventType === "DELETE") {
+            const oldId = (payload.old as { id?: string }).id;
+            if (!oldId) return;
+            setMessages((prev) => prev.filter((m) => m.id !== oldId));
+            void loadChannels();
+          } else if (payload.eventType === "UPDATE") {
+            const msg = payload.new as { id: string; body: string };
+            setMessages((prev) =>
+              prev.map((m) => (m.id === msg.id ? { ...m, body: msg.body } : m))
+            );
+          }
+        },
+      )
+      .subscribe((status, err) => {
+        console.log(`[chat] realtime status for chat-${channelId}:`, status, err ?? "");
+      });
+
+    realtimeRef.current = ch;
+  }, [markRead, loadChannels]);
+
   const openChannel = useCallback(async (channelId: string) => {
     setActiveChannelId(channelId);
     setShowThread(true);
     await loadMessages(channelId);
     await markRead(channelId);
+    // Subscription is (re)established by the effect keyed on activeChannelId below.
+  }, [loadMessages, markRead]);
 
-    // Realtime subscription
-    if (realtimeRef.current) void supabase.removeChannel(realtimeRef.current);
-    const ch = supabase
-      .channel(`chat:${channelId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "chat_messages", filter: `channel_id=eq.${channelId}` },
-        async (payload) => {
-          const msg = payload.new as { id: string; sender_id: string | null; body: string; created_at: string };
-          let senderName = "Unknown";
-          if (msg.sender_id) {
-            const { data: s } = await supabase
-              .from("members")
-              .select("first_name, last_name, preferred_name")
-              .eq("id", msg.sender_id)
-              .maybeSingle();
-            if (s) senderName = s.preferred_name || [s.first_name, s.last_name].filter(Boolean).join(" ") || "Unknown";
-          }
-          setMessages((prev) =>
-            prev.some((m) => m.id === msg.id) ? prev : [...prev, { ...msg, senderName }]
-          );
-          void markRead(channelId);
-          void loadChannels();
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "DELETE", schema: "public", table: "chat_messages", filter: `channel_id=eq.${channelId}` },
-        (payload) => {
-          const oldId = (payload.old as { id?: string }).id;
-          if (!oldId) return;
-          setMessages((prev) => prev.filter((m) => m.id !== oldId));
-          void loadChannels();
-        },
-      )
-      .subscribe();
-    realtimeRef.current = ch;
-  }, [loadMessages, markRead, loadChannels]);
+  // (Re)subscribe to realtime whenever the selected channel changes.
+  useEffect(() => {
+    if (!activeChannelId) return;
+    subscribeToChannel(activeChannelId);
+    return () => {
+      if (realtimeRef.current) {
+        void supabase.removeChannel(realtimeRef.current);
+        realtimeRef.current = null;
+      }
+    };
+  }, [activeChannelId, subscribeToChannel]);
+
+  // When the tab becomes visible again, the websocket may have dropped while
+  // backgrounded. Refetch messages and resubscribe so PCs that were in the
+  // background still pick up messages sent from other devices.
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible" || !activeChannelId) return;
+      console.log("[chat] tab visible — refetching messages and resubscribing");
+      void loadMessages(activeChannelId);
+      void markRead(activeChannelId);
+      void loadChannels();
+      subscribeToChannel(activeChannelId);
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [activeChannelId, loadMessages, markRead, loadChannels, subscribeToChannel]);
 
   useEffect(() => {
     return () => {
