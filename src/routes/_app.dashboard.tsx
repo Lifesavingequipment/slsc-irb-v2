@@ -60,10 +60,9 @@ function Dashboard() {
         .eq("club_id", activeClub.club_id).eq("membership_status", "pending"),
       supabase.from("session_rsvps").select("session_id, status").eq("user_id", user.id),
       supabase.from("sessions")
-        .select("id, session_type, survey_enabled")
+        .select("id, session_type, survey_enabled, starts_at")
         .eq("club_id", activeClub.club_id)
-        .gte("starts_at", nowIso)
-        .lte("starts_at", in7Iso),
+        .or(`ends_at.gte.${nowIso},and(ends_at.is.null,starts_at.gte.${nowIso})`),
     ]);
     setUpcoming((sess.data ?? []) as Upcoming[]);
     setMemberCount(members.count ?? 0);
@@ -72,42 +71,15 @@ function Dashboard() {
     (rsvps.data ?? []).forEach((r) => { map[r.session_id] = r.status; });
     setMyRsvps(map);
 
-    // Compute next-7 metrics
-    const list = (next7Sess.data ?? []) as { id: string; session_type: string; survey_enabled: boolean }[];
-    const trainingCount = list.filter((s) => s.session_type === "training").length;
+    // Compute upcoming metrics — use same session scope as the sessions-page filters
+    const list = (next7Sess.data ?? []) as { id: string; session_type: string; survey_enabled: boolean; starts_at: string }[];
+    // Training count stays limited to next 7 days (matches "Next 7 days" section header)
+    const trainingCount = list.filter((s) => s.session_type === "training" && s.starts_at <= in7Iso).length;
+    // RSVP counter: all upcoming sessions where user has no row in session_rsvps
     const respondedIds = new Set(Object.keys(map));
     const rsvpsPending = list.filter((s) => !respondedIds.has(s.id)).length;
-
-    const surveyIds = list.filter((s) => s.survey_enabled).map((s) => s.id);
-    let surveysPending = 0;
-    if (surveyIds.length > 0) {
-      const { data: qs } = await supabase
-        .from("session_survey_questions")
-        .select("session_id, id, required")
-        .in("session_id", surveyIds);
-      const requiredBySession = new Map<string, string[]>();
-      ((qs ?? []) as { session_id: string; id: string; required: boolean }[]).forEach((q) => {
-        if (!q.required) return;
-        const arr = requiredBySession.get(q.session_id) ?? [];
-        arr.push(q.id); requiredBySession.set(q.session_id, arr);
-      });
-      const sessionsWithRequired = Array.from(requiredBySession.keys());
-      if (sessionsWithRequired.length > 0) {
-        const { data: rs } = await supabase
-          .from("session_survey_responses")
-          .select("question_id, session_id, answer_text, answer_bool, answer_choice")
-          .in("session_id", sessionsWithRequired)
-          .eq("user_id", user.id);
-        const answered = new Set(
-          ((rs ?? []) as { question_id: string; answer_text: string | null; answer_bool: boolean | null; answer_choice: string | null }[])
-            .filter((r) => r.answer_text !== null || r.answer_bool !== null || r.answer_choice !== null)
-            .map((r) => r.question_id),
-        );
-        for (const [sid, qids] of requiredBySession.entries()) {
-          if (!qids.every((id) => answered.has(id))) surveysPending += 1;
-        }
-      }
-    }
+    // Surveys counter: all upcoming sessions with survey_enabled — mirrors the surveys-pending filter
+    const surveysPending = list.filter((s) => s.survey_enabled).length;
     setNext7({ trainingCount, rsvpsPending, surveysPending });
     setLoaded(true);
   };
