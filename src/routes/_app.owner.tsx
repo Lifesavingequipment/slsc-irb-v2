@@ -106,7 +106,6 @@ function OwnerDashboard() {
         { count: sessionCount },
         { count: openFeedbackCount },
         { data: memCounts },
-        { data: roleCounts },
         { data: sessionData },
         { data: coachList },
       ] = await Promise.all([
@@ -117,22 +116,19 @@ function OwnerDashboard() {
         supabase.from("club_memberships").select("id", { count: "exact", head: true }).eq("status", "approved"),
         supabase.from("sessions").select("id", { count: "exact", head: true }),
         supabase.from("feedback").select("id", { count: "exact", head: true }).eq("status", "open"),
-        supabase.from("club_memberships").select("club_id").eq("status", "approved"),
-        supabase.from("user_roles").select("club_id, role"),
+        supabase.from("club_memberships").select("club_id, role").eq("status", "approved"),
         supabase.from("sessions").select("club_id, starts_at").order("starts_at", { ascending: false }),
-        supabase.rpc("list_platform_coaches"),
+        supabase.rpc("list_club_admin_emails"),
       ]);
 
-      // member count map
+      // member count map + role count map (both from club_memberships)
       const memCountMap: Record<string, number> = {};
-      (memCounts ?? []).forEach((m) => { memCountMap[m.club_id] = (memCountMap[m.club_id] ?? 0) + 1; });
-
-      // role count map
       const roleCountMap: Record<string, RoleCount> = {};
-      (roleCounts ?? []).forEach((r) => {
-        if (!roleCountMap[r.club_id]) roleCountMap[r.club_id] = { club_admin: 0, coach: 0, member: 0, owner: 0 };
-        const role = r.role as keyof RoleCount;
-        if (role in roleCountMap[r.club_id]) roleCountMap[r.club_id][role]++;
+      (memCounts ?? []).forEach((m) => {
+        memCountMap[m.club_id] = (memCountMap[m.club_id] ?? 0) + 1;
+        if (!roleCountMap[m.club_id]) roleCountMap[m.club_id] = { club_admin: 0, coach: 0, member: 0, owner: 0 };
+        const role = (m.role ?? "member") as keyof RoleCount;
+        if (role in roleCountMap[m.club_id]) roleCountMap[m.club_id][role]++;
       });
 
       // session stats map
@@ -145,12 +141,10 @@ function OwnerDashboard() {
         if (!lastSessionMap[s.club_id]) lastSessionMap[s.club_id] = s.starts_at;
       });
 
-      // admin email map (first admin/owner per club)
+      // admin email map from club_memberships via RPC
       const adminEmailMap: Record<string, string> = {};
-      (coachList ?? []).forEach((c) => {
-        if ((c.role === "owner" || c.role === "club_admin") && !adminEmailMap[c.club_id] && c.email) {
-          adminEmailMap[c.club_id] = c.email;
-        }
+      (coachList ?? []).forEach((c: { club_id: string; email: string }) => {
+        if (c.email && !adminEmailMap[c.club_id]) adminEmailMap[c.club_id] = c.email;
       });
 
       setClubs(
