@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MapPin, Plus, Trash2, Pencil, X, Check } from "lucide-react";
 import { toast } from "sonner";
+import { AddressAutocomplete } from "./AddressAutocomplete";
 
 type Loc = { id: string; name: string; address: string | null };
 
@@ -119,7 +120,7 @@ export function LocationsSection() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="loc-addr">Address (optional)</Label>
-            <Input id="loc-addr" placeholder="e.g. 80 Pacific Ave, Miami QLD 4220" value={address} onChange={(e) => setAddress(e.target.value)} />
+            <AddressAutocomplete id="loc-addr" placeholder="e.g. 80 Pacific Ave, Miami QLD 4220" value={address} onChange={setAddress} />
           </div>
           <Button type="submit" disabled={saving}>{saving ? "Saving…" : "Add location"}</Button>
         </form>
@@ -143,7 +144,7 @@ export function LocationsSection() {
                 {editingId === l.id ? (
                   <div className="space-y-2">
                     <Input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Name" />
-                    <Input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} placeholder="Address" />
+                    <AddressAutocomplete value={editAddress} onChange={setEditAddress} placeholder="Address" />
                     <div className="flex gap-2">
                       <Button size="sm" onClick={() => saveEdit(l.id)}>
                         <Check className="h-4 w-4 mr-1" /> Save
