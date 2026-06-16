@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { Waves, LogOut, ShieldAlert, HeartPulse } from "lucide-react";
+import { LogOut, ShieldAlert, HeartPulse } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/onboarding/complete")({
@@ -109,25 +109,24 @@ function CompleteProfile() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="bg-surf-gradient text-primary-foreground safe-top px-6 pt-10 pb-12">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-white/15 flex items-center justify-center">
-              <Waves className="h-5 w-5" />
-            </div>
-            <div className="font-semibold">IRB Coaching</div>
-          </div>
-          <button onClick={signOut} className="text-sm opacity-80 hover:opacity-100 flex items-center gap-1.5">
-            <LogOut className="h-4 w-4" /> Sign out
-          </button>
+    <div className="min-h-screen bg-[#f9fafb]">
+      <div className="sticky top-0 z-10 bg-[#E63329] text-white px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <img src="/prop-logo.png" alt="Logo" className="h-9 w-9 rounded-lg object-cover" />
+          <div className="font-semibold">IRB Coaching</div>
         </div>
-        <h1 className="mt-8 text-2xl font-bold">Complete your profile</h1>
-        <p className="mt-1 text-sm opacity-90">We need an emergency contact before you can join sessions.</p>
+        <button onClick={signOut} className="text-sm text-white/90 hover:text-white flex items-center gap-1.5">
+          <LogOut className="h-4 w-4" /> Sign out
+        </button>
       </div>
 
-      <form onSubmit={onSubmit} className="px-4 -mt-6 max-w-2xl mx-auto pb-10 space-y-4">
-        <Card className="p-4 space-y-4">
+      <div className="px-4 pt-6 max-w-2xl mx-auto">
+        <h1 className="text-2xl font-bold text-foreground">Complete your profile</h1>
+        <p className="mt-1 text-sm text-muted-foreground">We need an emergency contact before you can join sessions.</p>
+      </div>
+
+      <form onSubmit={onSubmit} className="px-4 pt-4 max-w-2xl mx-auto pb-10 space-y-4">
+        <Card className="rounded-xl bg-white shadow-sm p-4 space-y-4">
           <div className="flex items-center gap-2">
             <ShieldAlert className="h-4 w-4 text-destructive" />
             <h2 className="font-semibold">Emergency contact <span className="text-destructive">*</span></h2>
@@ -152,7 +151,7 @@ function CompleteProfile() {
           </div>
         </Card>
 
-        <Card className="p-4 space-y-4">
+        <Card className="rounded-xl bg-white shadow-sm p-4 space-y-4">
           <div className="flex items-center gap-2">
             <HeartPulse className="h-4 w-4 text-primary" />
             <h2 className="font-semibold">Medical info <span className="text-xs text-muted-foreground font-normal">(optional)</span></h2>
