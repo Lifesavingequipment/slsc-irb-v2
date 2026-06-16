@@ -393,11 +393,11 @@ function SessionDetail() {
         <ChevronLeft className="h-4 w-4" /> Sessions
       </Link>
 
-      <Card className="p-5">
+      <Card className="p-4">
         <div className="flex items-center justify-between gap-3">
           <Badge variant="secondary" className="text-[10px] uppercase">{session.session_type}</Badge>
           {canManage && (
-            <Button asChild variant="ghost" size="icon" className="h-8 w-8 -mr-1">
+            <Button asChild variant="ghost" size="icon" className="h-7 w-7 -mr-1">
               <Link to="/sessions/$sessionId/edit" params={{ sessionId }}>
                 <Pencil className="h-4 w-4" />
               </Link>
@@ -405,9 +405,9 @@ function SessionDetail() {
           )}
         </div>
 
-        <h1 className="mt-2 text-2xl font-bold">{session.title}</h1>
+        <h1 className="mt-1.5 text-xl font-bold">{session.title}</h1>
 
-        <div className="mt-3 space-y-2 text-sm text-muted-foreground">
+        <div className="mt-2 space-y-1 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
             {format(new Date(session.starts_at), "EEEE d MMM yyyy · h:mma")}
@@ -426,10 +426,10 @@ function SessionDetail() {
           )}
         </div>
 
-        {session.notes && <p className="mt-4 text-sm whitespace-pre-wrap">{session.notes}</p>}
+        {session.notes && <p className="mt-3 text-sm whitespace-pre-wrap">{session.notes}</p>}
 
         {!weatherData.loading && (weatherData.weather || (!weatherData.tooFarForWaves && weatherData.waves)) && (
-          <div className="mt-4 pt-4 border-t space-y-1.5 text-sm text-muted-foreground">
+          <div className="mt-3 pt-3 border-t space-y-1 text-sm text-muted-foreground">
             {!weatherData.tooFarForWeather && weatherData.weather && (
               <div>
                 {weatherData.weather.emoji} {weatherData.weather.label} · {weatherData.weather.maxTemp}°C · {weatherData.weather.windDir} {weatherData.weather.windSpeed} km/h
@@ -449,9 +449,9 @@ function SessionDetail() {
           </div>
         )}
 
-        <div className="mt-4 flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleShare}>
-            <Share2 className="h-4 w-4 mr-2" /> Share
+        <div className="mt-3 flex items-center gap-2">
+          <Button variant="outline" size="sm" className="px-2.5 py-1 h-7 text-xs" onClick={handleShare}>
+            <Share2 className="h-3.5 w-3.5 mr-1.5" /> Share
           </Button>
           {rsvpClosed && (
             <Badge variant="outline" className="gap-1 ml-auto"><Lock className="h-3 w-3" /> RSVP closed</Badge>
@@ -460,12 +460,13 @@ function SessionDetail() {
       </Card>
 
       <Tabs defaultValue="rsvp" className="mt-4">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid grid-flow-col auto-cols-fr w-full">
           <TabsTrigger value="rsvp">RSVPs</TabsTrigger>
           <TabsTrigger value="plan">Plan</TabsTrigger>
           {session.survey_enabled && <TabsTrigger value="survey">Survey</TabsTrigger>}
           <TabsTrigger value="waves">Waves</TabsTrigger>
           <TabsTrigger value="gear">Gear</TabsTrigger>
+          {(session.carpool_enabled || canManage) && <TabsTrigger value="carpool">Carpool</TabsTrigger>}
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
         </TabsList>
 
@@ -531,7 +532,10 @@ function SessionDetail() {
           ) : (
             <TrainingPlanView sessionId={sessionId} />
           )}
-          {(session.carpool_enabled || canManage) && (
+        </TabsContent>
+
+        {(session.carpool_enabled || canManage) && (
+          <TabsContent value="carpool" className="space-y-4 mt-4">
             <Card className="p-4">
               <Button asChild variant="outline" size="sm">
                 <Link to="/sessions/$sessionId/carpool" params={{ sessionId }}>
@@ -542,8 +546,8 @@ function SessionDetail() {
                 </Link>
               </Button>
             </Card>
-          )}
-        </TabsContent>
+          </TabsContent>
+        )}
 
         {session.survey_enabled && (
           <TabsContent value="survey" className="space-y-4 mt-4">
