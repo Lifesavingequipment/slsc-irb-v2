@@ -8,11 +8,13 @@ import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, Plus, Users, UserPlus, Shield, ClipboardList, CheckCircle2, Dumbbell } from "lucide-react";
+import { Calendar, MapPin, Plus, Users, UserPlus, Shield, ClipboardList, CheckCircle2, Dumbbell, ChevronRight } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useIsPlatformOwner } from "@/lib/platform-owner";
 import { useRefetchOnFocus } from "@/hooks/use-refetch-on-focus";
 import { useMemberFirstName } from "@/hooks/useMemberFirstName";
+import { useWeatherTidesData } from "@/components/session/WeatherTidesCard";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — IRB Coaching" }] }),
@@ -119,6 +121,10 @@ function Dashboard() {
 
   if (!activeClub) return null;
 
+  const nextSessionForWeather = upcoming.find(
+    (s) => s.location && !isAfter(new Date(s.starts_at), addDays(new Date(), 7)),
+  );
+
   return (
     <AppShell>
       <div className="mb-5">
@@ -128,53 +134,55 @@ function Dashboard() {
 
       <div className="grid grid-cols-2 gap-3 mb-4">
         <Link to="/members">
-          <Card className="p-4 bg-white border border-[#e5e7eb] shadow-none hover:border-accent transition-colors cursor-pointer">
+          <Card className="p-4 bg-white border border-[#e5e7eb] border-l-4 border-l-primary shadow-none hover:border-accent hover:shadow-sm transition-all cursor-pointer">
             <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
-              <Users className="h-3.5 w-3.5" /> Members
+              <Users className="h-3.5 w-3.5 text-primary" /> Members
             </div>
-            <div className="mt-1 text-2xl font-bold">{memberCount ?? "—"}</div>
+            <div className="mt-1 text-3xl font-bold">{memberCount ?? "—"}</div>
           </Card>
         </Link>
         <Link to="/sessions">
-          <Card className="p-4 bg-white border border-[#e5e7eb] shadow-none hover:border-accent transition-colors cursor-pointer">
+          <Card className="p-4 bg-white border border-[#e5e7eb] border-l-4 border-l-primary shadow-none hover:border-accent hover:shadow-sm transition-all cursor-pointer">
             <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
-              <Calendar className="h-3.5 w-3.5" /> Upcoming
+              <Calendar className="h-3.5 w-3.5 text-primary" /> Upcoming
             </div>
-            <div className="mt-1 text-2xl font-bold">{loaded ? upcoming.length : "—"}</div>
+            <div className="mt-1 text-3xl font-bold">{loaded ? upcoming.length : "—"}</div>
           </Card>
         </Link>
       </div>
 
+      {nextSessionForWeather && (
+        <NextSessionCard session={nextSessionForWeather} />
+      )}
+
       <div className="mb-6">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Next 7 days</div>
-        <div className="grid grid-cols-1 gap-2">
-          <DashAction
-            icon={<ClipboardList className="h-4 w-4 text-primary" />}
-            label="Surveys to complete"
-            count={next7.surveysPending}
-            cta="Complete Surveys"
-            to="/sessions"
-            search={{ filter: "surveys-pending" }}
-            tone={next7.surveysPending > 0 ? "warning" : "muted"}
-          />
-          <DashAction
-            icon={<CheckCircle2 className="h-4 w-4 text-primary" />}
-            label="RSVPs to complete"
-            count={next7.rsvpsPending}
-            cta="Complete RSVPs"
-            to="/sessions"
-            search={{ filter: "rsvp-pending" }}
-            tone={next7.rsvpsPending > 0 ? "warning" : "muted"}
-          />
-          <DashAction
-            icon={<Dumbbell className="h-4 w-4 text-primary" />}
-            label="Upcoming training"
-            count={next7.trainingCount}
-            cta="View Sessions"
-            to="/sessions"
-            tone="muted"
-          />
-        </div>
+        <Card className="p-0 bg-white border border-[#e5e7eb] shadow-none overflow-hidden">
+          <div className="px-4 py-3 border-b border-[#e5e7eb]">
+            <h2 className="text-sm font-semibold">Actions needed</h2>
+          </div>
+          <div className="divide-y divide-[#e5e7eb]">
+            <ActionRow
+              icon={<ClipboardList className="h-4 w-4" />}
+              label="Surveys to complete"
+              count={next7.surveysPending}
+              to="/sessions"
+              search={{ filter: "surveys-pending" }}
+            />
+            <ActionRow
+              icon={<CheckCircle2 className="h-4 w-4" />}
+              label="RSVPs to complete"
+              count={next7.rsvpsPending}
+              to="/sessions"
+              search={{ filter: "rsvp-pending" }}
+            />
+            <ActionRow
+              icon={<Dumbbell className="h-4 w-4" />}
+              label="Upcoming training"
+              count={next7.trainingCount}
+              to="/sessions"
+            />
+          </div>
+        </Card>
       </div>
 
 
@@ -267,26 +275,66 @@ function Dashboard() {
   );
 }
 
-function DashAction({ icon, label, count, cta, to, search, tone }: {
+function ActionRow({ icon, label, count, to, search }: {
   icon: React.ReactNode;
   label: string;
   count: number;
-  cta: string;
   to: string;
   search?: Record<string, string>;
-  tone: "warning" | "muted";
 }) {
+  const active = count > 0;
   return (
-    <Card className="p-3 flex items-center gap-3 bg-white border border-[#e5e7eb] shadow-none">
-      <div className="shrink-0">{icon}</div>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium">{label}</div>
-        <div className="text-2xl font-bold leading-tight">{count}</div>
+    <Link
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      to={to as "/sessions"} search={search as any}
+      className={cn(
+        "flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/10",
+        !active && "opacity-50",
+      )}
+    >
+      <div className={cn("shrink-0", active ? "text-primary" : "text-muted-foreground")}>{icon}</div>
+      <div className="flex-1 min-w-0 text-sm font-medium">{label}</div>
+      <Badge variant={active ? "default" : "secondary"}>{count}</Badge>
+      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+    </Link>
+  );
+}
+
+function NextSessionCard({ session }: { session: Upcoming }) {
+  const { weather, waves } = useWeatherTidesData({
+    sessionId: session.id,
+    location: session.location,
+    startsAt: session.starts_at,
+  });
+
+  return (
+    <Card className="p-4 bg-white border border-[#e5e7eb] shadow-none mb-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Next session</div>
+          <div className="font-semibold truncate">{session.title}</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            {format(new Date(session.starts_at), "EEE d MMM · h:mma")}
+          </div>
+          {(weather || waves?.heightMax != null) && (
+            <div className="mt-2 flex items-center gap-3 text-sm flex-wrap">
+              {weather && (
+                <span className="flex items-center gap-1">
+                  {weather.emoji} {weather.maxTemp}°C · {weather.windSpeed}km/h {weather.windDir}
+                </span>
+              )}
+              {waves?.heightMax != null && (
+                <span className="flex items-center gap-1">
+                  🌊 {waves.heightMax.toFixed(1)}m{waves.periodMax != null ? ` · ${Math.round(waves.periodMax)}s` : ""}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        <Button asChild size="sm" variant="outline" className="shrink-0">
+          <Link to="/sessions/$sessionId" params={{ sessionId: session.id }}>View session</Link>
+        </Button>
       </div>
-      <Button asChild size="sm" variant={tone === "warning" && count > 0 ? "default" : "outline"}>
-        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-        <Link to={to as "/sessions"} search={search as any}>{cta}</Link>
-      </Button>
     </Card>
   );
 }
