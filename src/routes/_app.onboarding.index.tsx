@@ -88,6 +88,11 @@ function Onboarding() {
     }).select("id, club_name").single();
     if (error || !clubRow) { setBusy(false); toast.error(`Club insert failed: ${error?.message ?? "unknown error"}`); return; }
 
+    // Helper: delete the club we just created so we never leave a half-created record
+    const rollback = async () => {
+      await supabase.from("clubs").delete().eq("id", clubRow.id);
+    };
+
     const fullName: string = (user.user_metadata?.full_name as string | undefined) ?? "";
     const spaceIdx = fullName.indexOf(" ");
     const firstName = spaceIdx > 0 ? fullName.slice(0, spaceIdx) : fullName || "Unknown";
@@ -101,7 +106,7 @@ function Onboarding() {
         last_name: lastName,
         email: user.email ?? "",
       });
-      if (memberProfileError) { setBusy(false); toast.error(`Member profile insert failed: ${memberProfileError.message}`); return; }
+      if (memberProfileError) { await rollback(); setBusy(false); toast.error(`Member profile insert failed: ${memberProfileError.message}`); return; }
     }
 
     const { error: memberError } = await supabase.from("club_memberships").insert({
@@ -114,14 +119,14 @@ function Onboarding() {
       approved_by: user.id,
       joined_at: new Date().toISOString(),
     });
-    if (memberError) { setBusy(false); toast.error(`Membership insert failed: ${memberError.message}`); return; }
+    if (memberError) { await rollback(); setBusy(false); toast.error(`Membership insert failed: ${memberError.message}`); return; }
 
     const { error: roleError } = await supabase.from("user_roles").insert({
       user_id: user.id,
       club_id: clubRow.id,
       role: "owner",
     });
-    if (roleError) { setBusy(false); toast.error(`Role insert failed: ${roleError.message}`); return; }
+    if (roleError) { await rollback(); setBusy(false); toast.error(`Role insert failed: ${roleError.message}`); return; }
 
     if (parsed.data.venue_name) {
       const { error: locError } = await supabase.from("locations").insert({
