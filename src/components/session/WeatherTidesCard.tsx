@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
-import { Link } from "@tanstack/react-router";
-import { Card } from "@/components/ui/card";
 
 type WeatherData = {
   emoji: string;
@@ -171,17 +169,24 @@ async function fetchWaves(
   return null;
 }
 
-export function WeatherTidesCard({
+export type WeatherTidesState = {
+  loading: boolean;
+  weather: WeatherData | null;
+  waves: WaveData | null;
+  tooFarForWeather: boolean;
+  tooFarForWaves: boolean;
+  error: string | null;
+};
+
+export function useWeatherTidesData({
   sessionId,
   location,
   startsAt,
-  canManage = false,
 }: {
   sessionId: string;
   location: string | null;
   startsAt: string;
-  canManage?: boolean;
-}) {
+}): WeatherTidesState {
   const daysUntil = daysUntilSession(startsAt);
   const tooFarForWaves = daysUntil > 7;
   const tooFarForWeather = daysUntil > 16;
@@ -190,7 +195,6 @@ export function WeatherTidesCard({
   const [loading, setLoading] = useState(true);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [waves, setWaves] = useState<WaveData | null>(null);
-  const [timezone, setTimezone] = useState<string>("auto");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -202,7 +206,6 @@ export function WeatherTidesCard({
       return;
     }
 
-    // Nothing to fetch if both are out of range
     if (tooFarForWeather && tooFarForWaves) {
       setLoading(false);
       return;
@@ -214,19 +217,14 @@ export function WeatherTidesCard({
         const parsed = JSON.parse(cached);
         setWeather(parsed.weather ?? null);
         setWaves(parsed.waves ?? null);
-        setTimezone(parsed.timezone ?? "auto");
         setLoading(false);
-        console.log("[WeatherTidesCard] loaded from cache", parsed);
         return;
       } catch { /* bad cache */ }
     }
 
-    console.log("[WeatherTidesCard] starting fetch for location:", location, "date:", date, "daysUntil:", daysUntil);
-
     (async () => {
       try {
         const coords = await geocode(location);
-        console.log("[WeatherTidesCard] using coords", coords);
         const tz = getTimezone(coords.lat, coords.lng);
         const [w, wv] = await Promise.all([
           tooFarForWeather ? Promise.resolve(null) : fetchWeather(coords.lat, coords.lng, date, tz),
@@ -234,14 +232,11 @@ export function WeatherTidesCard({
         ]);
         setWeather(w);
         setWaves(wv);
-        setTimezone(tz);
-        sessionStorage.setItem(cacheKey, JSON.stringify({ weather: w, waves: wv, timezone: tz }));
-        console.log("[WeatherTidesCard] fetch complete", { weather: w, waves: wv, timezone: tz });
+        sessionStorage.setItem(cacheKey, JSON.stringify({ weather: w, waves: wv }));
         if (!w && !wv && !tooFarForWeather && !tooFarForWaves) {
-          setError("Weather and wave data unavailable for this location.");
+          setError("Weather data unavailable for this location.");
         }
       } catch (err) {
-        console.error("[WeatherTidesCard] unexpected error", err);
         setError(`Failed to load weather data: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
         setLoading(false);
@@ -249,75 +244,7 @@ export function WeatherTidesCard({
     })();
   }, [sessionId, location, startsAt]);
 
-  if (loading) {
-    return <Card className="mt-4 p-4 h-16 animate-pulse bg-muted/30" />;
-  }
-
-  if (!location) {
-    return (
-      <Card className="mt-4 p-4">
-        <p className="text-sm text-muted-foreground">
-          📍 Add a location to this session to see weather and tides.
-          {canManage && (
-            <>
-              {" "}
-              <Link
-                to="/sessions/$sessionId/edit"
-                params={{ sessionId }}
-                className="text-primary underline"
-              >
-                Edit session
-              </Link>
-            </>
-          )}
-        </p>
-      </Card>
-    );
-  }
-
-  // Both weather and wave forecasts are out of range (> 16 days out)
-  if (tooFarForWeather && tooFarForWaves) {
-    return (
-      <Card className="mt-4 p-4">
-        <div className="space-y-0.5 text-sm text-muted-foreground">
-          <p>Weather forecast not yet available.</p>
-          <p className="text-xs">Surf forecast available 7 days before session.</p>
-        </div>
-      </Card>
-    );
-  }
-
-  return (
-    <Card className="mt-4 p-4">
-      <div className="space-y-1.5 text-sm">
-        {tooFarForWeather ? (
-          <p className="text-xs text-muted-foreground">Weather forecast not yet available.</p>
-        ) : weather ? (
-          <div>
-            {weather.emoji} {weather.label} · {weather.maxTemp}°C · {weather.windDir} {weather.windSpeed} km/h
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            {error ?? "Weather data unavailable for this location."}
-          </p>
-        )}
-        {!tooFarForWaves && (
-          <div className="text-muted-foreground">
-            🌊 Surf:{" "}
-            {waves?.heightMax != null
-              ? `~${Math.round(waves.heightMax * 10) / 10}m`
-              : waves != null
-                ? "Approx. surf — coastal data unavailable"
-                : "—"}
-            {waves?.periodMax != null ? ` · ${Math.round(waves.periodMax)}s period` : ""}
-            {waves?.directionDominant != null ? ` · ${degreesToCompass(waves.directionDominant)}` : ""}
-            {waves?.approx ? " (approx.)" : ""}
-          </div>
-        )}
-        {tooFarForWaves && (
-          <p className="text-xs text-muted-foreground">Surf forecast available 7 days before session.</p>
-        )}
-      </div>
-    </Card>
-  );
+  return { loading, weather, waves, tooFarForWeather, tooFarForWaves, error };
 }
+
+export { degreesToCompass };

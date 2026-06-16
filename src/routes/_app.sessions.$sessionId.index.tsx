@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { WavePanel } from "@/components/session/WavePanel";
 import { SurveyEditor, SurveyRunner, SurveyResults, usePretrainingSurveyStatus } from "@/components/session/SurveyPanel";
 import { TrainingPlanView, TrainingPlanEditor } from "@/components/session/TrainingPlanPanel";
-import { WeatherTidesCard } from "@/components/session/WeatherTidesCard";
+import { useWeatherTidesData, degreesToCompass } from "@/components/session/WeatherTidesCard";
 import { useCoachPermissions } from "@/lib/coach-permissions";
 import { buildNameMap, memberFullName } from "@/lib/names";
 import { invalidateSessionsCache, removeSessionFromCache } from "./_app.sessions.index";
@@ -85,6 +85,26 @@ function SessionDetail() {
   const [busy, setBusy] = useState(false);
   const { perms } = useCoachPermissions(session?.club_id ?? null);
   const surveyStatus = usePretrainingSurveyStatus(sessionId, user?.id ?? null);
+  const weatherData = useWeatherTidesData({
+    sessionId,
+    location: session?.location ?? null,
+    startsAt: session?.starts_at ?? new Date().toISOString(),
+  });
+
+  const handleShare = async () => {
+    if (!session) return;
+    const text = [
+      session.title,
+      format(new Date(session.starts_at), "EEEE d MMM yyyy · h:mma"),
+      session.location ?? "",
+    ].filter(Boolean).join("\n");
+    if (navigator.share) {
+      try { await navigator.share({ title: session.title, text }); } catch { /* cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(text);
+      toast.success("Copied to clipboard");
+    }
+  };
 
   const load = useCallback(async () => {
     const { data: s } = await supabase.from("sessions").select("*").eq("id", sessionId).maybeSingle();
@@ -374,15 +394,19 @@ function SessionDetail() {
       </Link>
 
       <Card className="p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <Badge variant="secondary" className="text-[10px] uppercase">{session.session_type}</Badge>
-            <h1 className="mt-2 text-2xl font-bold">{session.title}</h1>
-          </div>
-          {rsvpClosed && (
-            <Badge variant="outline" className="gap-1"><Lock className="h-3 w-3" /> RSVP closed</Badge>
+        <div className="flex items-center justify-between gap-3">
+          <Badge variant="secondary" className="text-[10px] uppercase">{session.session_type}</Badge>
+          {canManage && (
+            <Button asChild variant="ghost" size="icon" className="h-8 w-8 -mr-1">
+              <Link to="/sessions/$sessionId/edit" params={{ sessionId }}>
+                <Pencil className="h-4 w-4" />
+              </Link>
+            </Button>
           )}
         </div>
+
+        <h1 className="mt-2 text-2xl font-bold">{session.title}</h1>
+
         <div className="mt-3 space-y-2 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
@@ -401,34 +425,39 @@ function SessionDetail() {
             <div className="flex items-center gap-2"><Users className="h-4 w-4" /> Capacity {going.length}/{session.capacity}</div>
           )}
         </div>
+
         {session.notes && <p className="mt-4 text-sm whitespace-pre-wrap">{session.notes}</p>}
-        <div className="mt-4 flex flex-wrap gap-2">
-          {(session.carpool_enabled || canManage) && (
-            <Button asChild variant="outline" size="sm">
-              <Link to="/sessions/$sessionId/carpool" params={{ sessionId }}>
-                <Users className="h-4 w-4 mr-2" /> Carpool & transport
-                {!session.carpool_enabled && canManage && (
-                  <Badge variant="outline" className="ml-2 text-[10px]">Off</Badge>
-                )}
-              </Link>
-            </Button>
-          )}
-          {canManage && (
-            <Button asChild variant="outline" size="sm">
-              <Link to="/sessions/$sessionId/edit" params={{ sessionId }}>
-                <Pencil className="h-4 w-4 mr-2" /> Edit session
-              </Link>
-            </Button>
+
+        {!weatherData.loading && (weatherData.weather || (!weatherData.tooFarForWaves && weatherData.waves)) && (
+          <div className="mt-4 pt-4 border-t space-y-1.5 text-sm text-muted-foreground">
+            {!weatherData.tooFarForWeather && weatherData.weather && (
+              <div>
+                {weatherData.weather.emoji} {weatherData.weather.label} · {weatherData.weather.maxTemp}°C · {weatherData.weather.windDir} {weatherData.weather.windSpeed} km/h
+              </div>
+            )}
+            {!weatherData.tooFarForWaves && weatherData.waves && (
+              <div>
+                🌊 Surf:{" "}
+                {weatherData.waves.heightMax != null
+                  ? `~${Math.round(weatherData.waves.heightMax * 10) / 10}m`
+                  : "Approx. surf — coastal data unavailable"}
+                {weatherData.waves.periodMax != null ? ` · ${Math.round(weatherData.waves.periodMax)}s period` : ""}
+                {weatherData.waves.directionDominant != null ? ` · ${degreesToCompass(weatherData.waves.directionDominant)}` : ""}
+                {weatherData.waves.approx ? " (approx.)" : ""}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="mt-4 flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleShare}>
+            <Share2 className="h-4 w-4 mr-2" /> Share
+          </Button>
+          {rsvpClosed && (
+            <Badge variant="outline" className="gap-1 ml-auto"><Lock className="h-3 w-3" /> RSVP closed</Badge>
           )}
         </div>
       </Card>
-
-      <WeatherTidesCard
-        sessionId={sessionId}
-        location={session.location}
-        startsAt={session.starts_at}
-        canManage={canManage}
-      />
 
       <Tabs defaultValue="rsvp" className="mt-4">
         <TabsList className="grid w-full grid-cols-6">
@@ -501,6 +530,18 @@ function SessionDetail() {
             />
           ) : (
             <TrainingPlanView sessionId={sessionId} />
+          )}
+          {(session.carpool_enabled || canManage) && (
+            <Card className="p-4">
+              <Button asChild variant="outline" size="sm">
+                <Link to="/sessions/$sessionId/carpool" params={{ sessionId }}>
+                  <Users className="h-4 w-4 mr-2" /> Carpool & transport
+                  {!session.carpool_enabled && canManage && (
+                    <Badge variant="outline" className="ml-2 text-[10px]">Off</Badge>
+                  )}
+                </Link>
+              </Button>
+            </Card>
           )}
         </TabsContent>
 
