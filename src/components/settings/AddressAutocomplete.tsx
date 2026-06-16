@@ -50,7 +50,7 @@ export function AddressAutocomplete({ id, value, onChange, placeholder, classNam
         const res = await fetch(
           `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
             q,
-          )}&format=json&addressdetails=1&limit=5&countrycodes=au`,
+          )}&format=json&addressdetails=1&limit=5&countrycodes=au,nz`,
           {
             signal: controller.signal,
             headers: { "User-Agent": "slsc-irb-v2 (surf club app)" },
