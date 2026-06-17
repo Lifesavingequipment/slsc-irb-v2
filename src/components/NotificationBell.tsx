@@ -33,7 +33,7 @@ export function NotificationBell() {
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    console.log("[NotificationBell] notifications:", notifications);
+    console.log("notifications:", notifications);
   }, [notifications]);
 
   const handleToggle = () => {
@@ -73,8 +73,8 @@ export function NotificationBell() {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
             ref={panelRef}
-            style={{ top: panelPos.top, right: panelPos.right }}
-            className="fixed z-50 w-[min(400px,calc(100vw-2rem))] max-h-96 overflow-y-auto rounded-xl border border-border bg-background shadow-xl"
+            style={{ top: panelPos.top, "--panel-right": `${panelPos.right}px` } as React.CSSProperties}
+            className="fixed z-50 left-2 right-2 sm:left-auto sm:right-[var(--panel-right)] sm:w-[400px] max-h-[50vh] overflow-y-auto rounded-xl border border-border bg-background shadow-xl"
           >
             <div className="sticky top-0 bg-background border-b border-border px-4 py-3 flex items-center justify-between">
               <span className="font-semibold text-sm">Notifications</span>
@@ -107,18 +107,9 @@ export function NotificationBell() {
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        {n.message ? (
-                          <div className="text-sm leading-snug">{n.message}</div>
-                        ) : (
-                          <div className="text-sm leading-snug text-muted-foreground">
-                            New notification
-                            {n.notification_type && (
-                              <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground/70">
-                                {n.notification_type.replace(/_/g, " ")}
-                              </span>
-                            )}
-                          </div>
-                        )}
+                        <div className="text-sm leading-snug">
+                          {n.message || n.notification_type}
+                        </div>
                         <div className="text-[10px] text-muted-foreground/70 mt-1">
                           {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
                         </div>
