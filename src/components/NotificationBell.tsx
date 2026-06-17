@@ -75,7 +75,7 @@ export function NotificationBell() {
           <div
             ref={panelRef}
             style={{ top: panelPos.top, "--panel-right": `${panelPos.right}px` } as React.CSSProperties}
-            className="fixed z-50 left-2 right-2 sm:left-auto sm:right-[var(--panel-right)] sm:w-[400px] max-h-[50vh] overflow-y-auto rounded-xl border border-border bg-background shadow-xl"
+            className="fixed z-50 left-2 right-2 sm:left-auto sm:right-[var(--panel-right)] sm:w-[400px] max-h-[50vh] overflow-y-auto rounded-xl border border-border bg-white shadow-xl"
           >
             <div className="sticky top-0 bg-background border-b border-border px-4 py-3 flex items-center justify-between">
               <span className="font-semibold text-sm">Notifications</span>
@@ -98,7 +98,9 @@ export function NotificationBell() {
                       onClick={() =>
                         handleNotificationClick(n.id, linkFor(n.notification_type, n.related_id))
                       }
-                      className="w-full text-left px-4 py-3 flex gap-3 hover:bg-accent/60 transition-colors border-b border-border/50 last:border-b-0"
+                      className={`w-full text-left px-4 py-3 flex gap-3 hover:bg-accent/60 transition-colors border-b border-border/50 last:border-b-0 ${
+                        !n.is_read ? "bg-orange-50" : ""
+                      }`}
                     >
                       <div className="mt-1.5 shrink-0">
                         {!n.is_read ? (
@@ -108,10 +110,10 @@ export function NotificationBell() {
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm leading-snug">
+                        <div className="text-sm leading-snug text-gray-900">
                           {n.message || n.notification_type}
                         </div>
-                        <div className="text-[10px] text-muted-foreground/70 mt-1">
+                        <div className="text-[10px] text-gray-500 mt-1">
                           {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
                         </div>
                       </div>
