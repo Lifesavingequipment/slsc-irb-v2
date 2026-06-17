@@ -26,6 +26,7 @@ function linkFor(type: string, relatedId: string | null): string | null {
 
 export function NotificationBell() {
   const { notifications, unreadCount, markAllRead, markRead } = useNotifications();
+  console.log("[NotificationBell] render", { unreadCount, count: notifications.length, notifications });
   const [open, setOpen] = useState(false);
   const [panelPos, setPanelPos] = useState({ top: 0, right: 0 });
   const navigate = useNavigate();

@@ -32,12 +32,14 @@ export function useNotifications() {
       .maybeSingle();
     if (!m) return;
     setMemberId(m.id);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("notifications")
       .select("id, club_id, member_id, message, notification_type, related_id, is_read, created_at")
       .eq("member_id", m.id)
       .order("created_at", { ascending: false })
       .limit(50);
+    if (error) console.error("[useNotifications] fetch error", error);
+    console.log("[useNotifications] fetched", { memberId: m.id, count: data?.length ?? 0, data });
     setNotifications((data ?? []) as AppNotification[]);
   }, [activeClub]);
 
