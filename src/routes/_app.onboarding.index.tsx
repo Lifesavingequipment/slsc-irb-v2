@@ -24,15 +24,6 @@ export const Route = createFileRoute("/_app/onboarding/")({
 
 type ClubRow = { id: string; club_name: string; address: string | null };
 
-function generateInviteCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const bytes = new Uint8Array(8);
-  crypto.getRandomValues(bytes);
-  let out = "";
-  for (let i = 0; i < 8; i++) out += chars[bytes[i] % chars.length];
-  return `IRB-${out}`;
-}
-
 type CreatedClub = { id: string; name: string; inviteCode: string };
 
 function Onboarding() {
@@ -83,78 +74,29 @@ function Onboarding() {
     if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
     if (!user) return;
     setBusy(true);
-    const branding: Record<string, string> = {};
-    if (parsed.data.description) branding.description = parsed.data.description;
-    if (parsed.data.logo_url) branding.logo_url = parsed.data.logo_url;
-    const { data: clubRow, error } = await supabase.from("clubs").insert({
-      club_name: parsed.data.name,
-      address: parsed.data.location || null,
-      ...(Object.keys(branding).length > 0 ? { branding } : {}),
-    }).select("id, club_name").single();
-    if (error || !clubRow) { setBusy(false); toast.error(`Club insert failed: ${error?.message ?? "unknown error"}`); return; }
-
-    // Helper: delete the club we just created so we never leave a half-created record
-    const rollback = async () => {
-      await supabase.from("clubs").delete().eq("id", clubRow.id);
-    };
 
     const fullName: string = (user.user_metadata?.full_name as string | undefined) ?? "";
     const spaceIdx = fullName.indexOf(" ");
     const firstName = spaceIdx > 0 ? fullName.slice(0, spaceIdx) : fullName || "Unknown";
     const lastName = spaceIdx > 0 ? fullName.slice(spaceIdx + 1) : "Unknown";
-    const { data: existingMemberProfile } = await supabase.from("members").select("id").eq("auth_user_id", user.id).maybeSingle();
-    if (!existingMemberProfile) {
-      const { error: memberProfileError } = await supabase.from("members").insert({
-        club_id: clubRow.id,
-        auth_user_id: user.id,
-        first_name: firstName,
-        last_name: lastName,
-        email: user.email ?? "",
-      });
-      if (memberProfileError) { await rollback(); setBusy(false); toast.error(`Member profile insert failed: ${memberProfileError.message}`); return; }
-    }
 
-    const { error: memberError } = await supabase.from("club_memberships").insert({
-      user_id: user.id,
-      club_id: clubRow.id,
-      status: "approved",
-      role: "owner",
-      is_primary_club: true,
-      approved_at: new Date().toISOString(),
-      approved_by: user.id,
-      joined_at: new Date().toISOString(),
-    });
-    if (memberError) { await rollback(); setBusy(false); toast.error(`Membership insert failed: ${memberError.message}`); return; }
-
-    const { error: roleError } = await supabase.from("user_roles").insert({
-      user_id: user.id,
-      club_id: clubRow.id,
-      role: "owner",
-    });
-    if (roleError) { await rollback(); setBusy(false); toast.error(`Role insert failed: ${roleError.message}`); return; }
-
-    if (parsed.data.venue_name) {
-      const { error: locError } = await supabase.from("locations").insert({
-        club_id: clubRow.id,
-        name: parsed.data.venue_name,
-        address: parsed.data.venue_address || null,
-        created_by: user.id,
-      });
-      if (locError) toast.error(`Location insert failed: ${locError.message}`);
-    }
-
-    const code = generateInviteCode();
-    const { error: codeError } = await supabase.from("club_invite_codes").insert({
-      club_id: clubRow.id,
-      code,
-      created_by: user.id,
-      active: true,
+    const { data, error } = await supabase.rpc("create_club", {
+      p_name: parsed.data.name,
+      p_first_name: firstName,
+      p_last_name: lastName,
+      p_email: user.email ?? "",
+      p_address: parsed.data.location || null,
+      p_description: parsed.data.description || null,
+      p_logo_url: parsed.data.logo_url || null,
+      p_venue_name: parsed.data.venue_name || null,
+      p_venue_address: parsed.data.venue_address || null,
     });
     setBusy(false);
-    if (codeError) { toast.error(`Invite code insert failed: ${codeError.message}`); return; }
+    if (error || !data) { toast.error(`Club creation failed: ${error?.message ?? "unknown error"}`); return; }
+    const result = data as { club_id: string; club_name: string; invite_code: string };
     toast.success("Club created — you're the owner.");
     await refresh();
-    setCreated({ id: clubRow.id, name: clubRow.club_name, inviteCode: code });
+    setCreated({ id: result.club_id, name: result.club_name, inviteCode: result.invite_code });
   };
 
   const onRequestToJoin = async (clubId: string) => {
