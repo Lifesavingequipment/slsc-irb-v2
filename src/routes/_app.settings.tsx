@@ -30,6 +30,10 @@ import { useConfirm } from "@/lib/confirm";
 
 export const Route = createFileRoute("/_app/settings")({
   head: () => ({ meta: [{ title: "Settings — IRB Coaching" }] }),
+  validateSearch: (search: Record<string, unknown>): { section?: SectionKey } => {
+    const s = search.section;
+    return { section: typeof s === "string" && (SECTION_ORDER as string[]).includes(s) ? (s as SectionKey) : undefined };
+  },
   component: SettingsPage,
 });
 
@@ -91,6 +95,7 @@ function SettingsPage() {
   const canManage = useCanManage();
   const navigate = useNavigate();
   const confirm = useConfirm();
+  const { section } = Route.useSearch();
 
   // Profile
   const [fullName, setFullName] = useState("");
@@ -130,6 +135,15 @@ function SettingsPage() {
     roles: false, templates: false, feedback: false,
   });
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+
+  useEffect(() => {
+    if (!section) return;
+    setOpen((p) => ({ ...p, [section]: true }));
+    const t = setTimeout(() => {
+      document.getElementById(`settings-${section}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+    return () => clearTimeout(t);
+  }, [section]);
 
   const approvedClubIds = memberships.filter((m) => m.status === "approved").map((m) => m.club_id);
   const activeClubId = activeClub?.club_id ?? approvedClubIds[0];
@@ -407,7 +421,7 @@ function SettingsPage() {
         : key === "templates" ? () => navigate({ to: "/settings/templates" })
         : () => setFeedbackOpen(true);
       return (
-        <Card key={key} className="p-0 overflow-hidden">
+        <Card key={key} id={`settings-${key}`} className="p-0 overflow-hidden">
           <div className="flex items-center gap-1 px-2 py-2">
             <button
               type="button"
@@ -427,7 +441,7 @@ function SettingsPage() {
 
     // Collapsible sections
     return (
-      <Card key={key} className="p-0 overflow-hidden">
+      <Card key={key} id={`settings-${key}`} className="p-0 overflow-hidden">
         <Collapsible open={open[key]} onOpenChange={(v) => setOpen((p) => ({ ...p, [key]: v }))}>
           <div className="flex items-center gap-1 px-2 py-2">
             <CollapsibleTrigger className="flex-1 flex items-center gap-2 py-2 px-2 text-left">

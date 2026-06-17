@@ -327,7 +327,7 @@ function TodayConditionsCard() {
       <Card className="p-3 mb-4 bg-white border border-[#e5e7eb] shadow-none">
         <p className="text-xs text-muted-foreground">
           Set a home beach in{" "}
-          <Link to="/settings" className="text-accent underline">Settings → Saved locations</Link>
+          <Link to="/settings" search={{ section: "locations" }} className="text-accent underline">Settings → Saved locations</Link>
           {" "}to see today's conditions.
         </p>
       </Card>
