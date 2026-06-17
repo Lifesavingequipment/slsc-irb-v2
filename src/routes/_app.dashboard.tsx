@@ -130,6 +130,8 @@ function Dashboard() {
         <h1 className="text-2xl font-bold tracking-tight">{activeClub.club.name}</h1>
       </div>
 
+      <TodayConditionsCard />
+
       <div className="grid grid-cols-2 gap-3 mb-4">
         <Link to="/members">
           <Card className="p-4 bg-white border border-[#e5e7eb] border-l-4 border-l-primary shadow-none hover:border-accent hover:shadow-sm transition-all cursor-pointer">
@@ -295,6 +297,89 @@ function ActionRow({ icon, label, count, to, search }: {
       <Badge variant={active ? "default" : "secondary"}>{count}</Badge>
       <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
     </Link>
+  );
+}
+
+type DefaultLoc = { id: string; name: string; address: string | null };
+
+function TodayConditionsCard() {
+  const { activeClub } = useClub();
+  const isAdmin = useIsAdmin();
+  const [defaultLoc, setDefaultLoc] = useState<DefaultLoc | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (!activeClub) return;
+    setDefaultLoc(undefined);
+    supabase
+      .from("locations")
+      .select("id, name, address")
+      .eq("club_id", activeClub.club_id)
+      .eq("is_default", true)
+      .maybeSingle()
+      .then(({ data }) => setDefaultLoc((data as DefaultLoc) ?? null));
+  }, [activeClub?.club_id]);
+
+  if (!activeClub || defaultLoc === undefined) return null;
+
+  if (!defaultLoc) {
+    if (!isAdmin) return null;
+    return (
+      <Card className="p-3 mb-4 bg-white border border-[#e5e7eb] shadow-none">
+        <p className="text-xs text-muted-foreground">
+          Set a home beach in{" "}
+          <Link to="/settings" className="text-accent underline">Settings → Saved locations</Link>
+          {" "}to see today's conditions.
+        </p>
+      </Card>
+    );
+  }
+
+  return <TodayConditionsCardContent location={defaultLoc} />;
+}
+
+function TodayConditionsCardContent({ location }: { location: DefaultLoc }) {
+  const { weather, waves, tides } = useWeatherTidesData({
+    sessionId: `today-${location.id}-${format(new Date(), "yyyy-MM-dd")}`,
+    location: location.address || location.name,
+    startsAt: new Date().toISOString(),
+  });
+
+  if (!weather && waves?.heightMax == null && (!tides || tides.length === 0)) return null;
+
+  return (
+    <Card className="p-4 bg-white border border-[#e5e7eb] shadow-none mb-4">
+      <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+        Today at {location.name}
+      </div>
+      <div className="flex items-center gap-3 text-sm flex-wrap">
+        {weather && (
+          <span className="flex items-center gap-1">
+            {weather.emoji} {weather.maxTemp}°C · {weather.windSpeed}km/h {weather.windDir}
+          </span>
+        )}
+        {waves?.heightMax != null && (
+          <span className="flex items-center gap-1">
+            🌊 {waves.heightMax.toFixed(1)}m{waves.periodMax != null ? ` · ${Math.round(waves.periodMax)}s` : ""}
+          </span>
+        )}
+      </div>
+      {tides && tides.length > 0 && (
+        <div className="mt-1 flex flex-col gap-0.5 text-sm text-muted-foreground">
+          {(["High", "Low"] as const).map((type) => {
+            const entries = tides.filter((t) => t.type === type);
+            if (entries.length === 0) return null;
+            return (
+              <div key={type}>
+                🌊 {type === "High" ? "HT" : "LT"}:{" "}
+                {entries
+                  .map((t) => `${t.time} · ${Math.round(t.height * 10) / 10}m`)
+                  .join(",  ")}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
   );
 }
 

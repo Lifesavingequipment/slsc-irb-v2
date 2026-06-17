@@ -7,11 +7,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MapPin, Plus, Trash2, Pencil, X, Check } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { MapPin, Plus, Trash2, Pencil, X, Check, Home } from "lucide-react";
 import { toast } from "sonner";
 import { AddressAutocomplete } from "./AddressAutocomplete";
 
-type Loc = { id: string; name: string; address: string | null };
+type Loc = { id: string; name: string; address: string | null; is_default: boolean };
 
 export function LocationsSection() {
   const { user } = useAuth();
@@ -35,7 +36,7 @@ export function LocationsSection() {
     setLoading(true);
     const { data, error } = await supabase
       .from("locations")
-      .select("id, name, address")
+      .select("id, name, address, is_default")
       .eq("club_id", clubId)
       .order("name");
     setLoading(false);
@@ -81,6 +82,22 @@ export function LocationsSection() {
     refresh();
   };
 
+  const setAsHome = async (id: string) => {
+    if (!clubId) return;
+    const { error: clearError } = await supabase
+      .from("locations")
+      .update({ is_default: false })
+      .eq("club_id", clubId);
+    if (clearError) { toast.error(clearError.message); return; }
+    const { error } = await supabase
+      .from("locations")
+      .update({ is_default: true })
+      .eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Home beach set");
+    refresh();
+  };
+
   const remove = async (id: string, locName: string) => {
     const ok = await confirm({
       title: "Delete this location?",
@@ -106,6 +123,9 @@ export function LocationsSection() {
       <p className="text-xs text-muted-foreground">
         Add the venues, pools and carpool pickup/drop-off points your club uses. They’ll appear as
         pickable options when creating sessions and configuring carpool pickups.
+      </p>
+      <p className="text-xs text-muted-foreground">
+        The home beach is used for the dashboard's "Today" weather, surf and tides — works best with a full street address.
       </p>
 
       <Card className="p-4">
@@ -157,9 +177,26 @@ export function LocationsSection() {
                 ) : (
                   <div className="flex items-start gap-2">
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">{l.name}</div>
+                      <div className="flex items-center gap-2">
+                        <div className="font-medium text-sm truncate">{l.name}</div>
+                        {l.is_default && (
+                          <Badge variant="secondary" className="gap-1 shrink-0">
+                            <Home className="h-3 w-3" /> Home beach
+                          </Badge>
+                        )}
+                      </div>
                       {l.address && (
                         <div className="text-xs text-muted-foreground truncate">{l.address}</div>
+                      )}
+                      {!l.is_default && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-1.5 h-7 text-xs"
+                          onClick={() => setAsHome(l.id)}
+                        >
+                          Set as home beach
+                        </Button>
                       )}
                     </div>
                     <Button size="sm" variant="ghost" onClick={() => startEdit(l)}>
