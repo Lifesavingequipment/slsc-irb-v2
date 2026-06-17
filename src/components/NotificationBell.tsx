@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bell } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
@@ -27,8 +27,24 @@ function linkFor(type: string, relatedId: string | null): string | null {
 export function NotificationBell() {
   const { notifications, unreadCount, markAllRead, markRead } = useNotifications();
   const [open, setOpen] = useState(false);
+  const [panelPos, setPanelPos] = useState({ top: 0, right: 0 });
   const navigate = useNavigate();
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    console.log("[NotificationBell] notifications:", notifications);
+  }, [notifications]);
+
+  const handleToggle = () => {
+    if (!open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const top = Math.min(rect.bottom + 8, window.innerHeight - 16);
+      const right = Math.max(window.innerWidth - rect.right, 16);
+      setPanelPos({ top, right });
+    }
+    setOpen((o) => !o);
+  };
 
   const handleNotificationClick = async (id: string, link: string | null) => {
     await markRead(id);
@@ -39,8 +55,9 @@ export function NotificationBell() {
   return (
     <div className="relative shrink-0">
       <button
+        ref={buttonRef}
         aria-label="Notifications"
-        onClick={() => setOpen((o) => !o)}
+        onClick={handleToggle}
         className="h-10 w-10 rounded-full bg-white/15 hover:bg-white/25 transition-colors flex items-center justify-center relative"
       >
         <Bell className="h-5 w-5 text-white" />
@@ -56,7 +73,8 @@ export function NotificationBell() {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
             ref={panelRef}
-            className="absolute right-0 top-12 z-50 w-[min(400px,calc(100vw-2rem))] max-h-[70vh] overflow-y-auto rounded-xl border border-border bg-background shadow-xl"
+            style={{ top: panelPos.top, right: panelPos.right }}
+            className="fixed z-50 w-[min(400px,calc(100vw-2rem))] max-h-96 overflow-y-auto rounded-xl border border-border bg-background shadow-xl"
           >
             <div className="sticky top-0 bg-background border-b border-border px-4 py-3 flex items-center justify-between">
               <span className="font-semibold text-sm">Notifications</span>
@@ -89,7 +107,18 @@ export function NotificationBell() {
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm leading-snug">{n.message}</div>
+                        {n.message ? (
+                          <div className="text-sm leading-snug">{n.message}</div>
+                        ) : (
+                          <div className="text-sm leading-snug text-muted-foreground">
+                            New notification
+                            {n.notification_type && (
+                              <span className="ml-1 text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                                {n.notification_type.replace(/_/g, " ")}
+                              </span>
+                            )}
+                          </div>
+                        )}
                         <div className="text-[10px] text-muted-foreground/70 mt-1">
                           {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
                         </div>
