@@ -125,22 +125,34 @@ export async function notifySessionUpdated(session: SessionRef, updaterMemberId:
 /** 3. Member approved — notify all club admins. */
 export async function notifyMemberApproved(clubId: string, member: MemberRef) {
   const ids = await clubAdminMemberIds(clubId);
+  const { data: ref } = await supabase
+    .from("members")
+    .select("auth_user_id")
+    .eq("id", member.id)
+    .maybeSingle();
+  const relatedId = ref?.auth_user_id ?? member.id;
   await notifyMembers(ids, {
     club_id: clubId,
     notification_type: "member_approved",
     message: `${fullName(member)} has joined the club`,
-    related_id: member.id,
+    related_id: relatedId,
   });
 }
 
 /** 4. Join request — notify all club admins. */
 export async function notifyJoinRequest(clubId: string, member: MemberRef) {
   const ids = await clubAdminMemberIds(clubId);
+  const { data: ref } = await supabase
+    .from("members")
+    .select("auth_user_id")
+    .eq("id", member.id)
+    .maybeSingle();
+  const relatedId = ref?.auth_user_id ?? member.id;
   await notifyMembers(ids, {
     club_id: clubId,
     notification_type: "member_request",
     message: `${fullName(member)} has requested to join the club`,
-    related_id: member.id,
+    related_id: relatedId,
   });
 }
 
