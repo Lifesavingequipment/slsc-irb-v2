@@ -459,11 +459,18 @@ function SessionDetail() {
             )}
             {weatherData.tides && weatherData.tides.length > 0 && (
               <div className="flex flex-col gap-0.5">
-                {weatherData.tides.map((t, i) => (
-                  <div key={i}>
-                    🌊 {t.type === "High" ? "High" : "Low"} tide: {t.time} · {Math.round(t.height * 10) / 10}m
-                  </div>
-                ))}
+                {(["High", "Low"] as const).map((type) => {
+                  const entries = weatherData.tides!.filter((t) => t.type === type);
+                  if (entries.length === 0) return null;
+                  return (
+                    <div key={type}>
+                      🌊 {type === "High" ? "HT" : "LT"}:{" "}
+                      {entries
+                        .map((t) => `${t.time} · ${Math.round(t.height * 10) / 10}m`)
+                        .join(",  ")}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
