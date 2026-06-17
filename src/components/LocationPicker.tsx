@@ -4,7 +4,14 @@ import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AddressAutocomplete } from "@/components/settings/AddressAutocomplete";
-import { MapPin, Check, X } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -35,7 +42,7 @@ type Props = {
 /**
  * Reusable location field used across sessions, carpools and onboarding.
  *
- * - Lists the club's saved locations as pickable pills.
+ * - Lists the club's saved locations in a dropdown.
  * - Falls back to an address autocomplete for new addresses.
  * - After picking a new address, offers to save it back to the club's locations.
  */
@@ -148,39 +155,37 @@ export function LocationPicker({
       {clubId && (
         <div className="space-y-1.5">
           {loading ? (
-            <div className="h-7 w-40 rounded-full bg-muted/40 animate-pulse" />
+            <div className="h-9 w-full rounded-lg bg-muted/40 animate-pulse" />
           ) : locations.length > 0 ? (
             <>
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
                 Saved locations
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {locations.map((l) => {
-                  const isSelected = selected?.id === l.id;
-                  return (
-                    <button
-                      key={l.id}
-                      type="button"
-                      title={l.address ?? l.name}
-                      onClick={() => pickSaved(l)}
-                      className={cn(
-                        "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                        isSelected
-                          ? "bg-[#FF6600] text-white border-[#FF6600]"
-                          : "border-border hover:bg-accent hover:text-accent-foreground",
-                      )}
-                    >
-                      <span className="inline-flex items-center gap-1">
-                        <MapPin className="h-3 w-3 shrink-0" />
-                        {l.name}
+              <Select
+                value={selected?.id ?? ""}
+                onValueChange={(id) => {
+                  const loc = locations.find((l) => l.id === id);
+                  if (loc) pickSaved(loc);
+                }}
+              >
+                <SelectTrigger className="h-9 rounded-lg">
+                  <SelectValue placeholder="Select a saved location...">
+                    {selected?.name}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      <span className="flex flex-col items-start">
+                        <span>{l.name}</span>
+                        {l.address && (
+                          <span className="text-xs text-muted-foreground">{l.address}</span>
+                        )}
                       </span>
-                    </button>
-                  );
-                })}
-              </div>
-              {selected?.address && (
-                <div className="text-xs text-muted-foreground">{selected.address}</div>
-              )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <div className="flex items-center gap-2 pt-1">
                 <div className="h-px flex-1 bg-border" />
                 <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
