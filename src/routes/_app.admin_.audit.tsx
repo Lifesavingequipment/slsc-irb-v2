@@ -27,7 +27,7 @@ type Entry = {
   created_at: string;
 };
 
-type Club = { id: string; name: string };
+type Club = { id: string; club_name: string };
 type Profile = { id: string; full_name: string | null };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -78,7 +78,7 @@ function AuditInner() {
     (async () => {
       setLoadingEntries(true);
       const { data: rows } = await supabase
-        .from("audit_log")
+        .from("app_audit_log")
         .select("id, actor_user_id, action, club_id, target_user_id, details, created_at")
         .order("created_at", { ascending: false })
         .limit(500);
@@ -92,7 +92,7 @@ function AuditInner() {
 
       const [clubsRes, profRes] = await Promise.all([
         clubIds.length
-          ? supabase.from("clubs").select("id, name").in("id", clubIds)
+          ? supabase.from("clubs").select("id, club_name").in("id", clubIds)
           : Promise.resolve({ data: [] as Club[] }),
         userIds.length
           ? supabase.from("profiles").select("id, full_name").in("id", userIds)
@@ -114,7 +114,7 @@ function AuditInner() {
   );
 
   const clubOptions = useMemo(
-    () => Object.values(clubs).sort((a, b) => a.name.localeCompare(b.name)),
+    () => Object.values(clubs).sort((a, b) => a.club_name.localeCompare(b.club_name)),
     [clubs],
   );
 
@@ -126,7 +126,7 @@ function AuditInner() {
       if (q) {
         const actor = profiles[e.actor_user_id]?.full_name ?? "";
         const target = e.target_user_id ? profiles[e.target_user_id]?.full_name ?? "" : "";
-        const club = e.club_id ? clubs[e.club_id]?.name ?? "" : "";
+        const club = e.club_id ? clubs[e.club_id]?.club_name ?? "" : "";
         const hay = `${actor} ${target} ${club} ${e.action}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
@@ -169,7 +169,7 @@ function AuditInner() {
             <SelectContent>
               <SelectItem value="all">All clubs</SelectItem>
               {clubOptions.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                <SelectItem key={c.id} value={c.id}>{c.club_name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -199,7 +199,7 @@ function AuditInner() {
                   </span>
                 </div>
                 {e.club_id && clubs[e.club_id] && (
-                  <div className="text-xs text-muted-foreground">{clubs[e.club_id].name}</div>
+                  <div className="text-xs text-muted-foreground">{clubs[e.club_id].club_name}</div>
                 )}
                 {e.details && Object.keys(e.details).length > 0 && (
                   <pre className="mt-1 text-[11px] bg-muted/40 rounded p-2 overflow-x-auto">
