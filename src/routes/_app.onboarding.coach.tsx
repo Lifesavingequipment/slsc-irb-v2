@@ -15,7 +15,7 @@ import {
 import { Waves, LogOut, CalendarPlus, MapPin, SkipForward } from "lucide-react";
 import { toast } from "sonner";
 import { DateTimePicker } from "@/components/ui/datetime-picker";
-import { AddressAutocomplete } from "@/components/settings/AddressAutocomplete";
+import { LocationPicker } from "@/components/LocationPicker";
 
 export const Route = createFileRoute("/_app/onboarding/coach")({
   head: () => ({ meta: [{ title: "Set up your first session — IRB Coaching" }] }),
@@ -23,8 +23,6 @@ export const Route = createFileRoute("/_app/onboarding/coach")({
 });
 
 const STASH_KEY = "pending_coach_onboarding_club";
-
-type Loc = { id: string; name: string; address: string | null };
 
 const schema = z.object({
   title: z.string().trim().min(2, "Give it a title").max(120),
@@ -42,14 +40,13 @@ function CoachOnboarding() {
   const navigate = useNavigate();
 
   const [clubId, setClubId] = useState<string | null>(null);
-  const [locations, setLocations] = useState<Loc[]>([]);
   const [busy, setBusy] = useState(false);
 
   // form state
   const [title, setTitle] = useState("");
   const [type, setType] = useState<"training" | "fitness" | "theory" | "other">("training");
-  const [locationId, setLocationId] = useState<string>("custom");
-  const [customLocation, setCustomLocation] = useState("");
+  const [locationId, setLocationId] = useState<string | null>(null);
+  const [location, setLocation] = useState("");
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
   const [notes, setNotes] = useState("");
@@ -70,20 +67,6 @@ function CoachOnboarding() {
     if (activeClub?.club_id !== target) setActiveClubId(target);
   }, [loading, memberships, activeClub?.club_id, navigate, setActiveClubId]);
 
-  useEffect(() => {
-    if (!clubId) return;
-    supabase
-      .from("locations")
-      .select("id, name, address")
-      .eq("club_id", clubId)
-      .order("name")
-      .then(({ data }) => {
-        const list = (data ?? []) as Loc[];
-        setLocations(list);
-        if (list.length > 0) setLocationId(list[0].id);
-      });
-  }, [clubId]);
-
   const clearStash = () => {
     if (typeof window !== "undefined") sessionStorage.removeItem(STASH_KEY);
   };
@@ -97,16 +80,10 @@ function CoachOnboarding() {
     e.preventDefault();
     if (!user || !clubId) return;
 
-    const usingSaved = locationId !== "custom" && locationId !== "";
-    const savedLoc = usingSaved ? locations.find((l) => l.id === locationId) : null;
-    const locationText = usingSaved
-      ? (savedLoc ? [savedLoc.name, savedLoc.address].filter(Boolean).join(" — ") : "")
-      : customLocation;
-
     const parsed = schema.safeParse({
       title, session_type: type,
-      location_id: usingSaved ? locationId : undefined,
-      location: locationText || undefined,
+      location_id: locationId ?? undefined,
+      location: location.trim() || undefined,
       starts_at: startsAt,
       ends_at: endsAt || undefined,
       notes,
@@ -138,21 +115,6 @@ function CoachOnboarding() {
     toast.success("First session scheduled.");
     clearStash();
     navigate({ to: "/dashboard", replace: true });
-  };
-
-  const addLocation = async () => {
-    if (!clubId) return;
-    const name = prompt("Location name (e.g. Miami Pool)")?.trim();
-    if (!name) return;
-    const address = prompt("Address (optional)")?.trim() || null;
-    const { data, error } = await supabase.from("locations")
-      .insert({ club_id: clubId, name, address, created_by: user?.id ?? null })
-      .select("id, name, address")
-      .single();
-    if (error) { toast.error(error.message); return; }
-    setLocations((prev) => [...prev, data as Loc].sort((a, b) => a.name.localeCompare(b.name)));
-    setLocationId(data!.id);
-    toast.success("Location saved");
   };
 
   return (
@@ -202,26 +164,13 @@ function CoachOnboarding() {
 
           <div className="space-y-1.5">
             <Label className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> Location</Label>
-            <Select value={locationId} onValueChange={setLocationId}>
-              <SelectTrigger><SelectValue placeholder="Choose location" /></SelectTrigger>
-              <SelectContent>
-                {locations.map((l) => (
-                  <SelectItem key={l.id} value={l.id}>{l.name}{l.address ? ` — ${l.address}` : ""}</SelectItem>
-                ))}
-                <SelectItem value="custom">Custom address…</SelectItem>
-              </SelectContent>
-            </Select>
-            {locationId === "custom" ? (
-              <AddressAutocomplete
-                value={customLocation}
-                onChange={setCustomLocation}
-                placeholder="Type address or place name"
-              />
-            ) : (
-              <Button type="button" variant="ghost" size="sm" onClick={addLocation} className="h-7 px-2 text-xs">
-                + Save a new location
-              </Button>
-            )}
+            <LocationPicker
+              value={location}
+              onChange={setLocation}
+              onLocationIdChange={setLocationId}
+              clubId={clubId}
+              placeholder="Type address or place name"
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { DateTimeFields } from "@/components/ui/date-time-fields";
 import { CarpoolEditor, validateCarpoolDrafts, emptyCarpoolDraft, type CarpoolDraft } from "@/components/session/CarpoolEditor";
 import { CoachSetupSection, type VehicleDraft, type ExistingVehicle } from "@/components/session/CoachSetupSection";
-import { AddressAutocomplete } from "@/components/settings/AddressAutocomplete";
+import { LocationPicker, formatLocation } from "@/components/LocationPicker";
 import { notifySessionUpdated, currentMemberId } from "@/lib/notify";
 import { invalidateSessionsCache } from "./_app.sessions.index";
 
@@ -91,9 +91,8 @@ function EditSession() {
   const [type, setType] = useState<"training" | "fitness" | "theory" | "other">("training");
   const [format, setFormat] = useState<"team" | "individual">("team");
   const [repeat, setRepeat] = useState<"none" | "daily" | "weekly" | "fortnightly" | "monthly">("none");
-  const [locations, setLocations] = useState<Loc[]>([]);
-  const [locationId, setLocationId] = useState<string>("custom");
-  const [customLocation, setCustomLocation] = useState("");
+  const [locationId, setLocationId] = useState<string | null>(null);
+  const [location, setLocation] = useState("");
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
   const [rsvpDeadline, setRsvpDeadline] = useState("");
@@ -112,7 +111,6 @@ function EditSession() {
   const [vehiclesToDelete, setVehiclesToDelete] = useState<string[]>([]);
   const [pendingVehicles, setPendingVehicles] = useState<VehicleDraft[]>([]);
   const [newVehicle, setNewVehicle] = useState<VehicleDraft>({ name: "", seats: 8, pickup: "", can_tow: false });
-  const [savedLocations, setSavedLocations] = useState<{ id: string; name: string; address: string | null }[]>([]);
   const [carpoolTemplates, setCarpoolTemplates] = useState<{ id: string; name: string; vehicles: { vehicle_name: string; available_seats: number; can_tow_trailer: boolean }[] }[]>([]);
 
   useEffect(() => {
@@ -132,8 +130,8 @@ function EditSession() {
       setSurvey(!!data.survey_enabled);
       setCarpool(!!data.carpool_enabled);
       setClubId(data.club_id);
-      setLocationId(data.location_id ?? "custom");
-      setCustomLocation(data.location_id ? "" : (data.location ?? ""));
+      setLocationId(data.location_id ?? null);
+      setLocation(data.location ?? "");
       setPickups([...(data.carpool_pickups ?? []), ""]);
       setTrailers(data.trailers_required ?? 0);
 
@@ -141,8 +139,12 @@ function EditSession() {
         supabase.from("locations").select("id, name, address").eq("club_id", data.club_id).order("name"),
         supabase.from("carpool_templates").select("id, name, vehicles").eq("club_id", data.club_id).order("name"),
       ]);
-      setLocations((locsRes.data ?? []) as Loc[]);
-      setSavedLocations((locsRes.data ?? []) as { id: string; name: string; address: string | null }[]);
+      const locList = (locsRes.data ?? []) as Loc[];
+      // If the session points at a saved location, show its composed "Name — Address".
+      if (data.location_id) {
+        const savedLoc = locList.find((l) => l.id === data.location_id);
+        if (savedLoc) setLocation(formatLocation(savedLoc));
+      }
       setCarpoolTemplates((carpoolTplRes.data ?? []) as typeof carpoolTemplates);
 
       const { data: cvs } = await supabase
@@ -196,16 +198,10 @@ function EditSession() {
     e.preventDefault();
     if (!user) return;
 
-    const usingSaved = locationId !== "custom" && locationId !== "";
-    const savedLoc = usingSaved ? locations.find((l) => l.id === locationId) : null;
-    const locationText = usingSaved
-      ? (savedLoc ? [savedLoc.name, savedLoc.address].filter(Boolean).join(" — ") : "")
-      : customLocation;
-
     const parsed = schema.safeParse({
       title, session_type: type, format, repeat_frequency: repeat,
-      location_id: usingSaved ? locationId : undefined,
-      location: locationText || undefined,
+      location_id: locationId ?? undefined,
+      location: location.trim() || undefined,
       starts_at: startsAt,
       ends_at: endsAt || undefined,
       rsvp_deadline: rsvpDeadline || undefined,
@@ -329,22 +325,6 @@ function EditSession() {
     navigate({ to: "/sessions/$sessionId", params: { sessionId } });
   };
 
-  const saveCustomLocation = async () => {
-    const targetClub = clubId ?? activeClub?.club_id;
-    if (!targetClub) return;
-    const name = customLocation.trim();
-    if (!name) return;
-    const { data, error } = await supabase.from("locations")
-      .insert({ club_id: targetClub, name, address: null, created_by: user?.id ?? null })
-      .select("id, name, address")
-      .single();
-    if (error) { toast.error(error.message); return; }
-    setLocations((prev) => [...prev, data as Loc].sort((a, b) => a.name.localeCompare(b.name)));
-    setSavedLocations((prev) => [...prev, data as Loc].sort((a, b) => a.name.localeCompare(b.name)));
-    setLocationId(data!.id);
-    toast.success("Location saved");
-  };
-
   return (
     <AppShell>
       <Link to="/sessions/$sessionId" params={{ sessionId }} className="inline-flex items-center text-sm text-muted-foreground mb-2">
@@ -392,29 +372,13 @@ function EditSession() {
 
           <div className="space-y-1.5">
             <Label>Location</Label>
-            <Select value={locationId} onValueChange={setLocationId}>
-              <SelectTrigger><SelectValue placeholder="Choose location" /></SelectTrigger>
-              <SelectContent>
-                {locations.map((l) => (
-                  <SelectItem key={l.id} value={l.id}>{l.name}{l.address ? ` — ${l.address}` : ""}</SelectItem>
-                ))}
-                <SelectItem value="custom">Custom address…</SelectItem>
-              </SelectContent>
-            </Select>
-            {locationId === "custom" && (
-              <>
-                <AddressAutocomplete
-                  value={customLocation}
-                  onChange={setCustomLocation}
-                  placeholder="Type address or place name"
-                />
-                {customLocation.trim() && (
-                  <Button type="button" variant="ghost" size="sm" onClick={saveCustomLocation} className="h-7 px-2 text-xs">
-                    + Save this location
-                  </Button>
-                )}
-              </>
-            )}
+            <LocationPicker
+              value={location}
+              onChange={setLocation}
+              onLocationIdChange={setLocationId}
+              clubId={clubId ?? activeClub?.club_id}
+              placeholder="Type address or place name"
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -507,7 +471,7 @@ function EditSession() {
                 onPickupsChange={setPickups}
                 trailers={trailers}
                 onTrailersChange={setTrailers}
-                savedLocations={savedLocations}
+                clubId={clubId ?? activeClub?.club_id}
                 existingVehicles={existingVehicles.filter((v) => !vehiclesToDelete.includes(v.id))}
                 onRemoveExisting={(id) => setVehiclesToDelete((prev) => [...prev, id])}
                 pendingVehicles={pendingVehicles}
@@ -529,7 +493,6 @@ function EditSession() {
                 value={carpools}
                 onChange={setCarpools}
                 defaultDeparture={startsAt}
-                savedLocations={savedLocations}
               />
             )}
           </div>

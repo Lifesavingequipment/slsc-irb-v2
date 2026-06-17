@@ -1,4 +1,4 @@
-import { Plus, Trash2, MapPin } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -7,51 +7,17 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { AddressAutocomplete } from "@/components/settings/AddressAutocomplete";
+import { LocationPicker } from "@/components/LocationPicker";
 
 export type VehicleDraft = { name: string; seats: number; pickup: string; can_tow: boolean };
-export type CoachSavedLocation = { id: string; name: string; address: string | null };
 export type ExistingVehicle = {
   id: string; name: string; seats: number; pickup_location: string | null; can_tow: boolean;
 };
 
-function formatLocation(l: CoachSavedLocation): string {
-  return l.address ? `${l.name} — ${l.address}` : l.name;
-}
-
-function SavedLocationPicker({
-  locations, onPick,
-}: { locations: CoachSavedLocation[]; onPick: (v: string) => void }) {
-  if (locations.length === 0) return null;
-  return (
-    <div className="flex items-center gap-1">
-      <Select onValueChange={(id) => {
-        const loc = locations.find((l) => l.id === id);
-        if (loc) onPick(formatLocation(loc));
-      }}>
-        <SelectTrigger className="h-7 text-xs w-auto gap-1 px-2">
-          <MapPin className="h-3 w-3" />
-          <SelectValue placeholder="Insert saved location" />
-        </SelectTrigger>
-        <SelectContent>
-          {locations.map((l) => (
-            <SelectItem key={l.id} value={l.id}>
-              <div className="flex flex-col">
-                <span className="text-sm">{l.name}</span>
-                {l.address && <span className="text-xs text-muted-foreground">{l.address}</span>}
-              </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
-
 export function CoachSetupSection({
   pickups, onPickupsChange,
   trailers, onTrailersChange,
-  savedLocations,
+  clubId,
   existingVehicles = [],
   onRemoveExisting,
   pendingVehicles = [],
@@ -63,7 +29,7 @@ export function CoachSetupSection({
   onPickupsChange: (v: string[]) => void;
   trailers: number;
   onTrailersChange: (n: number) => void;
-  savedLocations: CoachSavedLocation[];
+  clubId: string | null | undefined;
   existingVehicles?: ExistingVehicle[];
   onRemoveExisting?: (id: string) => void;
   pendingVehicles?: VehicleDraft[];
@@ -81,25 +47,20 @@ export function CoachSetupSection({
         <Label className="text-sm font-semibold">Pickup stops</Label>
         <p className="text-xs text-muted-foreground">Members pick from these when requesting a ride.</p>
         {pickups.map((stop, i) => (
-          <div key={i} className="space-y-1">
-            <div className="flex gap-2">
-              <AddressAutocomplete
-                className="flex-1"
-                value={stop}
-                placeholder={`Stop ${i + 1} e.g. Kurrawa SLSC (5:00pm)`}
-                onChange={(v) => onPickupsChange(pickups.map((s, idx) => idx === i ? v : s))}
-              />
-              <Button
-                type="button" variant="ghost" size="icon"
-                onClick={() => onPickupsChange(pickups.filter((_, idx) => idx !== i))}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-            <SavedLocationPicker
-              locations={savedLocations}
-              onPick={(v) => onPickupsChange(pickups.map((s, idx) => idx === i ? v : s))}
+          <div key={i} className="flex gap-2">
+            <LocationPicker
+              className="flex-1"
+              clubId={clubId}
+              value={stop}
+              placeholder={`Stop ${i + 1} e.g. Kurrawa SLSC (5:00pm)`}
+              onChange={(v) => onPickupsChange(pickups.map((s, idx) => idx === i ? v : s))}
             />
+            <Button
+              type="button" variant="ghost" size="icon"
+              onClick={() => onPickupsChange(pickups.filter((_, idx) => idx !== i))}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
           </div>
         ))}
         <Button
@@ -188,21 +149,16 @@ export function CoachSetupSection({
             value={newVehicle.name}
             onChange={(e) => onNewVehicleChange({ ...newVehicle, name: e.target.value })}
           />
-          <div className="grid grid-cols-2 gap-2">
-            <Input
-              type="number" min={1} max={50} placeholder="Seats"
-              value={newVehicle.seats}
-              onChange={(e) => onNewVehicleChange({ ...newVehicle, seats: Number(e.target.value) })}
-            />
-            <AddressAutocomplete
-              placeholder="Pickup (optional)"
-              value={newVehicle.pickup}
-              onChange={(v) => onNewVehicleChange({ ...newVehicle, pickup: v })}
-            />
-          </div>
-          <SavedLocationPicker
-            locations={savedLocations}
-            onPick={(v) => onNewVehicleChange({ ...newVehicle, pickup: v })}
+          <Input
+            type="number" min={1} max={50} placeholder="Seats"
+            value={newVehicle.seats}
+            onChange={(e) => onNewVehicleChange({ ...newVehicle, seats: Number(e.target.value) })}
+          />
+          <LocationPicker
+            clubId={clubId}
+            placeholder="Pickup (optional)"
+            value={newVehicle.pickup}
+            onChange={(v) => onNewVehicleChange({ ...newVehicle, pickup: v })}
           />
           <div className="flex items-center justify-between">
             <Label className="text-sm">Can tow trailer</Label>

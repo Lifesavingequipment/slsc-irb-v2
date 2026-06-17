@@ -12,6 +12,8 @@ type Props = {
   id?: string;
   value: string;
   onChange: (value: string) => void;
+  /** Fired when a suggestion is picked from the dropdown (not on plain typing). */
+  onSelect?: (value: string) => void;
   placeholder?: string;
   className?: string;
 };
@@ -21,7 +23,7 @@ type Props = {
  * Nominatim API (no key required). Falls back to a plain text input if the
  * API is unavailable — the user can always type an address manually.
  */
-export function AddressAutocomplete({ id, value, onChange, placeholder, className }: Props) {
+export function AddressAutocomplete({ id, value, onChange, onSelect, placeholder, className }: Props) {
   const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -91,6 +93,7 @@ export function AddressAutocomplete({ id, value, onChange, placeholder, classNam
   const select = (s: NominatimResult) => {
     skipFetch.current = true;
     onChange(s.display_name);
+    onSelect?.(s.display_name);
     setOpen(false);
     setSuggestions([]);
     setHighlight(-1);

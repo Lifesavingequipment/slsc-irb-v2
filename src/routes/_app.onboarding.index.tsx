@@ -14,6 +14,7 @@ import { Waves, LogOut, Clock, CheckCircle2, Copy, Mail, Share2, Ticket, UserCog
 import { toast } from "sonner";
 import { SupportRequestDialog } from "@/components/SupportRequestDialog";
 import { AddressAutocomplete } from "@/components/settings/AddressAutocomplete";
+import { LocationPicker } from "@/components/LocationPicker";
 import { notifyJoinRequest } from "@/lib/notify";
 
 export const Route = createFileRoute("/_app/onboarding/")({
@@ -341,7 +342,7 @@ function Onboarding() {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="venueAddress">Address</Label>
-                    <AddressAutocomplete id="venueAddress" value={venueAddress} onChange={setVenueAddress} placeholder="80 Pacific Ave, Miami QLD 4220" />
+                    <LocationPicker id="venueAddress" clubId={null} value={venueAddress} onChange={setVenueAddress} placeholder="80 Pacific Ave, Miami QLD 4220" />
                   </div>
                 </div>
 

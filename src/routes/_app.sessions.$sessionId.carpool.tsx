@@ -19,7 +19,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { AddressAutocomplete } from "@/components/settings/AddressAutocomplete";
+import { LocationPicker } from "@/components/LocationPicker";
 import {
   ChevronLeft, Car, Users, MapPin, Clock, Plus, Trash2, Pencil,
   AlertTriangle, UserPlus, HandHelping, CheckCircle2, Settings, Sparkles, Bus, Wrench,
@@ -59,12 +59,6 @@ type ClubVehicle = {
   id: string; session_id: string; club_id: string;
   name: string; seats: number; pickup_location: string | null; can_tow: boolean;
 };
-type SavedLocation = { id: string; name: string; address: string | null };
-
-function formatLocation(l: SavedLocation): string {
-  return l.address ? `${l.name} — ${l.address}` : l.name;
-}
-
 function CarpoolPage() {
   const { sessionId } = Route.useParams();
   const { user } = useAuth();
@@ -76,7 +70,6 @@ function CarpoolPage() {
   const [passengers, setPassengers] = useState<Passenger[]>([]);
   const [requests, setRequests] = useState<RideRequest[]>([]);
   const [clubVehicles, setClubVehicles] = useState<ClubVehicle[]>([]);
-  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
   const [nameMap, setNameMap] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
@@ -92,12 +85,11 @@ function CarpoolPage() {
       .eq("id", sessionId).maybeSingle();
     setSession(s as Session | null);
 
-    const [cp, pas, rq, cv, locs] = await Promise.all([
+    const [cp, pas, rq, cv] = await Promise.all([
       supabase.from("carpools").select("*").eq("session_id", sessionId).order("departure_time"),
       supabase.from("carpool_passengers").select("*").eq("session_id", sessionId),
       supabase.from("carpool_requests").select("*").eq("session_id", sessionId).order("created_at"),
       supabase.from("session_club_vehicles").select("*").eq("session_id", sessionId).order("created_at"),
-      s ? supabase.from("locations").select("id, name, address").eq("club_id", (s as Session).club_id).order("name") : Promise.resolve({ data: [] }),
     ]);
     const cps = (cp.data ?? []) as Carpool[];
     const ps = (pas.data ?? []) as Passenger[];
@@ -107,7 +99,6 @@ function CarpoolPage() {
     setPassengers(ps);
     setRequests(rs);
     setClubVehicles(cvs);
-    setSavedLocations(((locs as { data: SavedLocation[] | null }).data ?? []) as SavedLocation[]);
 
     const ids = new Set<string>();
     cps.forEach((c) => ids.add(c.driver_user_id));
@@ -645,7 +636,7 @@ function CarpoolPage() {
         defaultTime={session.starts_at}
         iAmDriver={iAmDriver}
         pickups={pickups}
-        savedLocations={savedLocations}
+        clubId={session.club_id}
       />
 
       <RequestRideDialog
@@ -655,7 +646,7 @@ function CarpoolPage() {
         busy={busy}
         existing={myRequest}
         pickups={pickups}
-        savedLocations={savedLocations}
+        clubId={session.club_id}
       />
 
       {canManage && (
@@ -669,7 +660,6 @@ function CarpoolPage() {
           onChange={load}
           sessionId={sessionId}
           clubId={session.club_id}
-          savedLocations={savedLocations}
         />
       )}
 
@@ -746,12 +736,12 @@ type OfferForm = {
   can_tow_trailer: boolean;
 };
 
-function OfferRideDialog({ open, onOpenChange, onSubmit, busy, defaultLocation, defaultTime, iAmDriver, pickups, savedLocations }: {
+function OfferRideDialog({ open, onOpenChange, onSubmit, busy, defaultLocation, defaultTime, iAmDriver, pickups, clubId }: {
   open: boolean; onOpenChange: (v: boolean) => void;
   onSubmit: (f: OfferForm) => void; busy: boolean;
   defaultLocation: string; defaultTime: string; iAmDriver: boolean;
   pickups: string[];
-  savedLocations: SavedLocation[];
+  clubId: string;
 }) {
   const initial = (): OfferForm => ({
     vehicle_name: "",
@@ -815,13 +805,10 @@ function OfferRideDialog({ open, onOpenChange, onSubmit, busy, defaultLocation, 
               </div>
             ) : null}
             {(pickups.length === 0 || !pickups.includes(form.departure_location)) && (
-              <AddressAutocomplete className={pickups.length > 0 ? "mt-2" : ""} value={form.departure_location}
+              <LocationPicker className={pickups.length > 0 ? "mt-2" : ""} clubId={clubId}
+                value={form.departure_location}
                 onChange={(v) => setForm({ ...form, departure_location: v })} />
             )}
-            <SavedLocationPicker
-              locations={savedLocations}
-              onPick={(v) => setForm({ ...form, departure_location: v })}
-            />
           </div>
           <div>
             <Label>Departure time</Label>
@@ -863,12 +850,12 @@ type RequestForm = {
   notes: string;
 };
 
-function RequestRideDialog({ open, onOpenChange, onSubmit, busy, existing, pickups, savedLocations }: {
+function RequestRideDialog({ open, onOpenChange, onSubmit, busy, existing, pickups, clubId }: {
   open: boolean; onOpenChange: (v: boolean) => void;
   onSubmit: (f: RequestForm) => void; busy: boolean;
   existing: RideRequest | null;
   pickups: string[];
-  savedLocations: SavedLocation[];
+  clubId: string;
 }) {
   const initial = (): RequestForm => ({
     pickup_location: existing?.pickup_location ?? pickups[0] ?? "",
@@ -913,14 +900,11 @@ function RequestRideDialog({ open, onOpenChange, onSubmit, busy, existing, picku
               </div>
             ) : null}
             {(pickups.length === 0 || !pickups.includes(form.pickup_location)) && (
-              <AddressAutocomplete className={pickups.length > 0 ? "mt-2" : ""} value={form.pickup_location}
+              <LocationPicker className={pickups.length > 0 ? "mt-2" : ""} clubId={clubId}
+                value={form.pickup_location}
                 placeholder="Where can a driver collect you?"
                 onChange={(v) => setForm({ ...form, pickup_location: v })} />
             )}
-            <SavedLocationPicker
-              locations={savedLocations}
-              onPick={(v) => setForm({ ...form, pickup_location: v })}
-            />
           </div>
           <div>
             <Label>Preferred departure time</Label>
@@ -945,7 +929,7 @@ function RequestRideDialog({ open, onOpenChange, onSubmit, busy, existing, picku
 
 // ===== Coach Setup Dialog =====
 function CoachSetupDialog({
-  open, onOpenChange, session, clubVehicles, onSavePickups, onSaveTrailers, onChange, sessionId, clubId, savedLocations,
+  open, onOpenChange, session, clubVehicles, onSavePickups, onSaveTrailers, onChange, sessionId, clubId,
 }: {
   open: boolean; onOpenChange: (v: boolean) => void;
   session: Session;
@@ -955,7 +939,6 @@ function CoachSetupDialog({
   onChange: () => void;
   sessionId: string;
   clubId: string;
-  savedLocations: SavedLocation[];
 }) {
   const [pickups, setPickups] = useState<string[]>([]);
   const [trailers, setTrailers] = useState<number>(0);
@@ -1019,22 +1002,17 @@ function CoachSetupDialog({
             <Label className="text-sm font-semibold">Pickup stops</Label>
             <p className="text-xs text-muted-foreground">Members pick from these when requesting a ride.</p>
             {pickups.map((stop, i) => (
-              <div key={i} className="space-y-1">
-                <div className="flex gap-2">
-                  <AddressAutocomplete
-                    className="flex-1"
-                    value={stop}
-                    placeholder={`Stop ${i + 1} e.g. Kurrawa SLSC (5:00pm)`}
-                    onChange={(v) => setPickups(pickups.map((s, idx) => idx === i ? v : s))}
-                  />
-                  <Button variant="ghost" size="icon" onClick={() =>
-                    setPickups(pickups.filter((_, idx) => idx !== i))
-                  }><Trash2 className="h-4 w-4" /></Button>
-                </div>
-                <SavedLocationPicker
-                  locations={savedLocations}
-                  onPick={(v) => setPickups(pickups.map((s, idx) => idx === i ? v : s))}
+              <div key={i} className="flex gap-2">
+                <LocationPicker
+                  className="flex-1"
+                  clubId={clubId}
+                  value={stop}
+                  placeholder={`Stop ${i + 1} e.g. Kurrawa SLSC (5:00pm)`}
+                  onChange={(v) => setPickups(pickups.map((s, idx) => idx === i ? v : s))}
                 />
+                <Button variant="ghost" size="icon" onClick={() =>
+                  setPickups(pickups.filter((_, idx) => idx !== i))
+                }><Trash2 className="h-4 w-4" /></Button>
               </div>
             ))}
             <div className="flex gap-2">
@@ -1092,16 +1070,10 @@ function CoachSetupDialog({
             <div className="rounded-md border p-3 space-y-2">
               <Input placeholder="Vehicle name (e.g. Club Bus)" value={newVehicle.name}
                 onChange={(e) => setNewVehicle({ ...newVehicle, name: e.target.value })} />
-              <div className="grid grid-cols-2 gap-2">
-                <Input type="number" min={1} max={50} placeholder="Seats" value={newVehicle.seats}
-                  onChange={(e) => setNewVehicle({ ...newVehicle, seats: Number(e.target.value) })} />
-                <AddressAutocomplete placeholder="Pickup (optional)" value={newVehicle.pickup}
-                  onChange={(v) => setNewVehicle({ ...newVehicle, pickup: v })} />
-              </div>
-              <SavedLocationPicker
-                locations={savedLocations}
-                onPick={(v) => setNewVehicle({ ...newVehicle, pickup: v })}
-              />
+              <Input type="number" min={1} max={50} placeholder="Seats" value={newVehicle.seats}
+                onChange={(e) => setNewVehicle({ ...newVehicle, seats: Number(e.target.value) })} />
+              <LocationPicker clubId={clubId} placeholder="Pickup (optional)" value={newVehicle.pickup}
+                onChange={(v) => setNewVehicle({ ...newVehicle, pickup: v })} />
               <div className="flex items-center justify-between">
                 <Label className="text-sm">Can tow trailer</Label>
                 <Switch checked={newVehicle.can_tow}
@@ -1126,36 +1098,6 @@ function toLocalInput(iso: string): string {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function SavedLocationPicker({ locations, onPick }: {
-  locations: SavedLocation[];
-  onPick: (value: string) => void;
-}) {
-  if (locations.length === 0) return null;
-  return (
-    <div className="flex items-center gap-1">
-      <Select onValueChange={(id) => {
-        const loc = locations.find((l) => l.id === id);
-        if (loc) onPick(formatLocation(loc));
-      }}>
-        <SelectTrigger className="h-7 text-xs w-auto gap-1 px-2">
-          <MapPin className="h-3 w-3" />
-          <SelectValue placeholder="Insert saved location" />
-        </SelectTrigger>
-        <SelectContent>
-          {locations.map((l) => (
-            <SelectItem key={l.id} value={l.id}>
-              <div className="flex flex-col">
-                <span className="text-sm">{l.name}</span>
-                {l.address && <span className="text-xs text-muted-foreground">{l.address}</span>}
-              </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
 }
 
 type EditRidePatch = Partial<Pick<Carpool, "available_seats" | "can_tow_trailer" | "vehicle_name" | "departure_location" | "notes">>;
@@ -1206,7 +1148,7 @@ function EditRideDialog({ carpool, onOpenChange, onSave, busy }: {
           </div>
           <div>
             <Label>Departure location</Label>
-            <AddressAutocomplete value={departureLocation} onChange={setDepartureLocation} />
+            <LocationPicker clubId={carpool?.club_id} value={departureLocation} onChange={setDepartureLocation} />
           </div>
           <div>
             <Label>Available seats</Label>

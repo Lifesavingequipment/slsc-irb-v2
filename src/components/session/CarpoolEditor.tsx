@@ -10,38 +10,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { DateTimeFields } from "@/components/ui/date-time-fields";
-import { Plus, Trash2, Car, MapPin } from "lucide-react";
+import { Plus, Trash2, Car } from "lucide-react";
 import { memberFullName } from "@/lib/names";
-import { AddressAutocomplete } from "@/components/settings/AddressAutocomplete";
-
-type SavedLocation = { id: string; name: string; address: string | null };
-
-function SavedLocationPicker({ locations, onPick }: { locations: SavedLocation[]; onPick: (v: string) => void }) {
-  if (locations.length === 0) return null;
-  return (
-    <div className="flex items-center gap-1">
-      <Select onValueChange={(id) => {
-        const loc = locations.find((l) => l.id === id);
-        if (loc) onPick(loc.address ? `${loc.name} — ${loc.address}` : loc.name);
-      }}>
-        <SelectTrigger className="h-7 text-xs w-auto gap-1 px-2">
-          <MapPin className="h-3 w-3" />
-          <SelectValue placeholder="Insert saved location" />
-        </SelectTrigger>
-        <SelectContent>
-          {locations.map((l) => (
-            <SelectItem key={l.id} value={l.id}>
-              <div className="flex flex-col">
-                <span className="text-sm">{l.name}</span>
-                {l.address && <span className="text-xs text-muted-foreground">{l.address}</span>}
-              </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
+import { LocationPicker } from "@/components/LocationPicker";
 
 export type CarpoolDraft = {
   // present when editing an existing carpool row
@@ -76,11 +47,10 @@ interface Props {
   value: CarpoolDraft[];
   onChange: (next: CarpoolDraft[]) => void;
   defaultDeparture?: string;
-  savedLocations?: SavedLocation[];
 }
 
 export function CarpoolEditor({
-  clubId, currentUserId, canPickAnyDriver, value, onChange, defaultDeparture, savedLocations = [],
+  clubId, currentUserId, canPickAnyDriver, value, onChange, defaultDeparture,
 }: Props) {
   const [members, setMembers] = useState<Member[]>([]);
 
@@ -169,14 +139,11 @@ export function CarpoolEditor({
 
           <div className="space-y-1.5">
             <Label>Departure location</Label>
-            <AddressAutocomplete
+            <LocationPicker
+              clubId={clubId}
               value={row.departure_location}
               onChange={(v) => update(i, { departure_location: v })}
               placeholder="Clubhouse car park"
-            />
-            <SavedLocationPicker
-              locations={savedLocations}
-              onPick={(v) => update(i, { departure_location: v })}
             />
           </div>
 
