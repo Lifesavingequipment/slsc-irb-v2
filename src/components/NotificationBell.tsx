@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Bell } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
@@ -26,16 +26,11 @@ function linkFor(type: string, relatedId: string | null): string | null {
 
 export function NotificationBell() {
   const { notifications, unreadCount, markAllRead, markRead } = useNotifications();
-  console.log("[NotificationBell] render", { unreadCount, count: notifications.length, notifications });
   const [open, setOpen] = useState(false);
   const [panelPos, setPanelPos] = useState({ top: 0, right: 0 });
   const navigate = useNavigate();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    console.log("notifications:", notifications);
-  }, [notifications]);
 
   const handleToggle = () => {
     if (!open && buttonRef.current) {
