@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { addDays, format, isAfter } from "date-fns";
+import { addDays, format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { useClub, useCanManage, useIsAdmin } from "@/lib/club-context";
@@ -121,9 +121,7 @@ function Dashboard() {
 
   if (!activeClub) return null;
 
-  const nextSessionForWeather = upcoming.find(
-    (s) => s.location && !isAfter(new Date(s.starts_at), addDays(new Date(), 7)),
-  );
+  const nextSessionForWeather = upcoming.find((s) => s.location);
 
   return (
     <AppShell>
@@ -301,7 +299,7 @@ function ActionRow({ icon, label, count, to, search }: {
 }
 
 function NextSessionCard({ session }: { session: Upcoming }) {
-  const { weather, waves } = useWeatherTidesData({
+  const { weather, waves, tides } = useWeatherTidesData({
     sessionId: session.id,
     location: session.location,
     startsAt: session.starts_at,
@@ -316,7 +314,7 @@ function NextSessionCard({ session }: { session: Upcoming }) {
           <div className="mt-0.5 text-xs text-muted-foreground">
             {format(new Date(session.starts_at), "EEE d MMM · h:mma")}
           </div>
-          {(weather || waves?.heightMax != null) && (
+          {(weather || waves?.heightMax != null || (tides && tides.length > 0)) && (
             <div className="mt-2 flex items-center gap-3 text-sm flex-wrap">
               {weather && (
                 <span className="flex items-center gap-1">
@@ -328,6 +326,22 @@ function NextSessionCard({ session }: { session: Upcoming }) {
                   🌊 {waves.heightMax.toFixed(1)}m{waves.periodMax != null ? ` · ${Math.round(waves.periodMax)}s` : ""}
                 </span>
               )}
+            </div>
+          )}
+          {tides && tides.length > 0 && (
+            <div className="mt-1 flex flex-col gap-0.5 text-sm text-muted-foreground">
+              {(["High", "Low"] as const).map((type) => {
+                const entries = tides.filter((t) => t.type === type);
+                if (entries.length === 0) return null;
+                return (
+                  <div key={type}>
+                    🌊 {type === "High" ? "HT" : "LT"}:{" "}
+                    {entries
+                      .map((t) => `${t.time} · ${Math.round(t.height * 10) / 10}m`)
+                      .join(",  ")}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
