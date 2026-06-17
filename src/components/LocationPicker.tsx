@@ -1,19 +1,16 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AddressAutocomplete } from "@/components/settings/AddressAutocomplete";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Check, X } from "lucide-react";
+import { Check, ChevronDown, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+
+// Matches the dropdown's max-h-48.
+const DROPDOWN_MAX_HEIGHT = 192;
 
 export type SavedLocation = { id: string; name: string; address: string | null };
 
@@ -66,6 +63,37 @@ export function LocationPicker({
   // Guards a refetch-induced flicker; we keep the latest clubId we loaded for.
   const loadedFor = useRef<string | null>(null);
 
+  // Saved-locations dropdown: portaled + positioned manually so it can flip
+  // upward and stay within the viewport instead of clipping on mobile.
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const reposition = () => {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const openUpward = spaceBelow < DROPDOWN_MAX_HEIGHT && spaceAbove > spaceBelow;
+      setDropdownStyle({
+        position: "fixed",
+        left: rect.left,
+        width: rect.width,
+        maxHeight: DROPDOWN_MAX_HEIGHT,
+        ...(openUpward ? { bottom: window.innerHeight - rect.top + 4 } : { top: rect.bottom + 4 }),
+      });
+    };
+    reposition();
+    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", reposition, true);
+    return () => {
+      window.removeEventListener("resize", reposition);
+      window.removeEventListener("scroll", reposition, true);
+    };
+  }, [dropdownOpen]);
+
   useEffect(() => {
     let cancelled = false;
     if (!clubId) {
@@ -95,6 +123,7 @@ export function LocationPicker({
 
   const pickSaved = (l: SavedLocation) => {
     setSavePrompt(null);
+    setDropdownOpen(false);
     onChange(formatLocation(l));
     onLocationIdChange?.(l.id);
   };
@@ -109,9 +138,7 @@ export function LocationPicker({
   // A suggestion was picked from the autocomplete dropdown — offer to save it.
   const handleSelected = (address: string) => {
     onLocationIdChange?.(null);
-    const exists = locations.some(
-      (l) => l.address === address || formatLocation(l) === address,
-    );
+    const exists = locations.some((l) => l.address === address || formatLocation(l) === address);
     if (clubId && !exists) {
       setSavePrompt({ address, name: address.split(",")[0].trim() });
     }
@@ -141,9 +168,7 @@ export function LocationPicker({
       return;
     }
     const loc = data as SavedLocation;
-    setLocations((prev) =>
-      [...prev, loc].sort((a, b) => a.name.localeCompare(b.name)),
-    );
+    setLocations((prev) => [...prev, loc].sort((a, b) => a.name.localeCompare(b.name)));
     setSavePrompt(null);
     onChange(formatLocation(loc));
     onLocationIdChange?.(loc.id);
@@ -161,31 +186,43 @@ export function LocationPicker({
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
                 Saved locations
               </div>
-              <Select
-                value={selected?.id ?? ""}
-                onValueChange={(id) => {
-                  const loc = locations.find((l) => l.id === id);
-                  if (loc) pickSaved(loc);
-                }}
+              <button
+                type="button"
+                ref={triggerRef}
+                onClick={() => setDropdownOpen((o) => !o)}
+                className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-lg border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring"
               >
-                <SelectTrigger className="h-9 rounded-lg">
-                  <SelectValue placeholder="Select a saved location...">
-                    {selected?.name}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {locations.map((l) => (
-                    <SelectItem key={l.id} value={l.id}>
-                      <span className="flex flex-col items-start">
-                        <span>{l.name}</span>
-                        {l.address && (
-                          <span className="text-xs text-muted-foreground">{l.address}</span>
-                        )}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <span className={cn("truncate", !selected && "text-muted-foreground")}>
+                  {selected?.name ?? "Select a saved location..."}
+                </span>
+                <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+              </button>
+
+              {dropdownOpen &&
+                createPortal(
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />
+                    <div
+                      style={dropdownStyle}
+                      className="z-50 max-h-48 overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md p-1"
+                    >
+                      {locations.map((l) => (
+                        <button
+                          key={l.id}
+                          type="button"
+                          onClick={() => pickSaved(l)}
+                          className="flex w-full flex-col items-start rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                        >
+                          <span>{l.name}</span>
+                          {l.address && (
+                            <span className="text-xs text-muted-foreground">{l.address}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </>,
+                  document.body,
+                )}
               <div className="flex items-center gap-2 pt-1">
                 <div className="h-px flex-1 bg-border" />
                 <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -212,9 +249,7 @@ export function LocationPicker({
           <div className="flex items-center gap-2">
             <Input
               value={savePrompt.name}
-              onChange={(e) =>
-                setSavePrompt((p) => (p ? { ...p, name: e.target.value } : p))
-              }
+              onChange={(e) => setSavePrompt((p) => (p ? { ...p, name: e.target.value } : p))}
               placeholder="Location name"
               className="h-8 text-sm"
             />

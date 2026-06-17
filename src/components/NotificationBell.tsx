@@ -61,10 +61,7 @@ export function NotificationBell() {
             <div className="sticky top-0 bg-background border-b border-border px-4 py-3 flex items-center justify-between">
               <span className="font-semibold text-sm">Notifications</span>
               {unreadCount > 0 && (
-                <button
-                  onClick={markAllRead}
-                  className="text-xs text-primary hover:underline"
-                >
+                <button onClick={markAllRead} className="text-xs text-primary hover:underline">
                   Mark all as read
                 </button>
               )}
@@ -79,7 +76,9 @@ export function NotificationBell() {
                 {notifications.map((n) => (
                   <li key={n.id}>
                     <button
-                      onClick={() => handleNotificationClick(n.id, linkFor(n.notification_type, n.related_id))}
+                      onClick={() =>
+                        handleNotificationClick(n.id, linkFor(n.notification_type, n.related_id))
+                      }
                       className="w-full text-left px-4 py-3 flex gap-3 hover:bg-accent/60 transition-colors border-b border-border/50 last:border-b-0"
                     >
                       <div className="mt-1.5 shrink-0">

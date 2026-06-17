@@ -20,7 +20,9 @@ export function useNotifications() {
 
   const load = useCallback(async () => {
     if (!activeClub) return;
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return;
     const { data: m } = await supabase
       .from("members")
@@ -32,14 +34,16 @@ export function useNotifications() {
     setMemberId(m.id);
     const { data } = await supabase
       .from("notifications")
-      .select("*")
+      .select("id, club_id, member_id, message, notification_type, related_id, is_read, created_at")
       .eq("member_id", m.id)
       .order("created_at", { ascending: false })
       .limit(50);
     setNotifications((data ?? []) as AppNotification[]);
   }, [activeClub]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   useEffect(() => {
     if (!memberId) return;
@@ -47,11 +51,20 @@ export function useNotifications() {
       .channel(`notifications:${memberId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications", filter: `member_id=eq.${memberId}` },
-        (payload) => { setNotifications((prev) => [payload.new as AppNotification, ...prev]); },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `member_id=eq.${memberId}`,
+        },
+        (payload) => {
+          setNotifications((prev) => [payload.new as AppNotification, ...prev]);
+        },
       )
       .subscribe();
-    return () => { void supabase.removeChannel(channel); };
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, [memberId]);
 
   const markAllRead = useCallback(async () => {
@@ -66,7 +79,7 @@ export function useNotifications() {
 
   const markRead = useCallback(async (id: string) => {
     await supabase.from("notifications").update({ is_read: true }).eq("id", id);
-    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, is_read: true } : n));
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
   }, []);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
