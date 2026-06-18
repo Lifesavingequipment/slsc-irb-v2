@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { useCanManage, useIsAdmin, useClub } from "@/lib/club-context";
@@ -453,6 +453,13 @@ function SessionDetail() {
                 {weatherData.weather.emoji} {weatherData.weather.label} · {weatherData.weather.maxTemp}°C · {weatherData.weather.windDir} {weatherData.weather.windSpeed} km/h
               </div>
             )}
+            {weatherData.weatherUpdatedAt ? (
+              <p className="text-xs text-muted-foreground mt-1">
+                Weather updated {formatDistanceToNow(new Date(weatherData.weatherUpdatedAt), { addSuffix: true })}
+              </p>
+            ) : weatherData.staleWarning ? (
+              <p className="text-xs text-amber-500 mt-1">⚠️ {weatherData.staleWarning}</p>
+            ) : null}
             {!weatherData.tooFarForWaves && weatherData.waves && (
               <div>
                 🌊 Surf:{" "}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
 
 type WeatherData = {
   emoji: string;
@@ -230,6 +231,8 @@ export type WeatherTidesState = {
   tooFarForWeather: boolean;
   tooFarForWaves: boolean;
   error: string | null;
+  weatherUpdatedAt: string | null;
+  staleWarning: string | null;
 };
 
 export function useWeatherTidesData({
@@ -251,48 +254,73 @@ export function useWeatherTidesData({
   const [waves, setWaves] = useState<WaveData | null>(null);
   const [tides, setTides] = useState<TideExtreme[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [weatherUpdatedAt, setWeatherUpdatedAt] = useState<string | null>(null);
+  const [staleWarning, setStaleWarning] = useState<string | null>(null);
 
   useEffect(() => {
-    const date = format(new Date(startsAt), "yyyy-MM-dd");
-    const cacheKey = `weather-tides-${sessionId}-${location}`;
-
-    if (!location) {
-      setLoading(false);
-      return;
+    function minutesSince(ts: string | null): number {
+      if (!ts) return Infinity;
+      return (Date.now() - new Date(ts).getTime()) / 60000;
     }
-
-    if (tooFarForWeather && tooFarForWaves) {
-      setLoading(false);
-      return;
-    }
-
-    const cached = sessionStorage.getItem(cacheKey);
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        setWeather(parsed.weather ?? null);
-        setWaves(parsed.waves ?? null);
-        setTides(parsed.tides ?? null);
-        setLoading(false);
-        return;
-      } catch { /* bad cache */ }
+    function intervalMinutes(starts: string): number {
+      const h = (new Date(starts).getTime() - Date.now()) / 3600000;
+      if (h <= 2) return 30;
+      if (h <= 24) return 60;
+      if (h <= 48) return 180;
+      return 360;
     }
 
     (async () => {
+      const { data: cached } = await supabase
+        .from("session_weather_cache")
+        .select("weather, waves, tides, weather_updated_at, tides_updated_at")
+        .eq("session_id", sessionId)
+        .maybeSingle();
+
+      if (cached) {
+        setWeather((cached.weather as WeatherData) ?? null);
+        setWaves((cached.waves as WaveData) ?? null);
+        setTides((cached.tides as TideExtreme[]) ?? null);
+        setWeatherUpdatedAt(cached.weather_updated_at);
+        setLoading(false);
+      }
+
+      if (new Date(startsAt) < new Date()) {
+        setLoading(false);
+        return;
+      }
+
+      const stale = minutesSince(cached?.weather_updated_at ?? null) >= intervalMinutes(startsAt);
+      if (!stale && cached?.weather) {
+        return;
+      }
+
       try {
-        const coords = await geocode(location);
-        const tz = getTimezone(coords.lat, coords.lng);
-        const [w, wv, td] = await Promise.all([
-          tooFarForWeather ? Promise.resolve(null) : fetchWeather(coords.lat, coords.lng, date, tz),
-          tooFarForWaves ? Promise.resolve(null) : fetchWaves(coords.lat, coords.lng, date, useArchive),
-          fetchTides(coords.lat, coords.lng, date),
-        ]);
-        setWeather(w);
-        setWaves(wv);
-        setTides(td);
-        sessionStorage.setItem(cacheKey, JSON.stringify({ weather: w, waves: wv, tides: td }));
-        if (!w && !wv && !tooFarForWeather && !tooFarForWaves) {
-          setError("Weather data unavailable for this location.");
+        const { data: { session } } = await supabase.auth.getSession();
+        const resp = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-session-weather`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${session?.access_token}`,
+            },
+            body: JSON.stringify({ session_id: sessionId }),
+          },
+        );
+        if (resp.ok) {
+          const fresh = await resp.json();
+          setWeather(fresh.weather ?? null);
+          setWaves(fresh.waves ?? null);
+          setTides(fresh.tides ?? null);
+          setWeatherUpdatedAt(fresh.weather_updated_at ?? null);
+          setStaleWarning(null);
+        } else if (cached?.weather_updated_at) {
+          const mins = Math.round(minutesSince(cached.weather_updated_at));
+          const ago = mins >= 60
+            ? `${Math.round(mins / 60)} hour${Math.round(mins / 60) === 1 ? "" : "s"} ago`
+            : `${mins} minutes ago`;
+          setStaleWarning(`Weather last updated ${ago}`);
         }
       } catch (err) {
         setError(`Failed to load weather data: ${err instanceof Error ? err.message : String(err)}`);
@@ -302,7 +330,10 @@ export function useWeatherTidesData({
     })();
   }, [sessionId, location, startsAt]);
 
-  return { loading, weather, waves, tides, tooFarForWeather, tooFarForWaves, error };
+  return {
+    loading, weather, waves, tides, tooFarForWeather, tooFarForWaves, error,
+    weatherUpdatedAt, staleWarning,
+  };
 }
 
 export { degreesToCompass };
