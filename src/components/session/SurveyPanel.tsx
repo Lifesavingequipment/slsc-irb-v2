@@ -13,7 +13,7 @@ import {
 import { Plus, Trash2, ClipboardList, ChevronDown, ChevronUp, BookmarkPlus, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
 
-type QType = "yes_no" | "text" | "single_choice";
+type QType = "yes_no" | "text" | "single_choice" | "multiple_choice";
 
 export type SurveyQuestion = {
   id?: string;
@@ -29,12 +29,14 @@ export type SurveyResponse = {
   answer_text: string | null;
   answer_bool: boolean | null;
   answer_choice: string | null;
+  answer_choices?: string[] | null;
 };
 
 export const TYPE_LABEL: Record<QType, string> = {
   yes_no: "Yes / No",
   text: "Short answer",
   single_choice: "Choose one",
+  multiple_choice: "Choose multiple",
 };
 
 export function emptyQuestion(position: number): SurveyQuestion {
@@ -103,7 +105,8 @@ export function SurveyEditor({
         session_id: sessionId, club_id: clubId, position: idx,
         question_text: q.question_text.trim(),
         question_type: q.question_type,
-        options: q.question_type === "single_choice" ? q.options.filter((o) => o.trim()) : null,
+        options: q.question_type === "single_choice" || q.question_type === "multiple_choice"
+          ? q.options.filter((o) => o.trim()) : null,
         required: q.required,
       }));
     if (rows.length > 0) {
@@ -140,7 +143,8 @@ export function SurveyEditor({
         position: idx,
         question_text: q.question_text.trim(),
         question_type: q.question_type,
-        options: q.question_type === "single_choice" ? q.options.filter((o) => o.trim()) : [],
+        options: q.question_type === "single_choice" || q.question_type === "multiple_choice"
+          ? q.options.filter((o) => o.trim()) : [],
         required: q.required,
       }));
     const { error } = await supabase.from("survey_templates").insert({
@@ -180,46 +184,48 @@ export function SurveyEditor({
           <p className="text-sm text-muted-foreground py-3 text-center">No questions yet.</p>
         )}
         {questions.map((q, i) => (
-          <div key={i} className="rounded-md border p-3 space-y-2">
+          <div key={i} className="rounded-md border p-3 space-y-3">
             <div className="flex items-center gap-2">
               <Badge variant="secondary">Q{i + 1}</Badge>
               <div className="ml-auto flex gap-1">
-                <Button type="button" size="icon" variant="ghost" onClick={() => move(i, -1)} disabled={i === 0}>
+                <Button type="button" size="icon" className="min-h-11 min-w-11" variant="ghost" onClick={() => move(i, -1)} disabled={i === 0}>
                   <ChevronUp className="h-4 w-4" />
                 </Button>
-                <Button type="button" size="icon" variant="ghost" onClick={() => move(i, 1)} disabled={i === questions.length - 1}>
+                <Button type="button" size="icon" className="min-h-11 min-w-11" variant="ghost" onClick={() => move(i, 1)} disabled={i === questions.length - 1}>
                   <ChevronDown className="h-4 w-4" />
                 </Button>
-                <Button type="button" size="icon" variant="ghost" onClick={() => remove(i)}>
+                <Button type="button" size="icon" className="min-h-11 min-w-11" variant="ghost" onClick={() => remove(i)}>
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               </div>
             </div>
             <Input
+              className="min-h-11"
               value={q.question_text}
               onChange={(e) => update(i, { question_text: e.target.value })}
               placeholder="e.g. Attending team BBQ after training?"
             />
-            <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
               <Select value={q.question_type} onValueChange={(v) => update(i, { question_type: v as QType })}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-11 w-full sm:flex-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {(Object.keys(TYPE_LABEL) as QType[]).map((t) => (
                     <SelectItem key={t} value={t}>{TYPE_LABEL[t]}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <label className="flex items-center justify-end gap-2 text-xs">
+              <label className="flex items-center justify-between sm:justify-end gap-2 text-xs">
                 <span className="text-muted-foreground">Required</span>
                 <Switch checked={q.required} onCheckedChange={(v) => update(i, { required: v })} />
               </label>
             </div>
-            {q.question_type === "single_choice" && (
+            {(q.question_type === "single_choice" || q.question_type === "multiple_choice") && (
               <div className="space-y-2">
                 <Label className="text-xs">Options</Label>
                 {(q.options.length === 0 ? [""] : q.options).map((opt, oi) => (
                   <div key={oi} className="flex gap-2">
                     <Input
+                      className="min-h-11 w-full"
                       value={opt}
                       onChange={(e) => {
                         const next = [...q.options]; next[oi] = e.target.value;
@@ -227,7 +233,7 @@ export function SurveyEditor({
                       }}
                       placeholder={`Option ${oi + 1}`}
                     />
-                    <Button type="button" size="icon" variant="ghost" onClick={() => {
+                    <Button type="button" size="icon" className="min-h-11 min-w-11 shrink-0" variant="ghost" onClick={() => {
                       const next = q.options.filter((_, x) => x !== oi);
                       update(i, { options: next });
                     }}>
@@ -235,7 +241,7 @@ export function SurveyEditor({
                     </Button>
                   </div>
                 ))}
-                <Button type="button" variant="ghost" size="sm" onClick={() => update(i, { options: [...q.options, ""] })}>
+                <Button type="button" variant="ghost" size="sm" className="min-h-11" onClick={() => update(i, { options: [...q.options, ""] })}>
                   <Plus className="h-4 w-4 mr-1" /> Add option
                 </Button>
               </div>
@@ -245,15 +251,15 @@ export function SurveyEditor({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="outline" onClick={add}>
+        <Button type="button" variant="outline" className="min-h-11" onClick={add}>
           <Plus className="h-4 w-4 mr-2" /> Add question
         </Button>
         {canManageTemplates && questions.length > 0 && (
-          <Button type="button" variant="ghost" onClick={saveAsTemplate}>
+          <Button type="button" variant="ghost" className="min-h-11" onClick={saveAsTemplate}>
             <BookmarkPlus className="h-4 w-4 mr-2" /> Save as template
           </Button>
         )}
-        <Button type="button" className="ml-auto" disabled={busy} onClick={save}>
+        <Button type="button" className="ml-auto min-h-11" disabled={busy} onClick={save}>
           {busy ? "Saving…" : "Save questions"}
         </Button>
       </div>
@@ -290,7 +296,7 @@ export function SurveyRunner({
     if (list.length > 0) {
       const { data: rs } = await supabase
         .from("session_survey_responses")
-        .select("question_id, answer_text, answer_bool, answer_choice, updated_at, created_at")
+        .select("question_id, answer_text, answer_bool, answer_choice, answer_choices, updated_at, created_at")
         .eq("session_id", sessionId)
         .eq("user_id", userId);
       const map: Record<string, SurveyResponse> = {};
@@ -305,10 +311,12 @@ export function SurveyRunner({
       const requiredIds = list.filter((q) => q.required).map((q) => q.id);
       const allRequiredAnswered = requiredIds.every((id) => {
         const a = map[id];
-        return a && (a.answer_text !== null || a.answer_bool !== null || a.answer_choice !== null);
+        return a && (a.answer_text !== null || a.answer_bool !== null || a.answer_choice !== null
+          || (a.answer_choices !== null && a.answer_choices !== undefined && a.answer_choices.length > 0));
       });
       const anyAnswered = Object.values(map).some(
-        (a) => a.answer_text !== null || a.answer_bool !== null || a.answer_choice !== null,
+        (a) => a.answer_text !== null || a.answer_bool !== null || a.answer_choice !== null
+          || (a.answer_choices !== null && a.answer_choices !== undefined && a.answer_choices.length > 0),
       );
       setSubmitted(requiredIds.length > 0 ? allRequiredAnswered : anyAnswered);
       setSubmittedAt(latest);
@@ -322,19 +330,28 @@ export function SurveyRunner({
 
   const setAns = (qid: string, patch: Partial<SurveyResponse>) =>
     setAnswers((m) => {
-      const prev = m[qid] ?? { question_id: qid, answer_text: null, answer_bool: null, answer_choice: null };
+      const prev = m[qid] ?? { question_id: qid, answer_text: null, answer_bool: null, answer_choice: null, answer_choices: null };
       return { ...m, [qid]: { ...prev, ...patch, question_id: qid } };
+    });
+
+  const toggleChoice = (qid: string, opt: string) =>
+    setAnswers((m) => {
+      const prev = m[qid] ?? { question_id: qid, answer_text: null, answer_bool: null, answer_choice: null, answer_choices: [] };
+      const current = prev.answer_choices ?? [];
+      const next = current.includes(opt) ? current.filter((o) => o !== opt) : [...current, opt];
+      return { ...m, [qid]: { ...prev, answer_choices: next, answer_text: null, answer_bool: null, answer_choice: null, question_id: qid } };
     });
 
   const submit = async () => {
     setBusy(true);
     const rows = questions.map((q) => {
-      const a = answers[q.id] ?? { question_id: q.id, answer_text: null, answer_bool: null, answer_choice: null };
+      const a = answers[q.id] ?? { question_id: q.id, answer_text: null, answer_bool: null, answer_choice: null, answer_choices: null };
       return {
         session_id: sessionId, club_id: clubId, question_id: q.id, user_id: userId,
         answer_text: a.answer_text, answer_bool: a.answer_bool, answer_choice: a.answer_choice,
+        answer_choices: a.answer_choices && a.answer_choices.length > 0 ? a.answer_choices : null,
       };
-    }).filter((r) => r.answer_text !== null || r.answer_bool !== null || r.answer_choice !== null);
+    }).filter((r) => r.answer_text !== null || r.answer_bool !== null || r.answer_choice !== null || r.answer_choices !== null);
     if (rows.length === 0) { setBusy(false); toast.error("Please answer the questions first."); return; }
     const { error } = await supabase.from("session_survey_responses").upsert(rows, { onConflict: "question_id,user_id" });
     setBusy(false);
@@ -352,7 +369,8 @@ export function SurveyRunner({
     if (!q.required) return false;
     const a = answers[q.id];
     if (!a) return true;
-    return a.answer_text === null && a.answer_bool === null && a.answer_choice === null;
+    return a.answer_text === null && a.answer_bool === null && a.answer_choice === null
+      && (!a.answer_choices || a.answer_choices.length === 0);
   });
 
   // Submitted state: show confirmation + Edit button
@@ -369,7 +387,7 @@ export function SurveyRunner({
             <> on {new Date(submittedAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })} at {new Date(submittedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</>
           )}.
         </p>
-        <Button type="button" variant="outline" size="sm" onClick={() => setEditing(true)}>
+        <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => setEditing(true)}>
           Edit survey
         </Button>
       </Card>
@@ -389,7 +407,7 @@ export function SurveyRunner({
         {questions.map((q, i) => {
           const a = answers[q.id];
           return (
-            <div key={q.id} className="rounded-md border p-3 space-y-2">
+            <div key={q.id} className="rounded-md border p-3 space-y-3">
               <div className="text-sm font-medium">
                 Q{i + 1}. {q.question_text}
                 {q.required && <span className="text-destructive ml-1">*</span>}
@@ -401,8 +419,8 @@ export function SurveyRunner({
                       key={String(v)}
                       type="button"
                       variant={a?.answer_bool === v ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setAns(q.id, { answer_bool: v, answer_text: null, answer_choice: null })}
+                      className="min-h-11 flex-1 sm:flex-none"
+                      onClick={() => setAns(q.id, { answer_bool: v, answer_text: null, answer_choice: null, answer_choices: null })}
                     >
                       {v ? "Yes" : "No"}
                     </Button>
@@ -413,7 +431,7 @@ export function SurveyRunner({
                 <Textarea
                   rows={2}
                   value={a?.answer_text ?? ""}
-                  onChange={(e) => setAns(q.id, { answer_text: e.target.value || null, answer_bool: null, answer_choice: null })}
+                  onChange={(e) => setAns(q.id, { answer_text: e.target.value || null, answer_bool: null, answer_choice: null, answer_choices: null })}
                 />
               )}
               {q.question_type === "single_choice" && (
@@ -423,25 +441,46 @@ export function SurveyRunner({
                       key={opt}
                       type="button"
                       variant={a?.answer_choice === opt ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setAns(q.id, { answer_choice: opt, answer_bool: null, answer_text: null })}
+                      className="min-h-11"
+                      onClick={() => setAns(q.id, { answer_choice: opt, answer_bool: null, answer_text: null, answer_choices: null })}
                     >
                       {opt}
                     </Button>
                   ))}
                 </div>
               )}
+              {q.question_type === "multiple_choice" && (
+                <div className="flex flex-col gap-2">
+                  {q.options.map((opt) => {
+                    const checked = a?.answer_choices?.includes(opt) ?? false;
+                    return (
+                      <label
+                        key={opt}
+                        className="flex items-center gap-3 rounded-md border px-3 min-h-11 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-5 w-5 shrink-0"
+                          checked={checked}
+                          onChange={() => toggleChoice(q.id, opt)}
+                        />
+                        <span className="text-sm">{opt}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         {submitted && editing && (
-          <Button type="button" variant="ghost" onClick={() => { setEditing(false); load(); }} className="flex-1">
+          <Button type="button" variant="ghost" className="min-h-11 flex-1" onClick={() => { setEditing(false); load(); }}>
             Cancel
           </Button>
         )}
-        <Button type="button" className="flex-1" disabled={busy || missingRequired} onClick={submit}>
+        <Button type="button" className="min-h-11 flex-1" disabled={busy || missingRequired} onClick={submit}>
           {busy ? "Saving…" : missingRequired ? "Answer required questions" : submitted ? "Save changes" : "Submit answers"}
         </Button>
       </div>
@@ -493,7 +532,7 @@ export function SurveyResults({ sessionId }: { sessionId: string }) {
       const qMap = new Map<string, string>(((qs ?? []) as any[]).map((q) => [q.id, q.question_text]));
       const { data: rs } = await supabase
         .from("session_survey_responses")
-        .select("question_id, user_id, answer_text, answer_bool, answer_choice")
+        .select("question_id, user_id, answer_text, answer_bool, answer_choice, answer_choices")
         .eq("session_id", sessionId);
       const userIds = Array.from(new Set(((rs ?? []) as any[]).map((r) => r.user_id)));
       const profMap = new Map<string, string>();
@@ -508,6 +547,7 @@ export function SurveyResults({ sessionId }: { sessionId: string }) {
         q: qMap.get(r.question_id) ?? "Question",
         a: r.answer_bool !== null ? (r.answer_bool ? "Yes" : "No")
           : r.answer_choice !== null ? r.answer_choice
+          : Array.isArray(r.answer_choices) && r.answer_choices.length > 0 ? r.answer_choices.join(", ")
           : r.answer_text ?? "",
       }));
       result.sort((a, b) => a.name.localeCompare(b.name) || a.q.localeCompare(b.q));
