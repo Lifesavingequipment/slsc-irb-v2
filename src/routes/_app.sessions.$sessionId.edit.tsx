@@ -22,6 +22,7 @@ import { CoachSetupSection, type VehicleDraft, type ExistingVehicle } from "@/co
 import { LocationPicker, formatLocation } from "@/components/LocationPicker";
 import { notifySessionUpdated, currentMemberId } from "@/lib/notify";
 import { invalidateSessionsCache } from "./_app.sessions.index";
+import { format } from "date-fns";
 
 export const Route = createFileRoute("/_app/sessions/$sessionId/edit")({
   head: () => ({ meta: [{ title: "Edit session — IRB Coaching" }] }),
@@ -91,6 +92,7 @@ function EditSession() {
   const [type, setType] = useState<"training" | "fitness" | "theory" | "other">("training");
   const [format, setFormat] = useState<"team" | "individual">("team");
   const [repeat, setRepeat] = useState<"none" | "daily" | "weekly" | "fortnightly" | "monthly">("none");
+  const [repeatUntil, setRepeatUntil] = useState("");
   const [locationId, setLocationId] = useState<string | null>(null);
   const [location, setLocation] = useState("");
   const [startsAt, setStartsAt] = useState("");
@@ -122,6 +124,8 @@ function EditSession() {
       setType(data.session_type as typeof type);
       setFormat(data.format as typeof format);
       setRepeat((data.repeat_frequency ?? "none") as typeof repeat);
+      // TODO: sessions table has no repeat_until column yet — field is UI-only until that's added.
+      setRepeatUntil((data as { repeat_until?: string | null }).repeat_until ? format(new Date((data as { repeat_until?: string | null }).repeat_until!), "yyyy-MM-dd") : "");
       setStartsAt(toLocalInput(data.starts_at));
       setEndsAt(toLocalInput(data.ends_at));
       setRsvpDeadline(toLocalInput(data.rsvp_deadline));
@@ -419,6 +423,18 @@ function EditSession() {
                 <SelectItem value="monthly">Monthly</SelectItem>
               </SelectContent>
             </Select>
+            {repeat !== "none" && (
+              <div className="space-y-1">
+                <Label htmlFor="repeat-until-edit">Repeat until</Label>
+                <Input
+                  id="repeat-until-edit"
+                  type="date"
+                  value={repeatUntil}
+                  onChange={(e) => setRepeatUntil(e.target.value)}
+                  className="h-11"
+                />
+              </div>
+            )}
           </div>
 
           <div className="space-y-1.5">
