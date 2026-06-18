@@ -264,7 +264,7 @@ function SessionsList() {
                   </span>
                   {s.location && (
                     <span className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" /> {s.location}
+                      <MapPin className="h-3 w-3" /> {s.location.split(" — ")[0]}
                     </span>
                   )}
                   <span className="flex items-center gap-1">

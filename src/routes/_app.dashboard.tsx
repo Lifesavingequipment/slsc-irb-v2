@@ -29,7 +29,6 @@ function Dashboard() {
   const { user } = useAuth();
   const { activeClub } = useClub();
   const canManage = useCanManage();
-  const isAdmin = useIsAdmin();
   const isPlatformOwner = useIsPlatformOwner();
   const firstName = useMemberFirstName();
 
@@ -132,6 +131,21 @@ function Dashboard() {
 
       <TodayConditionsCard />
 
+      {canManage && pendingCount !== null && pendingCount > 0 && (
+        <Card className="mb-4 p-4 rounded-xl border-l-4 border-l-warning border-warning/20 bg-warning/5">
+          <div className="flex items-start gap-3">
+            <UserPlus className="h-5 w-5 text-warning shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-medium">{pendingCount} member request{pendingCount === 1 ? "" : "s"} awaiting approval</div>
+              <p className="text-sm text-muted-foreground">Review and approve new members to give them access</p>
+            </div>
+            <Button asChild size="sm" variant="secondary">
+              <Link to="/members" search={{ tab: "pending" }}>Review</Link>
+            </Button>
+          </div>
+        </Card>
+      )}
+
       <div className="grid grid-cols-2 gap-3 mb-4">
         <Link to="/members">
           <Card className="p-4 bg-white border border-[#e5e7eb] border-l-4 border-l-primary shadow-none hover:border-accent hover:shadow-sm transition-all cursor-pointer">
@@ -199,22 +213,6 @@ function Dashboard() {
         </Card>
       )}
 
-      {isAdmin && pendingCount !== null && pendingCount > 0 && (
-        <Card className="mb-5 p-4 rounded-xl border-l-4 border-l-warning border-warning/20 bg-warning/5">
-          <div className="flex items-start gap-3">
-            <UserPlus className="h-5 w-5 text-warning shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <div className="font-medium">{pendingCount} member request{pendingCount === 1 ? "" : "s"} pending approval</div>
-              <p className="text-sm text-muted-foreground">Review and approve new members to give them access</p>
-            </div>
-            <Button asChild size="sm" variant="secondary">
-              <Link to="/members" search={{ tab: "pending" }}>Review now</Link>
-            </Button>
-          </div>
-        </Card>
-      )}
-
-
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg font-semibold">Upcoming sessions</h2>
         {canManage && (
@@ -260,7 +258,7 @@ function Dashboard() {
                       </span>
                       {s.location && (
                         <span className="flex items-center gap-1 truncate">
-                          <MapPin className="h-3 w-3" /> {s.location}
+                          <MapPin className="h-3 w-3" /> {s.location.split(" — ")[0]}
                         </span>
                       )}
                     </div>
