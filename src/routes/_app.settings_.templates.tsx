@@ -339,7 +339,7 @@ function SurveysTab({ clubId }: { clubId: string }) {
                       <Input
                         value={(q.options ?? []).join(", ")}
                         onChange={(e) => updateQ(i, { options: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
-                        placeholder="Comma-separated options"
+                        placeholder="Option 1, Option 2, Option 3  (separate each with a comma)"
                       />
                     )}
                   </div>
