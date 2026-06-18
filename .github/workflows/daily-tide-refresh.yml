@@ -1,0 +1,19 @@
+name: Daily tide refresh
+
+on:
+  schedule:
+    - cron: '0 15 * * *'  # 1:00 AM AEST (UTC+10) = 15:00 UTC
+  workflow_dispatch:       # allow manual trigger
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call daily-tide-refresh edge function
+        run: |
+          curl -X POST \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/daily-tide-refresh" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            --fail-with-body
+        timeout-minutes: 10
