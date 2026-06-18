@@ -414,17 +414,24 @@ function SessionDetail() {
             {session.ends_at && <>– {format(new Date(session.ends_at), "h:mma")}</>}
           </div>
           {session.location && (
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 shrink-0" />
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(session.location)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline decoration-dotted underline-offset-2 hover:text-blue-500 transition-colors"
-              >
-                {session.location}
-              </a>
-              <ExternalLink className="h-3 w-3 shrink-0 opacity-50" />
+            <div className="flex items-start gap-2">
+              <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
+              <div>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(session.location)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 underline decoration-dotted underline-offset-2 hover:text-blue-500 transition-colors"
+                >
+                  {session.location.split(" — ")[0]}
+                  <ExternalLink className="h-3 w-3 shrink-0 opacity-50" />
+                </a>
+                {session.location.includes(" — ") && (
+                  <div>
+                    <span className="text-xs text-muted-foreground">{session.location.split(" — ")[1]}</span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
           {session.rsvp_deadline && (

@@ -98,7 +98,7 @@ const schema = z.object({
   if (d.rsvp_deadline) {
     const r = new Date(d.rsvp_deadline).getTime();
     if (Number.isNaN(r)) ctx.addIssue({ code: "custom", path: ["rsvp_deadline"], message: "Invalid RSVP deadline" });
-    else if (r > s) ctx.addIssue({ code: "custom", path: ["rsvp_deadline"], message: "RSVP deadline must be on or before the session start" });
+    else if (r >= s) ctx.addIssue({ code: "custom", path: ["rsvp_deadline"], message: "RSVP deadline must be before the session start time" });
   }
 });
 
