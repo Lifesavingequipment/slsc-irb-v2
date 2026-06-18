@@ -8,7 +8,7 @@ import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, Plus, Users, UserPlus, Shield, ClipboardList, CheckCircle2, Dumbbell, ChevronRight } from "lucide-react";
+import { Calendar, MapPin, Plus, Users, UserPlus, Shield, ClipboardList, ClipboardCheck, CheckCircle2, Dumbbell, ChevronRight } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useIsPlatformOwner } from "@/lib/platform-owner";
 import { useRefetchOnFocus } from "@/hooks/use-refetch-on-focus";
@@ -25,6 +25,8 @@ type Upcoming = {
   id: string; title: string; starts_at: string; location: string | null; session_type: string;
 };
 
+type RsvpSummary = Record<string, { going: number; total: number }>;
+
 function Dashboard() {
   const { user } = useAuth();
   const { activeClub } = useClub();
@@ -36,6 +38,7 @@ function Dashboard() {
   const [memberCount, setMemberCount] = useState<number | null>(null);
   const [pendingCount, setPendingCount] = useState<number | null>(null);
   const [myRsvps, setMyRsvps] = useState<Record<string, string>>({});
+  const [rsvpSummary, setRsvpSummary] = useState<RsvpSummary>({});
   const [loaded, setLoaded] = useState(false);
   // Next 7 days action summary
   const [next7, setNext7] = useState<{
@@ -75,6 +78,19 @@ function Dashboard() {
     setUpcoming((sess.data ?? []) as Upcoming[]);
     setMemberCount(members.count ?? 0);
 
+    // RSVP summary (going/maybe/not_going counts) for the upcoming sessions shown on the dashboard.
+    const upcomingIds = (sess.data ?? []).map((s) => s.id);
+    const rsvpSummaryRes = upcomingIds.length
+      ? await supabase.from("session_rsvps").select("session_id, status").in("session_id", upcomingIds)
+      : { data: [] as { session_id: string; status: string }[] };
+    const summary: RsvpSummary = {};
+    for (const r of rsvpSummaryRes.data ?? []) {
+      if (!summary[r.session_id]) summary[r.session_id] = { going: 0, total: 0 };
+      summary[r.session_id].total++;
+      if (r.status === "going") summary[r.session_id].going++;
+    }
+    setRsvpSummary(summary);
+
     // Effective status = club_memberships.status (matched by auth_user_id)
     // ?? members.membership_status ?? "approved" — identical to the Members page.
     const cmByUser = new Map((clubMems.data ?? []).map((m) => [m.user_id, m]));
@@ -111,7 +127,7 @@ function Dashboard() {
   useEffect(() => {
     if (!activeClub || !user) return;
     setUpcoming([]); setMemberCount(null); setPendingCount(null);
-    setMyRsvps({}); setLoaded(false);
+    setMyRsvps({}); setRsvpSummary({}); setLoaded(false);
     setNext7({ trainingCount: 0, rsvpsPending: 0, surveysPending: 0 });
     refreshAll();
   }, [activeClub?.club_id, user?.id]);
@@ -121,12 +137,55 @@ function Dashboard() {
   if (!activeClub) return null;
 
   const nextSessionForWeather = upcoming.find((s) => s.location);
+  const nextSession = upcoming[0];
+
+  let subtitle: string | null = null;
+  if (canManage) {
+    if (nextSession) {
+      const respondedCount = rsvpSummary[nextSession.id]?.total ?? 0;
+      subtitle = `Next: ${nextSession.title} · ${respondedCount} of ${memberCount ?? 0} members responded`;
+    }
+  } else {
+    const { rsvpsPending, surveysPending } = next7;
+    if (rsvpsPending > 0 && surveysPending > 0) {
+      subtitle = `You have ${rsvpsPending} RSVPs and ${surveysPending} surveys to complete`;
+    } else if (rsvpsPending > 0) {
+      subtitle = `You have ${rsvpsPending} RSVPs to complete`;
+    } else if (surveysPending > 0) {
+      subtitle = `You have ${surveysPending} surveys to complete`;
+    } else {
+      subtitle = "You're all caught up ✓";
+    }
+  }
+
+  const totalResponded = Object.values(rsvpSummary).reduce((acc, v) => acc + v.total, 0);
+  const rsvpRate = memberCount && upcoming.length
+    ? Math.round((totalResponded / (memberCount * upcoming.length)) * 100)
+    : null;
+
+  type QuickAction = { label: string; to: string; search?: Record<string, string>; icon: React.ReactNode };
+  const quickActions: QuickAction[] = canManage
+    ? [
+        { label: "Create Session", to: "/sessions/new", icon: <Plus className="h-4 w-4" /> },
+        { label: "Record Attendance", to: "/attendance", icon: <ClipboardCheck className="h-4 w-4" /> },
+        { label: "View Members", to: "/members", icon: <Users className="h-4 w-4" /> },
+        { label: "View Sessions", to: "/sessions", icon: <Calendar className="h-4 w-4" /> },
+        ...(isPlatformOwner ? [{ label: "Manage Clubs", to: "/owner", icon: <Shield className="h-4 w-4" /> }] : []),
+      ]
+    : [
+        { label: "RSVP Now", to: "/sessions", search: { filter: "rsvp-pending" }, icon: <CheckCircle2 className="h-4 w-4" /> },
+        { label: "View Sessions", to: "/sessions", icon: <Calendar className="h-4 w-4" /> },
+        { label: "View Training", to: "/sessions", icon: <Dumbbell className="h-4 w-4" /> },
+      ];
+
+  const upcomingPreview = upcoming.slice(0, 3);
 
   return (
     <AppShell>
       <div className="mb-5">
         <p className="text-sm text-muted-foreground">{firstName ? `Welcome back, ${firstName}` : "Welcome back"}</p>
         <h1 className="text-2xl font-bold tracking-tight">{activeClub.club.name}</h1>
+        {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
       </div>
 
       <TodayConditionsCard />
@@ -146,31 +205,8 @@ function Dashboard() {
         </Card>
       )}
 
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <Link to="/members">
-          <Card className="p-4 bg-white border border-[#e5e7eb] border-l-4 border-l-primary shadow-none hover:border-accent hover:shadow-sm transition-all cursor-pointer">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
-              <Users className="h-3.5 w-3.5 text-primary" /> Members
-            </div>
-            <div className="mt-1 text-3xl font-bold">{memberCount ?? "—"}</div>
-          </Card>
-        </Link>
-        <Link to="/sessions">
-          <Card className="p-4 bg-white border border-[#e5e7eb] border-l-4 border-l-primary shadow-none hover:border-accent hover:shadow-sm transition-all cursor-pointer">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
-              <Calendar className="h-3.5 w-3.5 text-primary" /> Upcoming
-            </div>
-            <div className="mt-1 text-3xl font-bold">{loaded ? upcoming.length : "—"}</div>
-          </Card>
-        </Link>
-      </div>
-
-      {nextSessionForWeather && (
-        <NextSessionCard session={nextSessionForWeather} />
-      )}
-
       <div className="mb-6">
-        <Card className="p-0 bg-white border border-[#e5e7eb] shadow-none overflow-hidden">
+        <Card className="p-0 bg-white border border-[#e5e7eb] rounded-xl shadow-none overflow-hidden">
           <div className="px-4 py-3 border-b border-[#e5e7eb]">
             <h2 className="text-sm font-semibold">Actions needed</h2>
           </div>
@@ -199,19 +235,95 @@ function Dashboard() {
         </Card>
       </div>
 
-
-      {isPlatformOwner && (
-        <Card className="mb-3 p-3 border-primary/40 bg-primary/5">
-          <Link to="/admin" className="flex items-center gap-3">
-            <Shield className="h-5 w-5 text-primary shrink-0" />
-            <div className="flex-1">
-              <div className="font-medium">Platform admin</div>
-              <p className="text-xs text-muted-foreground">Stats across every club, manage owners, email coaches.</p>
-            </div>
-            <Button size="sm" variant="secondary">Open</Button>
+      {!loaded ? (
+        <div className={cn("grid gap-3 mb-4", canManage ? "grid-cols-2" : "grid-cols-2")} aria-busy="true">
+          {(canManage ? [0, 1, 2, 3] : [0, 1]).map((i) => (
+            <Card key={i} className="h-16 rounded-xl animate-pulse bg-muted/30" />
+          ))}
+        </div>
+      ) : canManage ? (
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <Link to="/members">
+            <Card className="p-4 rounded-xl bg-white border border-[#e5e7eb] border-l-4 border-l-primary shadow-none hover:border-accent hover:shadow-sm transition-all cursor-pointer">
+              <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
+                <Users className="h-3.5 w-3.5 text-primary" /> Members
+              </div>
+              <div className="mt-1 text-3xl font-bold">{memberCount ?? "—"}</div>
+            </Card>
           </Link>
-        </Card>
+          <Link to="/sessions">
+            <Card className="p-4 rounded-xl bg-white border border-[#e5e7eb] border-l-4 border-l-primary shadow-none hover:border-accent hover:shadow-sm transition-all cursor-pointer">
+              <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
+                <Calendar className="h-3.5 w-3.5 text-primary" /> Sessions
+              </div>
+              <div className="mt-1 text-3xl font-bold">{upcoming.length}</div>
+            </Card>
+          </Link>
+          <Card className="p-4 rounded-xl bg-white border border-[#e5e7eb] border-l-4 border-l-primary shadow-none">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
+              <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> RSVP Rate
+            </div>
+            <div className="mt-1 text-3xl font-bold">{rsvpRate !== null ? `${rsvpRate}%` : "—"}</div>
+          </Card>
+          <Link to="/sessions" search={{ filter: "surveys-pending" }}>
+            <Card className="p-4 rounded-xl bg-white border border-[#e5e7eb] border-l-4 border-l-primary shadow-none hover:border-accent hover:shadow-sm transition-all cursor-pointer">
+              <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
+                <ClipboardList className="h-3.5 w-3.5 text-primary" /> Surveys
+              </div>
+              <div className="mt-1 text-3xl font-bold">{next7.surveysPending}</div>
+            </Card>
+          </Link>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <Link to="/sessions">
+            <Card className="p-4 rounded-xl bg-white border border-[#e5e7eb] border-l-4 border-l-primary shadow-none hover:border-accent hover:shadow-sm transition-all cursor-pointer">
+              <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
+                <Calendar className="h-3.5 w-3.5 text-primary" /> Sessions
+              </div>
+              <div className="mt-1 text-3xl font-bold">{upcoming.length}</div>
+            </Card>
+          </Link>
+          <Card className="p-4 rounded-xl bg-white border border-[#e5e7eb] border-l-4 border-l-primary shadow-none">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
+              <Dumbbell className="h-3.5 w-3.5 text-primary" /> Training
+            </div>
+            <div className="mt-1 text-3xl font-bold">{next7.trainingCount}</div>
+          </Card>
+        </div>
       )}
+
+      {nextSessionForWeather && (
+        <NextSessionCard
+          session={nextSessionForWeather}
+          myRsvp={myRsvps[nextSessionForWeather.id] ?? null}
+          canManage={canManage}
+        />
+      )}
+
+      <div className="mb-6">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">Quick actions</h2>
+        {quickActions.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No quick actions available</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {quickActions.map((a) => (
+              <Button
+                key={a.label}
+                asChild
+                variant="outline"
+                className="h-14 min-h-11 rounded-xl justify-start gap-2 px-4 text-sm font-medium"
+              >
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                <Link to={a.to as "/sessions"} search={a.search as any}>
+                  {a.icon}
+                  {a.label}
+                </Link>
+              </Button>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg font-semibold">Upcoming sessions</h2>
@@ -224,7 +336,7 @@ function Dashboard() {
 
       {!loaded ? (
         <div className="space-y-3" aria-busy="true">
-          {[0, 1].map((i) => <Card key={i} className="p-4 h-20 animate-pulse bg-muted/30" />)}
+          {[0, 1].map((i) => <Card key={i} className="p-4 h-20 rounded-xl animate-pulse bg-muted/30" />)}
         </div>
       ) : upcoming.length === 0 ? (
         <EmptyState
@@ -239,9 +351,9 @@ function Dashboard() {
         />
       ) : (
         <div className="space-y-3">
-          {upcoming.map((s) => (
+          {upcomingPreview.map((s) => (
             <Link key={s.id} to="/sessions/$sessionId" params={{ sessionId: s.id }}>
-              <Card className="p-4 hover:border-accent transition-colors">
+              <Card className="p-4 rounded-xl hover:border-accent transition-colors">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1">
@@ -262,12 +374,31 @@ function Dashboard() {
                         </span>
                       )}
                     </div>
+                    {rsvpSummary[s.id] && rsvpSummary[s.id].total > 0 && (
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {rsvpSummary[s.id].going} going · {rsvpSummary[s.id].total} responded
+                      </div>
+                    )}
                   </div>
                 </div>
               </Card>
             </Link>
           ))}
+          <Link to="/sessions" className="block text-sm text-accent">View all sessions →</Link>
         </div>
+      )}
+
+      {isPlatformOwner && (
+        <Card className="mt-4 mb-3 p-3 rounded-xl border-primary/40 bg-primary/5">
+          <Link to="/admin" className="flex items-center gap-3">
+            <Shield className="h-5 w-5 text-primary shrink-0" />
+            <div className="flex-1">
+              <div className="font-medium">Platform admin</div>
+              <p className="text-xs text-muted-foreground">Stats across every club, manage owners, email coaches.</p>
+            </div>
+            <Button size="sm" variant="secondary">Open</Button>
+          </Link>
+        </Card>
       )}
     </AppShell>
   );
@@ -381,7 +512,11 @@ function TodayConditionsCardContent({ location }: { location: DefaultLoc }) {
   );
 }
 
-function NextSessionCard({ session }: { session: Upcoming }) {
+function NextSessionCard({ session, myRsvp, canManage }: {
+  session: Upcoming;
+  myRsvp?: string | null;
+  canManage: boolean;
+}) {
   const { weather, waves, tides } = useWeatherTidesData({
     sessionId: session.id,
     location: session.location,
@@ -389,7 +524,7 @@ function NextSessionCard({ session }: { session: Upcoming }) {
   });
 
   return (
-    <Card className="p-4 bg-white border border-[#e5e7eb] shadow-none mb-4">
+    <Card className="p-4 rounded-xl bg-white border border-[#e5e7eb] shadow-none mb-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Next session</div>
@@ -397,6 +532,19 @@ function NextSessionCard({ session }: { session: Upcoming }) {
           <div className="mt-0.5 text-xs text-muted-foreground">
             {format(new Date(session.starts_at), "EEE d MMM · h:mma")}
           </div>
+          {myRsvp && (
+            <div className="mt-1.5">
+              {myRsvp === "going" && (
+                <Badge className="bg-success text-success-foreground text-[10px] uppercase">Going</Badge>
+              )}
+              {myRsvp === "maybe" && (
+                <Badge className="bg-warning text-warning-foreground text-[10px] uppercase">Maybe</Badge>
+              )}
+              {myRsvp === "not_going" && (
+                <Badge variant="secondary" className="text-[10px] uppercase">Can't go</Badge>
+              )}
+            </div>
+          )}
           {(weather || waves?.heightMax != null || (tides && tides.length > 0)) && (
             <div className="mt-2 flex items-center gap-3 text-sm flex-wrap">
               {weather && (
@@ -428,9 +576,26 @@ function NextSessionCard({ session }: { session: Upcoming }) {
             </div>
           )}
         </div>
-        <Button asChild size="sm" variant="outline" className="shrink-0">
-          <Link to="/sessions/$sessionId" params={{ sessionId: session.id }}>View session</Link>
-        </Button>
+        <div className="shrink-0 flex items-center gap-2">
+          {!myRsvp && !canManage ? (
+            <Button asChild size="sm" className="min-h-11">
+              <Link to="/sessions/$sessionId" params={{ sessionId: session.id }}>RSVP Now</Link>
+            </Button>
+          ) : canManage ? (
+            <>
+              <Button asChild size="sm" variant="outline" className="min-h-11">
+                <Link to="/sessions/$sessionId" params={{ sessionId: session.id }}>View</Link>
+              </Button>
+              <Button asChild size="sm" variant="ghost" className="min-h-11">
+                <Link to="/sessions/$sessionId/edit" params={{ sessionId: session.id }}>Edit</Link>
+              </Button>
+            </>
+          ) : (
+            <Button asChild size="sm" variant="outline" className="min-h-11">
+              <Link to="/sessions/$sessionId" params={{ sessionId: session.id }}>View session</Link>
+            </Button>
+          )}
+        </div>
       </div>
     </Card>
   );
