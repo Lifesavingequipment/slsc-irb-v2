@@ -17,6 +17,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppSessionsRouteImport } from './routes/_app.sessions'
 import { Route as AppOwnerRouteImport } from './routes/_app.owner'
+import { Route as AppMoreRouteImport } from './routes/_app.more'
 import { Route as AppLocationsRouteImport } from './routes/_app.locations'
 import { Route as AppEquipmentRouteImport } from './routes/_app.equipment'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
@@ -84,6 +85,11 @@ const AppSessionsRoute = AppSessionsRouteImport.update({
 const AppOwnerRoute = AppOwnerRouteImport.update({
   id: '/owner',
   path: '/owner',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMoreRoute = AppMoreRouteImport.update({
+  id: '/more',
+  path: '/more',
   getParentRoute: () => AppRoute,
 } as any)
 const AppLocationsRoute = AppLocationsRouteImport.update({
@@ -248,6 +254,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AppDashboardRoute
   '/equipment': typeof AppEquipmentRouteWithChildren
   '/locations': typeof AppLocationsRoute
+  '/more': typeof AppMoreRoute
   '/owner': typeof AppOwnerRoute
   '/sessions': typeof AppSessionsRouteWithChildren
   '/settings': typeof AppSettingsRoute
@@ -285,6 +292,7 @@ export interface FileRoutesByTo {
   '/chat': typeof AppChatRoute
   '/dashboard': typeof AppDashboardRoute
   '/locations': typeof AppLocationsRoute
+  '/more': typeof AppMoreRoute
   '/owner': typeof AppOwnerRoute
   '/settings': typeof AppSettingsRoute
   '/admin/audit': typeof AppAdminAuditRoute
@@ -323,6 +331,7 @@ export interface FileRoutesById {
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/equipment': typeof AppEquipmentRouteWithChildren
   '/_app/locations': typeof AppLocationsRoute
+  '/_app/more': typeof AppMoreRoute
   '/_app/owner': typeof AppOwnerRoute
   '/_app/sessions': typeof AppSessionsRouteWithChildren
   '/_app/settings': typeof AppSettingsRoute
@@ -363,6 +372,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/equipment'
     | '/locations'
+    | '/more'
     | '/owner'
     | '/sessions'
     | '/settings'
@@ -400,6 +410,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/dashboard'
     | '/locations'
+    | '/more'
     | '/owner'
     | '/settings'
     | '/admin/audit'
@@ -437,6 +448,7 @@ export interface FileRouteTypes {
     | '/_app/dashboard'
     | '/_app/equipment'
     | '/_app/locations'
+    | '/_app/more'
     | '/_app/owner'
     | '/_app/sessions'
     | '/_app/settings'
@@ -529,6 +541,13 @@ declare module '@tanstack/react-router' {
       path: '/owner'
       fullPath: '/owner'
       preLoaderRoute: typeof AppOwnerRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/more': {
+      id: '/_app/more'
+      path: '/more'
+      fullPath: '/more'
+      preLoaderRoute: typeof AppMoreRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/locations': {
@@ -801,6 +820,7 @@ interface AppRouteChildren {
   AppDashboardRoute: typeof AppDashboardRoute
   AppEquipmentRoute: typeof AppEquipmentRouteWithChildren
   AppLocationsRoute: typeof AppLocationsRoute
+  AppMoreRoute: typeof AppMoreRoute
   AppOwnerRoute: typeof AppOwnerRoute
   AppSessionsRoute: typeof AppSessionsRouteWithChildren
   AppSettingsRoute: typeof AppSettingsRoute
@@ -822,6 +842,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
   AppEquipmentRoute: AppEquipmentRouteWithChildren,
   AppLocationsRoute: AppLocationsRoute,
+  AppMoreRoute: AppMoreRoute,
   AppOwnerRoute: AppOwnerRoute,
   AppSessionsRoute: AppSessionsRouteWithChildren,
   AppSettingsRoute: AppSettingsRoute,
@@ -848,13 +869,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

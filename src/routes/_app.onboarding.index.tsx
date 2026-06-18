@@ -19,6 +19,10 @@ import { notifyJoinRequest } from "@/lib/notify";
 
 export const Route = createFileRoute("/_app/onboarding/")({
   head: () => ({ meta: [{ title: "Get started — IRB Coaching" }] }),
+  validateSearch: (search: Record<string, unknown>): { add?: boolean } => {
+    const a = search.add;
+    return { add: a === true || a === "1" || a === "true" || a === 1 };
+  },
   component: Onboarding,
 });
 
@@ -30,6 +34,7 @@ function Onboarding() {
   const { user, signOut } = useAuth();
   const { memberships, refresh } = useClub();
   const navigate = useNavigate();
+  const search = Route.useSearch();
   const [clubs, setClubs] = useState<ClubRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState<CreatedClub | null>(null);
@@ -44,11 +49,11 @@ function Onboarding() {
   const [venueAddress, setVenueAddress] = useState("");
 
   useEffect(() => {
-    if (created) return;
+    if (created || search.add) return;
     if (memberships.some((m) => m.status === "approved")) {
       navigate({ to: "/dashboard", replace: true });
     }
-  }, [memberships, navigate, created]);
+  }, [memberships, navigate, created, search.add]);
 
   useEffect(() => {
     supabase.from("clubs").select("id, club_name, address").order("club_name").then(({ data }) => {
@@ -191,7 +196,17 @@ function Onboarding() {
           </button>
         </div>
         <div className="max-w-2xl mx-auto mt-6">
-          <h1 className="text-2xl font-bold text-foreground">Get started</h1>
+          {search.add && (
+            <Link
+              to="/dashboard"
+              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2"
+            >
+              ← Back
+            </Link>
+          )}
+          <h1 className="text-2xl font-bold text-foreground">
+            {search.add ? "Join or create another club" : "Get started"}
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">Find your club or create a new one.</p>
         </div>
       </div>
