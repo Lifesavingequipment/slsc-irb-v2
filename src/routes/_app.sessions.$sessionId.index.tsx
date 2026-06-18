@@ -397,7 +397,7 @@ function SessionDetail() {
         <div className="flex items-center justify-between gap-3">
           <Badge variant="secondary" className="text-[10px] uppercase">{session.session_type}</Badge>
           {canManage && (
-            <Button asChild variant="ghost" size="icon" className="h-7 w-7 -mr-1">
+            <Button asChild variant="ghost" size="icon" className="h-9 w-9 -mr-1">
               <Link to="/sessions/$sessionId/edit" params={{ sessionId }}>
                 <Pencil className="h-4 w-4" />
               </Link>
@@ -477,7 +477,7 @@ function SessionDetail() {
         )}
 
         <div className="mt-3 flex items-center gap-2">
-          <Button variant="outline" size="sm" className="px-2.5 py-1 h-7 text-xs" onClick={handleShare}>
+          <Button variant="outline" size="sm" className="h-9 text-sm" onClick={handleShare}>
             <Share2 className="h-3.5 w-3.5 mr-1.5" /> Share
           </Button>
           {rsvpClosed && (
@@ -488,13 +488,13 @@ function SessionDetail() {
 
       <Tabs defaultValue="rsvp" className="mt-4">
         <TabsList className="flex overflow-x-auto w-full h-auto">
-          <TabsTrigger value="rsvp" className="text-xs flex-shrink-0">RSVPs</TabsTrigger>
-          <TabsTrigger value="plan" className="text-xs flex-shrink-0">Plan</TabsTrigger>
-          {session.survey_enabled && <TabsTrigger value="survey" className="text-xs flex-shrink-0">Survey</TabsTrigger>}
-          <TabsTrigger value="waves" className="text-xs flex-shrink-0">Waves</TabsTrigger>
-          <TabsTrigger value="gear" className="text-xs flex-shrink-0">Gear</TabsTrigger>
-          {(session.carpool_enabled || canManage) && <TabsTrigger value="carpool" className="text-xs flex-shrink-0">Carpool</TabsTrigger>}
-          <TabsTrigger value="attendance" className="text-xs flex-shrink-0">Attend</TabsTrigger>
+          <TabsTrigger value="rsvp" className="text-xs flex-shrink-0 min-h-[40px] px-3">RSVPs</TabsTrigger>
+          <TabsTrigger value="plan" className="text-xs flex-shrink-0 min-h-[40px] px-3">Plan</TabsTrigger>
+          {session.survey_enabled && <TabsTrigger value="survey" className="text-xs flex-shrink-0 min-h-[40px] px-3">Survey</TabsTrigger>}
+          <TabsTrigger value="waves" className="text-xs flex-shrink-0 min-h-[40px] px-3">Waves</TabsTrigger>
+          <TabsTrigger value="gear" className="text-xs flex-shrink-0 min-h-[40px] px-3">Gear</TabsTrigger>
+          {(session.carpool_enabled || canManage) && <TabsTrigger value="carpool" className="text-xs flex-shrink-0 min-h-[40px] px-3">Carpool</TabsTrigger>}
+          <TabsTrigger value="attendance" className="text-xs flex-shrink-0 min-h-[40px] px-3">Attend</TabsTrigger>
         </TabsList>
 
         <TabsContent value="rsvp" className="space-y-4 mt-4">

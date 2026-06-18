@@ -354,7 +354,7 @@ function EditSession() {
             <div className="space-y-1.5">
               <Label>Type</Label>
               <Select value={type} onValueChange={(v) => setType(v as typeof type)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="training">Training</SelectItem>
                   <SelectItem value="fitness">Fitness</SelectItem>
@@ -366,7 +366,7 @@ function EditSession() {
             <div className="space-y-1.5">
               <Label>Format</Label>
               <Select value={format} onValueChange={(v) => setFormat(v as typeof format)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="team">Team</SelectItem>
                   <SelectItem value="individual">Individual</SelectItem>
@@ -509,11 +509,11 @@ function EditSession() {
           </div>
 
           <div className="flex gap-2">
-            <Button type="button" variant="outline" className="flex-1 h-11"
+            <Button type="button" variant="outline" className="flex-1 h-12 text-base"
               onClick={() => navigate({ to: "/sessions/$sessionId", params: { sessionId } })}>
               Cancel
             </Button>
-            <Button type="submit" disabled={busy} className="flex-1 h-11">
+            <Button type="submit" disabled={busy} className="flex-1 h-12 text-base">
               {busy ? "Saving..." : "Save changes"}
             </Button>
           </div>

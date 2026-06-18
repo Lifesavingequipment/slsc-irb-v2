@@ -336,11 +336,11 @@ function MembersPageInner({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by name or phone"
-                className="pl-9 h-9"
+                className="pl-9 h-11"
               />
             </div>
             <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="h-9 w-[140px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-11 w-[140px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All roles</SelectItem>
                 <SelectItem value="coach">Coach</SelectItem>
@@ -408,8 +408,8 @@ function MembersPageInner({
               </div>
               {isAdmin && (
                 <div className="mt-3 grid grid-cols-2 gap-2">
-                  <Button size="sm" onClick={() => setStatus(m, "approved")}>Approve</Button>
-                  <Button size="sm" variant="outline" onClick={() => setStatus(m, "rejected")}>Reject</Button>
+                  <Button size="sm" className="h-11 text-sm" onClick={() => setStatus(m, "approved")}>Approve</Button>
+                  <Button size="sm" variant="outline" className="h-11 text-sm" onClick={() => setStatus(m, "rejected")}>Reject</Button>
                 </div>
               )}
             </Card>

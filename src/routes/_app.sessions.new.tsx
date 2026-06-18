@@ -348,7 +348,7 @@ function NewSession() {
             <div className="space-y-1.5">
               <Label>Type</Label>
               <Select value={type} onValueChange={(v) => setType(v as typeof type)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="training">Training</SelectItem>
                   <SelectItem value="fitness">Fitness</SelectItem>
@@ -360,7 +360,7 @@ function NewSession() {
             <div className="space-y-1.5">
               <Label>Format</Label>
               <Select value={format} onValueChange={(v) => setFormat(v as typeof format)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="team">Team</SelectItem>
                   <SelectItem value="individual">Individual</SelectItem>
@@ -614,7 +614,7 @@ function NewSession() {
             <Textarea id="notes" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
 
-          <Button type="submit" disabled={busy} className="w-full h-11">
+          <Button type="submit" disabled={busy} className="w-full h-12 text-base">
             {busy ? "Creating..." : "Create session"}
           </Button>
         </form>

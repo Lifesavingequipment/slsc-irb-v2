@@ -200,7 +200,7 @@ function SessionsList() {
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`whitespace-nowrap px-3.5 py-1.5 text-sm font-medium rounded-full transition-colors ${
+            className={`whitespace-nowrap px-4 py-2 min-h-[36px] text-sm font-medium rounded-full transition-colors ${
               tab === t ? "bg-card border border-border shadow-sm text-foreground" : "bg-muted text-muted-foreground"
             }`}
           >{TAB_LABELS[t]}</button>

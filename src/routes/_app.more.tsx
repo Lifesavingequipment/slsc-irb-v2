@@ -43,7 +43,8 @@ function MorePage() {
   const canManage = useCanManage();
 
   return (
-    <AppShell title="More">
+    <AppShell>
+      <h1 className="text-2xl font-bold mb-4">More</h1>
       <Card className="rounded-xl border bg-white divide-y overflow-hidden">
         {canManage && <MoreRow icon={Users} label="Members" to="/members" />}
         <MoreRow icon={Settings} label="Settings" to="/settings" />

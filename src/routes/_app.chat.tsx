@@ -5,6 +5,7 @@ import { useClub, useCanManage } from "@/lib/club-context";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -439,7 +440,7 @@ function ChatPage() {
                   key={ch.id}
                   type="button"
                   onClick={() => openChannel(ch.id)}
-                  className={`w-full text-left px-4 py-3 border-b hover:bg-muted/40 transition-colors flex items-start gap-3 ${
+                  className={`w-full text-left px-4 py-4 border-b hover:bg-muted/40 transition-colors flex items-start gap-3 ${
                     activeChannelId === ch.id ? "bg-muted/60" : ""
                   }`}
                 >
@@ -510,7 +511,7 @@ function ChatPage() {
                             <AvatarFallback className="text-[10px]">{initials(msg.senderName ?? "?")}</AvatarFallback>
                           </Avatar>
                         )}
-                        <div className={`max-w-[75%] ${isMe ? "items-end" : "items-start"} flex flex-col`}>
+                        <div className={`max-w-[80%] sm:max-w-[70%] ${isMe ? "items-end" : "items-start"} flex flex-col`}>
                           {!isMe && (
                             <span className="text-[10px] text-muted-foreground mb-0.5 px-1">{msg.senderName}</span>
                           )}
@@ -540,12 +541,13 @@ function ChatPage() {
               </ScrollArea>
 
               {/* Input */}
-              <div className="px-4 py-3 border-t shrink-0 flex gap-2">
-                <Input
+              <div className="px-4 py-3 border-t shrink-0 flex gap-2 items-end">
+                <Textarea
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
                   placeholder="Type a message…"
-                  className="flex-1 h-10"
+                  className="flex-1 min-h-[44px] max-h-[120px] overflow-y-auto resize-none"
+                  rows={1}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendMessage(); } }}
                 />
                 <Button
