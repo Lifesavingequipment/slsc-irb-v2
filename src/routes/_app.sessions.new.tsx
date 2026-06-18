@@ -133,6 +133,11 @@ function NewSession() {
   const [surveyTemplates, setSurveyTemplates] = useState<{ id: string; name: string; questions: DraftQ[] }[]>([]);
   const [carpoolTemplates, setCarpoolTemplates] = useState<{ id: string; name: string; vehicles: { vehicle_name: string; available_seats: number; can_tow_trailer: boolean }[] }[]>([]);
 
+  const handleStartsAtChange = (next: string) => {
+    setEndsAt((prevEnds) => (prevEnds === "" || prevEnds === startsAt ? next : prevEnds));
+    setStartsAt(next);
+  };
+
   const occurrenceCount = useMemo(() => {
     if (repeat === "none" || !startsAt || !repeatUntil) return 1;
     try {
@@ -370,6 +375,7 @@ function NewSession() {
               value={location}
               onChange={setLocation}
               onLocationIdChange={setLocationId}
+              valueId={locationId}
               clubId={activeClub?.club_id}
               placeholder="Type address or place name"
             />
@@ -379,7 +385,7 @@ function NewSession() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="starts">Starts</Label>
-              <DateTimeFields id="starts" required value={startsAt} onChange={setStartsAt} invalid={!!errors.starts_at} />
+              <DateTimeFields id="starts" required value={startsAt} onChange={handleStartsAtChange} invalid={!!errors.starts_at} />
               {errors.starts_at && <p className="text-xs text-destructive">{errors.starts_at}</p>}
             </div>
             <div className="space-y-1.5">

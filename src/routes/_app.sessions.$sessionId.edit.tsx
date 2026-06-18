@@ -194,6 +194,11 @@ function EditSession() {
     return <AppShell><div className="py-12 text-center text-sm text-muted-foreground">Loading…</div></AppShell>;
   }
 
+  const handleStartsAtChange = (next: string) => {
+    setEndsAt((prevEnds) => (prevEnds === "" || prevEnds === startsAt ? next : prevEnds));
+    setStartsAt(next);
+  };
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -376,6 +381,7 @@ function EditSession() {
               value={location}
               onChange={setLocation}
               onLocationIdChange={setLocationId}
+              valueId={locationId}
               clubId={clubId ?? activeClub?.club_id}
               placeholder="Type address or place name"
             />
@@ -384,7 +390,7 @@ function EditSession() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="starts">Starts</Label>
-              <DateTimeFields id="starts" required value={startsAt} onChange={setStartsAt} invalid={!!errors.starts_at} />
+              <DateTimeFields id="starts" required value={startsAt} onChange={handleStartsAtChange} invalid={!!errors.starts_at} />
               {errors.starts_at && <p className="text-xs text-destructive">{errors.starts_at}</p>}
             </div>
             <div className="space-y-1.5">

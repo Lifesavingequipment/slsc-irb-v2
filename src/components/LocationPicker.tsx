@@ -34,6 +34,8 @@ type Props = {
    * address is used). Lets forms that track a `location_id` FK keep it in sync.
    */
   onLocationIdChange?: (id: string | null) => void;
+  /** Id of the currently selected saved location, when the consuming form tracks one. */
+  valueId?: string | null;
 };
 
 /**
@@ -51,6 +53,7 @@ export function LocationPicker({
   id,
   className,
   onLocationIdChange,
+  valueId,
 }: Props) {
   const { user } = useAuth();
   const [locations, setLocations] = useState<SavedLocation[]>([]);
@@ -119,7 +122,10 @@ export function LocationPicker({
     };
   }, [clubId]);
 
-  const selected = locations.find((l) => formatLocation(l) === value) ?? null;
+  const selected =
+    valueId !== undefined
+      ? locations.find((l) => l.id === valueId) ?? null
+      : locations.find((l) => formatLocation(l) === value) ?? null;
 
   const pickSaved = (l: SavedLocation) => {
     setSavePrompt(null);
