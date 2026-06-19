@@ -139,12 +139,10 @@ function Onboarding() {
         .eq("club_id", clubId)
         .maybeSingle();
       if (!existingMember) {
-        const { data: existingProfile } = await supabase
-          .from("members")
-          .select("first_name, last_name, email, phone")
-          .eq("auth_user_id", user.id)
-          .not("club_id", "eq", clubId)
-          .maybeSingle();
+        const { data: nameData } = await supabase
+          .rpc("get_user_display_name", { p_user_id: user.id });
+
+        const existingProfile = nameData as { first_name: string; last_name: string; email: string } | null;
 
         let firstName: string | null;
         let lastName: string | null;
@@ -166,7 +164,6 @@ function Onboarding() {
           first_name: firstName,
           last_name: lastName,
           email,
-          phone: existingProfile?.phone ?? undefined,
           membership_status: "pending",
         });
       }
