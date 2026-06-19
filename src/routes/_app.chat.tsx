@@ -29,6 +29,7 @@ import {
   Paperclip,
   SmilePlus,
   X,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -56,6 +57,10 @@ type Message = {
   edited_at?: string | null;
   deleted_at?: string | null;
   reply_to_id?: string | null;
+  attachment_url?: string | null;
+  attachment_name?: string | null;
+  attachment_type?: string | null;
+  attachment_size?: number | null;
   senderName?: string;
   replyToBody?: string;
   replyToSender?: string;
@@ -135,6 +140,16 @@ function ChatPage() {
   const [reactions, setReactions] = useState<Record<string, ReactionGroup[]>>({});
   const [typingNames, setTypingNames] = useState<string[]>([]);
   const [lastReadBy, setLastReadBy] = useState<string[]>([]);
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Message[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const bottomRef = useRef<HTMLDivElement>(null);
   const unreadDividerRef = useRef<HTMLDivElement>(null);
   const realtimeRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -284,7 +299,9 @@ function ChatPage() {
     async (channelId: string, lastReadAt?: string | null) => {
       const { data: msgs } = await supabase
         .from("chat_messages")
-        .select("id, sender_id, body, created_at, edited_at, deleted_at, reply_to_id")
+        .select(
+          "id, sender_id, body, created_at, edited_at, deleted_at, reply_to_id, attachment_url, attachment_name, attachment_type, attachment_size",
+        )
         .eq("channel_id", channelId)
         .order("created_at", { ascending: true })
         .limit(200);
@@ -423,6 +440,10 @@ function ChatPage() {
                 edited_at: string | null;
                 deleted_at: string | null;
                 reply_to_id: string | null;
+                attachment_url: string | null;
+                attachment_name: string | null;
+                attachment_type: string | null;
+                attachment_size: number | null;
               };
               let senderName = "Unknown";
               if (msg.sender_id) {
@@ -661,6 +682,20 @@ function ChatPage() {
     void loadReadReceipts(lastMine.id);
   }, [messages, myMemberId, loadReadReceipts]);
 
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAttachmentFile(file);
+    if (file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = (ev) => setAttachmentPreview(ev.target?.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setAttachmentPreview(null);
+    }
+    e.target.value = "";
+  }
+
   const sendMessage = async () => {
     if (!body.trim() || !activeChannelId || !myMemberId) return;
     setSending(true);
@@ -668,6 +703,36 @@ function ChatPage() {
     const replyTo = replyingTo;
     setBody("");
     setReplyingTo(null);
+
+    let attachmentUrl: string | null = null;
+    let attachmentName: string | null = null;
+    let attachmentType: string | null = null;
+    let attachmentSize: number | null = null;
+    if (attachmentFile) {
+      setUploading(true);
+      const ext = attachmentFile.name.split(".").pop();
+      const path = `${activeChannelId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("chat-attachments")
+        .upload(path, attachmentFile, { contentType: attachmentFile.type });
+      if (upErr) {
+        toast.error("Upload failed: " + upErr.message);
+        setUploading(false);
+        setSending(false);
+        return;
+      }
+      const { data: signed } = await supabase.storage
+        .from("chat-attachments")
+        .createSignedUrl(path, 60 * 60 * 24 * 365);
+      attachmentUrl = signed?.signedUrl ?? null;
+      attachmentName = attachmentFile.name;
+      attachmentType = attachmentFile.type.startsWith("image/") ? "image" : "file";
+      attachmentSize = attachmentFile.size;
+      setUploading(false);
+      setAttachmentFile(null);
+      setAttachmentPreview(null);
+    }
+
     const { data: inserted, error } = await supabase
       .from("chat_messages")
       .insert({
@@ -675,8 +740,14 @@ function ChatPage() {
         sender_id: myMemberId,
         body: trimmed,
         reply_to_id: replyTo?.id ?? null,
+        attachment_url: attachmentUrl,
+        attachment_name: attachmentName,
+        attachment_type: attachmentType,
+        attachment_size: attachmentSize,
       })
-      .select("id, sender_id, body, created_at, edited_at, deleted_at, reply_to_id")
+      .select(
+        "id, sender_id, body, created_at, edited_at, deleted_at, reply_to_id, attachment_url, attachment_name, attachment_type, attachment_size",
+      )
       .single();
     setSending(false);
     if (error) {
@@ -701,6 +772,44 @@ function ChatPage() {
       );
     }
   };
+
+  async function searchMessages(q: string) {
+    if (!q.trim() || !activeChannelId) {
+      setSearchResults([]);
+      return;
+    }
+    setSearchLoading(true);
+    const { data } = await supabase
+      .from("chat_messages")
+      .select("id, sender_id, body, created_at, edited_at, deleted_at, reply_to_id")
+      .eq("channel_id", activeChannelId)
+      .is("deleted_at", null)
+      .ilike("body", `%${q}%`)
+      .order("created_at", { ascending: false })
+      .limit(20);
+    setSearchLoading(false);
+    setSearchResults((data ?? []) as Message[]);
+  }
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void searchMessages(searchQuery);
+    }, 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, activeChannelId]);
+
+  function jumpToMessage(msgId: string) {
+    setSearchOpen(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    const el = messageRefs.current[msgId];
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("bg-yellow-100", "dark:bg-yellow-900/30");
+      setTimeout(() => el.classList.remove("bg-yellow-100", "dark:bg-yellow-900/30"), 2000);
+    }
+  }
 
   const openNewChat = async () => {
     if (!activeClub) return;
@@ -903,8 +1012,61 @@ function ChatPage() {
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </button>
-                <div className="font-semibold text-sm truncate">{activeChannel?.name ?? ""}</div>
+                <div className="font-semibold text-sm truncate flex-1">
+                  {activeChannel?.name ?? ""}
+                </div>
+                <button
+                  type="button"
+                  className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted shrink-0"
+                  onClick={() => setSearchOpen(true)}
+                >
+                  <Search className="h-4 w-4" />
+                </button>
               </div>
+
+              {/* Search panel */}
+              {searchOpen && (
+                <div className="border-b bg-background px-4 py-3 space-y-2 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <input
+                      autoFocus
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search messages..."
+                      className="flex-1 bg-transparent text-sm outline-none"
+                    />
+                    <button
+                      onClick={() => {
+                        setSearchOpen(false);
+                        setSearchQuery("");
+                        setSearchResults([]);
+                      }}
+                      className="text-muted-foreground text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {searchLoading && <p className="text-xs text-muted-foreground">Searching...</p>}
+                  {searchResults.length > 0 && (
+                    <div className="max-h-48 overflow-y-auto space-y-1">
+                      {searchResults.map((r) => (
+                        <button
+                          key={r.id}
+                          onClick={() => jumpToMessage(r.id)}
+                          className="w-full text-left px-2 py-1.5 rounded hover:bg-muted text-sm"
+                        >
+                          <p className="truncate">{r.body}</p>
+                          <p className="text-xs text-muted-foreground">{fmtTime(r.created_at)}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {!searchLoading && searchQuery.trim() && searchResults.length === 0 && (
+                    <p className="text-xs text-muted-foreground">No messages found</p>
+                  )}
+                </div>
+              )}
 
               {/* Messages */}
               <ScrollArea className="flex-1 px-4 py-3">
@@ -924,7 +1086,12 @@ function ChatPage() {
                     const isEditing = editingId === msg.id;
 
                     return (
-                      <div key={msg.id}>
+                      <div
+                        key={msg.id}
+                        ref={(el) => {
+                          messageRefs.current[msg.id] = el;
+                        }}
+                      >
                         {msg.id === firstUnreadId && (
                           <div ref={unreadDividerRef} className="flex items-center gap-2 my-3">
                             <div className="flex-1 h-px bg-border" />
@@ -1022,6 +1189,32 @@ function ChatPage() {
                                 )}
                               </div>
                             )}
+                            {msg.attachment_url &&
+                              !msg.deleted_at &&
+                              (msg.attachment_type === "image" ? (
+                                <img
+                                  src={msg.attachment_url}
+                                  className="mt-1 max-w-[200px] rounded-lg cursor-pointer object-cover"
+                                  onClick={() => setLightboxUrl(msg.attachment_url!)}
+                                />
+                              ) : (
+                                <a
+                                  href={msg.attachment_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`mt-1 flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg border ${isMe ? "border-white/30 text-white" : "border-border text-foreground"}`}
+                                >
+                                  <Paperclip className="h-3 w-3 shrink-0" />
+                                  <span className="truncate max-w-[150px]">
+                                    {msg.attachment_name}
+                                  </span>
+                                  <span className="shrink-0 opacity-60">
+                                    {msg.attachment_size
+                                      ? `${(msg.attachment_size / 1024).toFixed(0)}KB`
+                                      : ""}
+                                  </span>
+                                </a>
+                              ))}
                             {!isDeleted && reactions[msg.id]?.length > 0 && (
                               <div
                                 className={`flex flex-wrap gap-1 mt-1 ${isMe ? "justify-end" : "justify-start"}`}
@@ -1086,6 +1279,34 @@ function ChatPage() {
                 </div>
               )}
 
+              {/* Attachment preview */}
+              {attachmentFile && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-muted mx-4 mb-1 rounded-lg">
+                  {attachmentPreview ? (
+                    <img src={attachmentPreview} className="h-12 w-12 object-cover rounded" />
+                  ) : (
+                    <div className="h-12 w-12 bg-muted-foreground/20 rounded flex items-center justify-center">
+                      <Paperclip className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm truncate">{attachmentFile.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(attachmentFile.size / 1024).toFixed(0)} KB
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setAttachmentFile(null);
+                      setAttachmentPreview(null);
+                    }}
+                    className="text-muted-foreground hover:text-foreground p-1"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
               {/* Typing indicator */}
               {typingNames.length > 0 && (
                 <div className="px-4 pb-1 text-xs text-muted-foreground flex items-center gap-1">
@@ -1115,9 +1336,24 @@ function ChatPage() {
                 className="px-4 py-3 border-t bg-background shrink-0 flex gap-2 items-end"
                 style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}
               >
-                <Button size="icon" variant="ghost" className="h-10 w-10 shrink-0" disabled>
-                  <Paperclip className="h-4 w-4" />
-                </Button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="h-10 w-10 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors shrink-0"
+                  disabled={uploading}
+                >
+                  {uploading ? (
+                    <span className="animate-spin">⏳</span>
+                  ) : (
+                    <Paperclip className="h-4 w-4" />
+                  )}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept="image/*,.pdf,.doc,.docx,.txt"
+                  onChange={handleFileSelect}
+                />
                 <Textarea
                   value={body}
                   onChange={(e) => {
@@ -1264,6 +1500,17 @@ function ChatPage() {
             {renderActionRows(actionMsg, true)}
           </div>
         </>
+      )}
+
+      {/* Lightbox */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <img src={lightboxUrl} className="max-w-full max-h-full object-contain" />
+          <button className="absolute top-4 right-4 text-white text-2xl">✕</button>
+        </div>
       )}
     </AppShell>
   );
