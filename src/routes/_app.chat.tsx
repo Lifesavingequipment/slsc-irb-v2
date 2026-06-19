@@ -973,7 +973,7 @@ function ChatPage() {
 
   return (
     <AppShell>
-      <div className="flex h-[calc(100dvh-3.5rem-3.5rem)] md:h-[calc(100dvh-3.5rem-2rem)] -mx-4 md:-mx-6 -mt-4 md:-mt-6 mb-0 md:-mb-8 overflow-hidden rounded-none md:rounded-xl border bg-background">
+      <div className="fixed md:relative inset-x-0 top-[56px] bottom-[56px] md:inset-auto md:h-[calc(100dvh-3.5rem-2rem)] md:-mx-6 md:-mt-6 md:-mb-8 overflow-hidden md:rounded-xl border bg-background flex">
         {/* Left panel — channel list */}
         <div
           className={`flex flex-col w-full md:w-72 border-r shrink-0 ${showThread ? "hidden md:flex" : "flex"}`}
