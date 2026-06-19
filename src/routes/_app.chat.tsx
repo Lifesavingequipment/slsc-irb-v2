@@ -973,7 +973,7 @@ function ChatPage() {
 
   return (
     <AppShell>
-      <div className="flex h-[calc(100vh-7rem)] md:h-[calc(100vh-6rem)] -mx-4 md:-mx-6 -mt-4 md:-mt-6 overflow-hidden rounded-none md:rounded-xl border bg-background">
+      <div className="flex h-[calc(100dvh-7rem)] md:h-[calc(100dvh-6rem)] -mx-4 md:-mx-6 -mt-4 md:-mt-6 -mb-24 md:-mb-8 overflow-hidden rounded-none md:rounded-xl border bg-background">
         {/* Left panel — channel list */}
         <div
           className={`flex flex-col w-full md:w-72 border-r shrink-0 ${showThread ? "hidden md:flex" : "flex"}`}
@@ -987,7 +987,7 @@ function ChatPage() {
             )}
           </div>
 
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 min-h-0">
             {loading ? (
               <div className="p-4 text-sm text-muted-foreground text-center">Loading…</div>
             ) : channels.length === 0 ? (
@@ -1064,7 +1064,7 @@ function ChatPage() {
           ) : (
             <>
               {/* Thread header */}
-              <div className="flex items-center gap-3 px-4 py-3 border-b bg-background shrink-0 shadow-sm sticky top-0 z-10">
+              <div className="flex items-center gap-3 px-4 py-3 border-b bg-background shrink-0 shadow-sm">
                 <button
                   type="button"
                   className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted"
@@ -1139,7 +1139,7 @@ function ChatPage() {
               )}
 
               {/* Messages */}
-              <ScrollArea className="flex-1 px-4 py-3">
+              <ScrollArea className="flex-1 min-h-0 px-4 py-3">
                 <div>
                   {messages.length === 0 && (
                     <div className="text-center text-sm text-muted-foreground py-8">
