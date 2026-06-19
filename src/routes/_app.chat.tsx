@@ -63,6 +63,8 @@ type Message = {
 
 type ClubMember = { id: string; name: string };
 
+type ReactionGroup = { emoji: string; memberIds: string[]; names: string[] };
+
 function initials(name: string) {
   return (
     name
@@ -130,12 +132,19 @@ function ChatPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBody, setEditBody] = useState("");
   const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
+  const [reactions, setReactions] = useState<Record<string, ReactionGroup[]>>({});
+  const [typingNames, setTypingNames] = useState<string[]>([]);
+  const [lastReadBy, setLastReadBy] = useState<string[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const unreadDividerRef = useRef<HTMLDivElement>(null);
   const realtimeRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFiredRef = useRef(false);
   const initialScrollDoneRef = useRef(false);
+  const messageIdsRef = useRef<string[]>([]);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
   // Load self
   useEffect(() => {
@@ -241,52 +250,125 @@ function ChatPage() {
     loadChannels();
   }, [loadChannels]);
 
-  const loadMessages = useCallback(async (channelId: string, lastReadAt?: string | null) => {
-    const { data: msgs } = await supabase
-      .from("chat_messages")
-      .select("id, sender_id, body, created_at, edited_at, deleted_at, reply_to_id")
-      .eq("channel_id", channelId)
-      .order("created_at", { ascending: true })
-      .limit(200);
-
-    if (!msgs) return [];
-
-    // Fetch sender names
-    const senderIds = [...new Set(msgs.map((m) => m.sender_id).filter(Boolean) as string[])];
-    const nameMap: Record<string, string> = {};
-    if (senderIds.length > 0) {
-      const { data: senders } = await supabase
-        .from("members")
-        .select("id, first_name, last_name, preferred_name")
-        .in("id", senderIds);
-      (senders ?? []).forEach((s) => {
-        nameMap[s.id] =
-          s.preferred_name || [s.first_name, s.last_name].filter(Boolean).join(" ") || "Unknown";
-      });
+  const loadReactionsForMessages = useCallback(async (msgIds: string[]) => {
+    if (!msgIds.length) return;
+    const { data } = await supabase
+      .from("message_reactions")
+      .select("message_id, emoji, member_id, member:members(first_name, last_name, preferred_name)")
+      .in("message_id", msgIds);
+    if (!data) return;
+    const grouped: Record<string, ReactionGroup[]> = {};
+    for (const r of data) {
+      if (!grouped[r.message_id]) grouped[r.message_id] = [];
+      const existing = grouped[r.message_id].find((g) => g.emoji === r.emoji);
+      const member = r.member as {
+        preferred_name?: string;
+        first_name?: string;
+        last_name?: string;
+      } | null;
+      const name =
+        member?.preferred_name ||
+        [member?.first_name, member?.last_name].filter(Boolean).join(" ") ||
+        "Unknown";
+      if (existing) {
+        existing.memberIds.push(r.member_id);
+        existing.names.push(name);
+      } else {
+        grouped[r.message_id].push({ emoji: r.emoji, memberIds: [r.member_id], names: [name] });
+      }
     }
-
-    const byId = new Map(msgs.map((m) => [m.id, m]));
-    const built: Message[] = msgs.map((m) => {
-      const replyTo = m.reply_to_id ? byId.get(m.reply_to_id) : undefined;
-      return {
-        ...m,
-        senderName: m.sender_id ? (nameMap[m.sender_id] ?? "Unknown") : "System",
-        replyToBody: replyTo?.body,
-        replyToSender: replyTo
-          ? replyTo.sender_id
-            ? (nameMap[replyTo.sender_id] ?? "Unknown")
-            : "System"
-          : undefined,
-      };
-    });
-
-    const firstUnread = lastReadAt
-      ? built.find((m) => new Date(m.created_at).getTime() > new Date(lastReadAt).getTime())
-      : undefined;
-    setFirstUnreadId(firstUnread?.id ?? null);
-    setMessages(built);
-    return built;
+    setReactions(grouped);
   }, []);
+
+  const loadMessages = useCallback(
+    async (channelId: string, lastReadAt?: string | null) => {
+      const { data: msgs } = await supabase
+        .from("chat_messages")
+        .select("id, sender_id, body, created_at, edited_at, deleted_at, reply_to_id")
+        .eq("channel_id", channelId)
+        .order("created_at", { ascending: true })
+        .limit(200);
+
+      if (!msgs) return [];
+
+      // Fetch sender names
+      const senderIds = [...new Set(msgs.map((m) => m.sender_id).filter(Boolean) as string[])];
+      const nameMap: Record<string, string> = {};
+      if (senderIds.length > 0) {
+        const { data: senders } = await supabase
+          .from("members")
+          .select("id, first_name, last_name, preferred_name")
+          .in("id", senderIds);
+        (senders ?? []).forEach((s) => {
+          nameMap[s.id] =
+            s.preferred_name || [s.first_name, s.last_name].filter(Boolean).join(" ") || "Unknown";
+        });
+      }
+
+      const byId = new Map(msgs.map((m) => [m.id, m]));
+      const built: Message[] = msgs.map((m) => {
+        const replyTo = m.reply_to_id ? byId.get(m.reply_to_id) : undefined;
+        return {
+          ...m,
+          senderName: m.sender_id ? (nameMap[m.sender_id] ?? "Unknown") : "System",
+          replyToBody: replyTo?.body,
+          replyToSender: replyTo
+            ? replyTo.sender_id
+              ? (nameMap[replyTo.sender_id] ?? "Unknown")
+              : "System"
+            : undefined,
+        };
+      });
+
+      const firstUnread = lastReadAt
+        ? built.find((m) => new Date(m.created_at).getTime() > new Date(lastReadAt).getTime())
+        : undefined;
+      setFirstUnreadId(firstUnread?.id ?? null);
+      setMessages(built);
+      void loadReactionsForMessages(built.map((m) => m.id));
+      return built;
+    },
+    [loadReactionsForMessages],
+  );
+
+  const toggleReaction = useCallback(
+    async (messageId: string, emoji: string) => {
+      if (!myMemberId) return;
+      const myReaction = reactions[messageId]?.find(
+        (r) => r.emoji === emoji && r.memberIds.includes(myMemberId),
+      );
+      if (myReaction) {
+        await supabase
+          .from("message_reactions")
+          .delete()
+          .eq("message_id", messageId)
+          .eq("member_id", myMemberId)
+          .eq("emoji", emoji);
+      } else {
+        await supabase
+          .from("message_reactions")
+          .insert({ message_id: messageId, member_id: myMemberId, emoji });
+      }
+    },
+    [myMemberId, reactions],
+  );
+
+  const loadReadReceipts = useCallback(
+    async (msgId: string) => {
+      const { data } = await supabase
+        .from("message_reads")
+        .select("member_id, member:members(first_name, preferred_name)")
+        .eq("message_id", msgId)
+        .neq("member_id", myMemberId ?? "");
+      setLastReadBy(
+        (data ?? []).map((r) => {
+          const m = r.member as { preferred_name?: string; first_name?: string } | null;
+          return m?.preferred_name || m?.first_name || "Someone";
+        }),
+      );
+    },
+    [myMemberId],
+  );
 
   const markRead = useCallback(
     async (channelId: string) => {
@@ -298,8 +380,17 @@ function ChatPage() {
         .eq("channel_id", channelId)
         .eq("member_id", myMemberId);
       setChannels((prev) => prev.map((c) => (c.id === channelId ? { ...c, unread: 0 } : c)));
+      if (messages.length > 0) {
+        const latestId = messages[messages.length - 1].id;
+        await supabase
+          .from("message_reads")
+          .upsert(
+            { message_id: latestId, member_id: myMemberId, read_at: now },
+            { onConflict: "message_id,member_id" },
+          );
+      }
     },
-    [myMemberId],
+    [myMemberId, messages],
   );
 
   // Subscribe to realtime changes for a channel. Uses a wildcard event ('*') so
@@ -385,13 +476,28 @@ function ChatPage() {
             }
           },
         )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "message_reactions" },
+          () => {
+            void loadReactionsForMessages(messageIdsRef.current);
+          },
+        )
+        .on("presence", { event: "sync" }, () => {
+          const state = ch.presenceState<{ name: string; typing: boolean }>();
+          const typing = Object.values(state)
+            .flat()
+            .filter((p) => p.typing && p.name !== myMemberName)
+            .map((p) => p.name);
+          setTypingNames(typing);
+        })
         .subscribe((status, err) => {
           console.log(`[chat] realtime status for chat-${channelId}:`, status, err ?? "");
         });
 
       realtimeRef.current = ch;
     },
-    [markRead, loadChannels],
+    [markRead, loadChannels, loadReactionsForMessages, myMemberName],
   );
 
   const openChannel = useCallback(
@@ -439,6 +545,7 @@ function ChatPage() {
     return () => {
       if (realtimeRef.current) void supabase.removeChannel(realtimeRef.current);
       if (longPressTimer.current) clearTimeout(longPressTimer.current);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
   }, []);
 
@@ -539,6 +646,20 @@ function ChatPage() {
     }
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, firstUnreadId]);
+
+  useEffect(() => {
+    messageIdsRef.current = messages.map((m) => m.id);
+  }, [messages]);
+
+  useEffect(() => {
+    if (!myMemberId || messages.length === 0) return;
+    const lastMine = [...messages].reverse().find((m) => m.sender_id === myMemberId);
+    if (!lastMine) {
+      setLastReadBy([]);
+      return;
+    }
+    void loadReadReceipts(lastMine.id);
+  }, [messages, myMemberId, loadReadReceipts]);
 
   const sendMessage = async () => {
     if (!body.trim() || !activeChannelId || !myMemberId) return;
@@ -649,6 +770,20 @@ function ChatPage() {
     const iconClass = compact ? "h-4 w-4" : "h-5 w-5";
     return (
       <>
+        <div className="flex justify-around mb-3 pb-3 border-b">
+          {REACTION_EMOJIS.map((emoji) => (
+            <button
+              key={emoji}
+              onClick={() => {
+                void toggleReaction(msg.id, emoji);
+                setActionMsg(null);
+              }}
+              className="text-2xl hover:scale-125 transition-transform active:scale-110 p-1"
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
         <button type="button" className={rowClass} onClick={() => copyMessage(msg)}>
           <Copy className={iconClass} /> Copy
         </button>
@@ -779,8 +914,10 @@ function ChatPage() {
                       No messages yet. Say hello!
                     </div>
                   )}
-                  {messages.map((msg, idx) => {
+                  {messages.map((msg, idx, arr) => {
                     const isMe = msg.sender_id === myMemberId;
+                    const isLastMine =
+                      isMe && !arr.slice(idx + 1).some((m) => m.sender_id === myMemberId);
                     const grouped = isGrouped(messages, idx);
                     const lastInGroup = isLastInGroup(messages, idx);
                     const isDeleted = !!msg.deleted_at;
@@ -885,6 +1022,39 @@ function ChatPage() {
                                 )}
                               </div>
                             )}
+                            {!isDeleted && reactions[msg.id]?.length > 0 && (
+                              <div
+                                className={`flex flex-wrap gap-1 mt-1 ${isMe ? "justify-end" : "justify-start"}`}
+                              >
+                                {reactions[msg.id].map((r) => {
+                                  const iMine = r.memberIds.includes(myMemberId ?? "");
+                                  return (
+                                    <button
+                                      key={r.emoji}
+                                      onClick={() => void toggleReaction(msg.id, r.emoji)}
+                                      title={r.names.join(", ")}
+                                      className={`flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full border transition-colors ${
+                                        iMine
+                                          ? "bg-[#FF6600]/10 border-[#FF6600] text-[#FF6600]"
+                                          : "bg-muted border-border text-foreground"
+                                      }`}
+                                    >
+                                      <span>{r.emoji}</span>
+                                      <span>{r.memberIds.length}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            {isLastMine && (
+                              <div className="text-[10px] text-muted-foreground mt-0.5 text-right">
+                                {lastReadBy.length === 0
+                                  ? "Delivered"
+                                  : `Read by ${lastReadBy.slice(0, 2).join(", ")}${
+                                      lastReadBy.length > 2 ? ` +${lastReadBy.length - 2}` : ""
+                                    }`}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -916,6 +1086,30 @@ function ChatPage() {
                 </div>
               )}
 
+              {/* Typing indicator */}
+              {typingNames.length > 0 && (
+                <div className="px-4 pb-1 text-xs text-muted-foreground flex items-center gap-1">
+                  <span className="flex gap-0.5">
+                    <span className="animate-bounce" style={{ animationDelay: "0ms" }}>
+                      •
+                    </span>
+                    <span className="animate-bounce" style={{ animationDelay: "150ms" }}>
+                      •
+                    </span>
+                    <span className="animate-bounce" style={{ animationDelay: "300ms" }}>
+                      •
+                    </span>
+                  </span>
+                  <span>
+                    {typingNames.length === 1
+                      ? `${typingNames[0]} is typing...`
+                      : typingNames.length === 2
+                        ? `${typingNames[0]} and ${typingNames[1]} are typing...`
+                        : "Several people are typing..."}
+                  </span>
+                </div>
+              )}
+
               {/* Input */}
               <div
                 className="px-4 py-3 border-t bg-background shrink-0 flex gap-2 items-end"
@@ -926,7 +1120,15 @@ function ChatPage() {
                 </Button>
                 <Textarea
                   value={body}
-                  onChange={(e) => setBody(e.target.value)}
+                  onChange={(e) => {
+                    setBody(e.target.value);
+                    if (!activeChannelId) return;
+                    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                    void realtimeRef.current?.track({ name: myMemberName, typing: true });
+                    typingTimeoutRef.current = setTimeout(() => {
+                      void realtimeRef.current?.track({ name: myMemberName, typing: false });
+                    }, 2000);
+                  }}
                   placeholder="Type a message…"
                   className="flex-1 min-h-[44px] max-h-[120px] overflow-y-auto resize-none"
                   rows={1}

@@ -2491,6 +2491,81 @@ export type Database = {
           },
         ]
       }
+      message_reactions: {
+        Row: {
+          created_at: string | null
+          emoji: string
+          id: string
+          member_id: string
+          message_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          emoji: string
+          id?: string
+          member_id: string
+          message_id: string
+        }
+        Update: {
+          created_at?: string | null
+          emoji?: string
+          id?: string
+          member_id?: string
+          message_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_reactions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_reactions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      message_reads: {
+        Row: {
+          id: string
+          member_id: string
+          message_id: string
+          read_at: string | null
+        }
+        Insert: {
+          id?: string
+          member_id: string
+          message_id: string
+          read_at?: string | null
+        }
+        Update: {
+          id?: string
+          member_id?: string
+          message_id?: string
+          read_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_reads_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_reads_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nipper_enrollments: {
         Row: {
           club_id: string
