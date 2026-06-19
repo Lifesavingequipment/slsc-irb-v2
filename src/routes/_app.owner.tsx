@@ -545,46 +545,51 @@ function MemberRow({ member, onSave }: { member: ClubMember; onSave: (patch: { r
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2 p-3">
-      <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium truncate">{member.first_name} {member.last_name}</div>
-        <div className="text-xs text-muted-foreground truncate">{member.email}</div>
+    <div className="flex flex-col gap-2 p-3">
+      {/* Row 1: name + status badge */}
+      <div className="flex items-center gap-2 min-w-0">
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium truncate">{member.first_name} {member.last_name}</div>
+          <div className="text-xs text-muted-foreground truncate">{member.email}</div>
+        </div>
+        <span className={`shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full ${statusColor[member.status] ?? "bg-gray-100 text-gray-700"}`}>
+          {member.status}
+        </span>
       </div>
 
-      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${statusColor[member.status] ?? "bg-gray-100 text-gray-700"}`}>
-        {member.status}
-      </span>
+      {/* Row 2: role select + status select + save button */}
+      <div className="flex items-center gap-2">
+        <Select value={role} onValueChange={setRole}>
+          <SelectTrigger className="h-7 w-[110px] text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {ROLES.map((r) => (
+              <SelectItem key={r} value={r} className="text-xs">{r === "club_admin" ? "Admin" : r.charAt(0).toUpperCase() + r.slice(1)}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-      <Select value={role} onValueChange={setRole}>
-        <SelectTrigger className="h-7 w-[110px] text-xs">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {ROLES.map((r) => (
-            <SelectItem key={r} value={r} className="text-xs">{r === "club_admin" ? "Admin" : r.charAt(0).toUpperCase() + r.slice(1)}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        <Select value={status} onValueChange={setStatus}>
+          <SelectTrigger className="h-7 w-[100px] text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUSES.map((s) => (
+              <SelectItem key={s} value={s} className="text-xs">{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-      <Select value={status} onValueChange={setStatus}>
-        <SelectTrigger className="h-7 w-[100px] text-xs">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {STATUSES.map((s) => (
-            <SelectItem key={s} value={s} className="text-xs">{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      <Button
-        size="sm"
-        className="h-7 px-3 text-xs"
-        disabled={!dirty || saving}
-        onClick={save}
-      >
-        {saving ? "Saving…" : "Save"}
-      </Button>
+        <Button
+          size="sm"
+          className="h-7 px-3 text-xs"
+          disabled={!dirty || saving}
+          onClick={save}
+        >
+          {saving ? "Saving…" : "Save"}
+        </Button>
+      </div>
     </div>
   );
 }
