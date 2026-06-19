@@ -85,6 +85,7 @@ function SessionsList() {
   const [myRsvps, setMyRsvps] = useState<Record<string, string>>(initial?.myRsvps ?? {});
   const [goingCounts, setGoingCounts] = useState<Record<string, number>>(initial?.goingCounts ?? {});
   const [loaded, setLoaded] = useState<boolean>(!!initial);
+  const [weatherMap, setWeatherMap] = useState<Record<string, { weather: unknown; waves: unknown; tides: unknown }>>({});
 
   const cancelledRef = useRef(false);
   const load = useCallback(async () => {
@@ -106,20 +107,26 @@ function SessionsList() {
     if (cancelledRef.current) return;
     const list = (data ?? []) as Row[];
     const ids = list.map((r) => r.id);
-    const [{ data: rsvps }, { data: counts }] = await Promise.all([
+    const [{ data: rsvps }, { data: counts }, { data: weatherData }] = await Promise.all([
       supabase.from("session_rsvps").select("session_id, status").eq("user_id", user.id),
       ids.length
         ? supabase.from("session_rsvps").select("session_id").in("session_id", ids).eq("status", "going")
         : Promise.resolve({ data: [] as { session_id: string }[] }),
+      ids.length
+        ? supabase.from("session_weather_cache").select("session_id, weather, waves, tides").in("session_id", ids)
+        : Promise.resolve({ data: [] as { session_id: string; weather: unknown; waves: unknown; tides: unknown }[] }),
     ]);
     if (cancelledRef.current) return;
     const map: Record<string, string> = {};
     (rsvps ?? []).forEach((r) => { map[r.session_id] = r.status; });
     const cmap: Record<string, number> = {};
     (counts ?? []).forEach((r) => { cmap[r.session_id] = (cmap[r.session_id] ?? 0) + 1; });
+    const wmap: Record<string, { weather: unknown; waves: unknown; tides: unknown }> = {};
+    (weatherData ?? []).forEach((w) => { wmap[w.session_id] = w; });
     setRows(list);
     setMyRsvps(map);
     setGoingCounts(cmap);
+    setWeatherMap(wmap);
     setLoaded(true);
     sessionsCache.set(cacheKey(activeClub.club_id, fetchTab), {
       rows: list, myRsvps: map, goingCounts: cmap,
@@ -271,6 +278,39 @@ function SessionsList() {
                     <Users className="h-3 w-3" /> {goingCounts[s.id] ?? 0} going
                   </span>
                 </div>
+                {tab !== "past" && weatherMap[s.id] && (() => {
+                  const wc = weatherMap[s.id];
+                  const weather = wc.weather as { emoji?: string; maxTemp?: number; windSpeed?: number; windDir?: string } | null;
+                  const waves = wc.waves as { heightMax?: number } | null;
+                  const tides = wc.tides as { type: string; height: number; time: string }[] | null;
+
+                  const hasWeather = weather?.maxTemp != null;
+                  const hasWaves = waves?.heightMax != null;
+                  const hasTides = tides && tides.length > 0;
+
+                  if (!hasWeather && !hasWaves && !hasTides) return null;
+
+                  const htEntries = tides?.filter((t) => t.type === "High") ?? [];
+                  const ltEntries = tides?.filter((t) => t.type === "Low") ?? [];
+
+                  return (
+                    <div className="mt-1 text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5">
+                      {hasWeather && (
+                        <span>{weather!.emoji} {weather!.maxTemp}°C · {weather!.windSpeed}km/h {weather!.windDir}</span>
+                      )}
+                      {hasWaves && (
+                        <span>🌊 {waves!.heightMax!.toFixed(1)}m</span>
+                      )}
+                      {hasTides && (
+                        <span>
+                          {htEntries.length > 0 && `HT: ${htEntries.map((t) => t.time).join(", ")}`}
+                          {htEntries.length > 0 && ltEntries.length > 0 && " · "}
+                          {ltEntries.length > 0 && `LT: ${ltEntries.map((t) => t.time).join(", ")}`}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
               </Card>
             </Link>
           ))}
