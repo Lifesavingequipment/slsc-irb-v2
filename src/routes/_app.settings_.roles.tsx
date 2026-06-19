@@ -28,13 +28,14 @@ export const Route = createFileRoute("/_app/settings_/roles")({
   component: RolesPage,
 });
 
-type ClubRole = "club_admin" | "coach" | "assistant_coach" | "member";
+type ClubRole = "club_admin" | "coach" | "assistant_coach" | "member" | "guardian";
 
 const ROLE_OPTIONS: { value: ClubRole; label: string }[] = [
   { value: "club_admin", label: "Club Admin" },
   { value: "coach", label: "Coach" },
   { value: "assistant_coach", label: "Asst. Coach" },
   { value: "member", label: "Member" },
+  { value: "guardian", label: "Guardian (view only)" },
 ];
 
 const PERM_TABS: { value: ClubRole; label: string }[] = [
@@ -228,6 +229,7 @@ function RolesPageInner({ clubId }: { clubId: string }) {
               <SelectItem value="coach">Coach</SelectItem>
               <SelectItem value="assistant_coach">Asst. coach</SelectItem>
               <SelectItem value="member">Member only</SelectItem>
+              <SelectItem value="guardian">Guardian</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -242,6 +244,7 @@ function RolesPageInner({ clubId }: { clubId: string }) {
               const isAdmin = m.roles.includes("club_admin");
               const isCoach = m.roles.includes("coach");
               const isAsst = m.roles.includes("assistant_coach");
+              const isGuardian = m.roles.includes("guardian");
               const isSelf = m.user_id === user?.id;
               return (
                 <div key={m.user_id} className="p-3 flex items-start gap-3">
@@ -261,7 +264,8 @@ function RolesPageInner({ clubId }: { clubId: string }) {
                       {isAdmin && <Badge className={`text-[10px] uppercase ${roleBadgeClass("club_admin")}`}>Club admin</Badge>}
                       {isCoach && <Badge className={`text-[10px] uppercase ${roleBadgeClass("coach")}`}>Coach</Badge>}
                       {isAsst && <Badge className={`text-[10px] uppercase ${roleBadgeClass("assistant_coach")}`}>Asst. coach</Badge>}
-                      {!isAdmin && !isCoach && !isAsst && (
+                      {isGuardian && <Badge className={`text-[10px] uppercase ${roleBadgeClass("guardian")}`}>Guardian</Badge>}
+                      {!isAdmin && !isCoach && !isAsst && !isGuardian && (
                         <Badge variant="secondary" className="text-[10px] uppercase">Member</Badge>
                       )}
                     </div>

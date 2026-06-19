@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { addDays, format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
-import { useClub, useCanManage, useIsAdmin } from "@/lib/club-context";
+import { useClub, useCanManage, useIsAdmin, useIsGuardian } from "@/lib/club-context";
 import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ function Dashboard() {
   const { activeClub } = useClub();
   const canManage = useCanManage();
   const isPlatformOwner = useIsPlatformOwner();
+  const isGuardian = useIsGuardian();
   const firstName = useMemberFirstName();
 
   const [upcoming, setUpcoming] = useState<Upcoming[]>([]);
@@ -40,6 +41,7 @@ function Dashboard() {
   const [myRsvps, setMyRsvps] = useState<Record<string, string>>({});
   const [rsvpSummary, setRsvpSummary] = useState<RsvpSummary>({});
   const [loaded, setLoaded] = useState(false);
+  const [guardianChildren, setGuardianChildren] = useState<{ id: string; name: string }[]>([]);
   // Next 7 days action summary
   const [next7, setNext7] = useState<{
     trainingCount: number;
@@ -121,6 +123,28 @@ function Dashboard() {
     // Surveys counter: all upcoming sessions with survey_enabled — mirrors the surveys-pending filter
     const surveysPending = list.filter((s) => s.survey_enabled).length;
     setNext7({ trainingCount, rsvpsPending, surveysPending });
+
+    if (isGuardian) {
+      const { data: me } = await supabase
+        .from("members")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .eq("club_id", activeClub.club_id)
+        .maybeSingle();
+      const myMemberId = me?.id;
+      if (myMemberId) {
+        const { data: links } = await supabase
+          .from("member_guardians")
+          .select("child_member_id, child:members(first_name, last_name, preferred_name)")
+          .eq("guardian_user_id", user.id)
+          .eq("club_id", activeClub.club_id);
+        setGuardianChildren((links ?? []).map((l) => {
+          const c = l.child as { first_name?: string; last_name?: string; preferred_name?: string };
+          return { id: l.child_member_id, name: c.preferred_name || [c.first_name, c.last_name].filter(Boolean).join(" ") || "Child" };
+        }));
+      }
+    }
+
     setLoaded(true);
   };
 
@@ -129,6 +153,7 @@ function Dashboard() {
     setUpcoming([]); setMemberCount(null); setPendingCount(null);
     setMyRsvps({}); setRsvpSummary({}); setLoaded(false);
     setNext7({ trainingCount: 0, rsvpsPending: 0, surveysPending: 0 });
+    setGuardianChildren([]);
     refreshAll();
   }, [activeClub?.club_id, user?.id]);
 
@@ -189,6 +214,13 @@ function Dashboard() {
       </div>
 
       <TodayConditionsCard />
+
+      {isGuardian && guardianChildren.length > 0 && (
+        <Card className="p-4 rounded-xl mb-4 bg-[#FF6600]/5 border-[#FF6600]/20">
+          <p className="text-sm text-muted-foreground">Viewing as guardian of</p>
+          <p className="font-semibold">{guardianChildren.map((c) => c.name).join(", ")}</p>
+        </Card>
+      )}
 
       {canManage && pendingCount !== null && pendingCount > 0 && (
         <Card className="mb-4 p-4 rounded-xl border-l-4 border-l-warning border-warning/20 bg-warning/5">

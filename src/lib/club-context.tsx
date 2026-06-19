@@ -6,7 +6,7 @@ export interface ClubMembership {
   club_id: string;
   status: "pending" | "approved" | "rejected";
   club: { id: string; name: string; location: string | null };
-  roles: ("owner" | "club_admin" | "coach" | "member")[];
+  roles: ("owner" | "club_admin" | "coach" | "member" | "guardian")[];
 }
 
 interface ClubContextValue {
@@ -113,4 +113,10 @@ export function useIsAdmin() {
   if (isPlatformOwner) return true;
   if (!activeClub) return false;
   return activeClub.roles.some((r) => r === "owner" || r === "club_admin");
+}
+
+export function useIsGuardian() {
+  const { activeClub } = useClub();
+  if (!activeClub) return false;
+  return activeClub.roles.some((r) => r === "guardian");
 }

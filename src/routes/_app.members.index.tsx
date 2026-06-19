@@ -782,7 +782,108 @@ function MemberRow({ row, displayName, partnerName, roles, canManage, canRemove,
       {isExpanded && isAdmin && isOwnerRole && (
         <div className="mt-2 text-[10px] uppercase text-muted-foreground">Owner role is locked</div>
       )}
+      {isExpanded && canManage && activeClubId && (
+        <GuardiansSection clubId={activeClubId} childMemberId={row.id} />
+      )}
     </Card>
+  );
+}
+
+function GuardiansSection({ clubId, childMemberId }: { clubId: string; childMemberId: string }) {
+  const [links, setLinks] = useState<{ guardian_user_id: string; name: string }[]>([]);
+  const [available, setAvailable] = useState<{ user_id: string; name: string }[]>([]);
+  const [picking, setPicking] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data: linkRows } = await supabase
+      .from("member_guardians")
+      .select("guardian_user_id")
+      .eq("child_member_id", childMemberId);
+    const guardianIds = (linkRows ?? []).map((r) => r.guardian_user_id);
+
+    const { data: roleRows } = await supabase
+      .from("club_roles")
+      .select("user_id")
+      .eq("club_id", clubId)
+      .eq("role", "guardian");
+    const allGuardianIds = Array.from(new Set([...guardianIds, ...(roleRows ?? []).map((r) => r.user_id)]));
+
+    const { data: gMembers } = allGuardianIds.length
+      ? await supabase.from("members")
+          .select("auth_user_id, first_name, last_name, preferred_name")
+          .eq("club_id", clubId)
+          .in("auth_user_id", allGuardianIds)
+      : { data: [] as { auth_user_id: string | null; first_name: string | null; last_name: string | null; preferred_name: string | null }[] };
+    const nameOf = new Map(
+      (gMembers ?? []).map((m) => [m.auth_user_id, m.preferred_name || [m.first_name, m.last_name].filter(Boolean).join(" ") || "Guardian"]),
+    );
+
+    setLinks(guardianIds.map((id) => ({ guardian_user_id: id, name: nameOf.get(id) ?? "Guardian" })));
+    setAvailable(
+      (roleRows ?? [])
+        .map((r) => ({ user_id: r.user_id, name: nameOf.get(r.user_id) ?? "Guardian" }))
+        .filter((g) => !guardianIds.includes(g.user_id)),
+    );
+    setLoading(false);
+  }, [clubId, childMemberId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const linkGuardian = async (guardianUserId: string) => {
+    setPicking(false);
+    const { error } = await supabase.from("member_guardians")
+      .insert({ club_id: clubId, guardian_user_id: guardianUserId, child_member_id: childMemberId });
+    if (error) { toast.error(error.message); return; }
+    load();
+  };
+
+  const removeGuardian = async (guardianUserId: string) => {
+    const { error } = await supabase.from("member_guardians")
+      .delete()
+      .eq("guardian_user_id", guardianUserId)
+      .eq("child_member_id", childMemberId);
+    if (error) { toast.error(error.message); return; }
+    load();
+  };
+
+  if (loading) return null;
+
+  return (
+    <div className="mt-3 pt-3 border-t">
+      <div className="text-xs text-muted-foreground mb-1.5">Guardians:</div>
+      <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+        {links.length === 0 ? (
+          <span className="text-xs text-muted-foreground italic">None linked</span>
+        ) : (
+          links.map((l) => (
+            <Badge key={l.guardian_user_id} variant="secondary" className="text-[10px] gap-1 pr-1">
+              {l.name}
+              <button type="button" onClick={() => removeGuardian(l.guardian_user_id)} className="hover:text-destructive">
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))
+        )}
+      </div>
+      {picking ? (
+        <Select onValueChange={linkGuardian}>
+          <SelectTrigger className="h-8 text-xs w-48"><SelectValue placeholder="Choose guardian" /></SelectTrigger>
+          <SelectContent>
+            {available.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-muted-foreground">No guardians available</div>
+            ) : available.map((g) => (
+              <SelectItem key={g.user_id} value={g.user_id}>{g.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setPicking(true)}>
+          <UserPlus className="h-3 w-3 mr-1" /> Link guardian
+        </Button>
+      )}
+    </div>
   );
 }
 

@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { format, formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
-import { useCanManage, useIsAdmin, useClub } from "@/lib/club-context";
+import { useCanManage, useIsAdmin, useIsGuardian, useClub } from "@/lib/club-context";
 import { useConfirm } from "@/lib/confirm";
 import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
@@ -74,6 +74,7 @@ function SessionDetail() {
   const { activeClub } = useClub();
   const canManage = useCanManage();
   const isAdmin = useIsAdmin();
+  const isGuardian = useIsGuardian();
   const navigate = useNavigate();
   const confirm = useConfirm();
 
@@ -513,7 +514,7 @@ function SessionDetail() {
 
         <TabsContent value="rsvp" className="space-y-4 mt-4">
 
-          {session.survey_enabled && surveyStatus.required && !surveyStatus.complete && !canManage && user && (
+          {!isGuardian && session.survey_enabled && surveyStatus.required && !surveyStatus.complete && !canManage && user && (
             <SurveyRunner
               sessionId={sessionId}
               clubId={session.club_id}
@@ -522,31 +523,33 @@ function SessionDetail() {
             />
           )}
 
-          <Card className="p-4">
-            <div className="text-sm font-semibold mb-3">Your response</div>
-            <div className="grid grid-cols-3 gap-2">
-              {(["going", "maybe", "not_going"] as const).map((s) => {
-                const blocked = session.survey_enabled && surveyStatus.required && !surveyStatus.complete && !canManage;
-                return (
-                  <Button
-                    key={s}
-                    variant={myRsvp === s ? "default" : "outline"}
-                    disabled={busy || rsvpClosed || blocked}
-                    onClick={() => rsvp(s)}
-                    className="h-11"
-                  >
-                    {STATUS_LABELS[s]}
-                  </Button>
-                );
-              })}
-            </div>
-            {rsvpClosed && (
-              <p className="mt-2 text-xs text-muted-foreground">The RSVP deadline has passed.</p>
-            )}
-            {session.survey_enabled && surveyStatus.required && !surveyStatus.complete && !canManage && (
-              <p className="mt-2 text-xs text-warning">Complete the pre-training survey above before you can RSVP.</p>
-            )}
-          </Card>
+          {!isGuardian && (
+            <Card className="p-4">
+              <div className="text-sm font-semibold mb-3">Your response</div>
+              <div className="grid grid-cols-3 gap-2">
+                {(["going", "maybe", "not_going"] as const).map((s) => {
+                  const blocked = session.survey_enabled && surveyStatus.required && !surveyStatus.complete && !canManage;
+                  return (
+                    <Button
+                      key={s}
+                      variant={myRsvp === s ? "default" : "outline"}
+                      disabled={busy || rsvpClosed || blocked}
+                      onClick={() => rsvp(s)}
+                      className="h-11"
+                    >
+                      {STATUS_LABELS[s]}
+                    </Button>
+                  );
+                })}
+              </div>
+              {rsvpClosed && (
+                <p className="mt-2 text-xs text-muted-foreground">The RSVP deadline has passed.</p>
+              )}
+              {session.survey_enabled && surveyStatus.required && !surveyStatus.complete && !canManage && (
+                <p className="mt-2 text-xs text-warning">Complete the pre-training survey above before you can RSVP.</p>
+              )}
+            </Card>
+          )}
 
           <RsvpList title={`Going (${going.length})`} rows={going} tone="success"
             canManage={canManage} busy={busy} onSetStatus={setRsvpFor} nameOf={dn} />
@@ -601,7 +604,7 @@ function SessionDetail() {
                 />
                 {(isAdmin || perms.view_survey_results) && <SurveyResults sessionId={sessionId} />}
               </>
-            ) : user ? (
+            ) : user && !isGuardian ? (
               <SurveyRunner
                 sessionId={sessionId}
                 clubId={session.club_id}

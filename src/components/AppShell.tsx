@@ -4,7 +4,7 @@ import {
   ChevronDown, Wrench, LogOut, User as UserIcon, MessageSquare, Menu,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useClub, useCanManage } from "@/lib/club-context";
+import { useClub, useCanManage, useIsGuardian } from "@/lib/club-context";
 import { useAuth } from "@/lib/auth-context";
 import { signOutAndRedirect } from "@/lib/sign-out";
 import {
@@ -19,7 +19,14 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { useChatUnread } from "@/hooks/useChatUnread";
 import { useMemberFirstName } from "@/hooks/useMemberFirstName";
 
-function getNavItems(canManage: boolean) {
+function getNavItems(canManage: boolean, isGuardian: boolean) {
+  if (isGuardian) {
+    return [
+      { to: "/dashboard", label: "Home", icon: Home },
+      { to: "/sessions", label: "Sessions", icon: Calendar },
+      { to: "/more", label: "More", icon: Menu },
+    ] as const;
+  }
   return [
     { to: "/dashboard", label: "Home", icon: Home },
     { to: "/sessions", label: "Sessions", icon: Calendar },
@@ -37,7 +44,8 @@ export function AppShell({ title, action, children }: {
   const { activeClub, memberships, setActiveClubId } = useClub();
   const { user } = useAuth();
   const canManage = useCanManage();
-  const navItems = getNavItems(canManage);
+  const isGuardian = useIsGuardian();
+  const navItems = getNavItems(canManage, isGuardian);
   const chatUnread = useChatUnread();
   const location = useLocation();
   const firstName = useMemberFirstName();
@@ -233,7 +241,7 @@ export function AppShell({ title, action, children }: {
 
         {/* ── Mobile bottom tab bar (hidden on md+) ── */}
         <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-[#1e293b] safe-bottom">
-          <div className={`grid ${navItems.length === 5 ? "grid-cols-5" : "grid-cols-4"}`}>
+          <div className={`grid ${navItems.length === 5 ? "grid-cols-5" : navItems.length === 3 ? "grid-cols-3" : "grid-cols-4"}`}>
             {navItems.map((item) => {
               const active = location.pathname.startsWith(item.to);
               const Icon = item.icon;

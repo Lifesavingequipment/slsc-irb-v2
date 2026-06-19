@@ -13,6 +13,9 @@ export function roleBadgeClass(role: string): string {
   if (r === "member") {
     return "bg-gray-200 text-gray-700 hover:bg-gray-300";
   }
+  if (r === "guardian") {
+    return "bg-teal-600 text-white hover:bg-teal-700";
+  }
   if (r === "guest") {
     return "bg-gray-100 text-gray-500 hover:bg-gray-200";
   }
