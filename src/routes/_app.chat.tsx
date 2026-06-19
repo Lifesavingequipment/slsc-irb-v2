@@ -999,20 +999,23 @@ function ChatPage() {
                 const canDelete =
                   ch.type !== "main" && (canManage || ch.created_by === myMemberId);
                 return (
-                  <div key={ch.id} className="relative group">
+                  <div
+                    key={ch.id}
+                    className={`flex items-center border-b hover:bg-muted/40 transition-colors ${
+                      activeChannelId === ch.id ? "bg-muted/60" : ""
+                    }`}
+                  >
                     <button
                       type="button"
                       onClick={() => openChannel(ch.id)}
-                      className={`w-full text-left px-4 py-4 border-b hover:bg-muted/40 transition-colors flex items-start gap-3 ${
-                        activeChannelId === ch.id ? "bg-muted/60" : ""
-                      }`}
+                      className="flex-1 min-w-0 text-left px-4 py-4 flex items-start gap-3"
                     >
                       <div className="h-10 w-10 rounded-full bg-[#FF6600]/10 flex items-center justify-center shrink-0 text-[#FF6600]">
                         <MessageSquare className="h-4 w-4" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-1">
-                          <span className="text-sm font-semibold truncate pr-6">{ch.name}</span>
+                          <span className="text-sm font-semibold truncate">{ch.name}</span>
                           {ch.lastTime && (
                             <span className="text-[10px] text-muted-foreground shrink-0">
                               {fmtTime(ch.lastTime)}
@@ -1035,11 +1038,8 @@ function ChatPage() {
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="absolute top-3 right-3 h-7 w-7 text-destructive opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeletingChannelId(ch.id);
-                        }}
+                        className="h-8 w-8 mr-2 shrink-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => setDeletingChannelId(ch.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
