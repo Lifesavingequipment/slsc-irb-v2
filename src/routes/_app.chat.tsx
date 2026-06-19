@@ -30,6 +30,7 @@ import {
   SmilePlus,
   X,
   Search,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -43,6 +44,7 @@ type Channel = {
   id: string;
   name: string;
   type: string;
+  created_by?: string | null;
   lastMessage?: string;
   lastTime?: string;
   unread: number;
@@ -149,6 +151,9 @@ function ChatPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Message[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [deletingChannelId, setDeletingChannelId] = useState<string | null>(null);
+  const [membersChannelId, setMembersChannelId] = useState<string | null>(null);
+  const [channelMembers, setChannelMembers] = useState<{ id: string; name: string }[]>([]);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const bottomRef = useRef<HTMLDivElement>(null);
   const unreadDividerRef = useRef<HTMLDivElement>(null);
@@ -194,7 +199,7 @@ function ChatPage() {
       // Load channels I'm in
       const { data: cm, error: cmErr } = await supabase
         .from("chat_members")
-        .select("channel_id, last_read_at, channel:chat_channels(id, name, type)")
+        .select("channel_id, last_read_at, channel:chat_channels(id, name, type, created_by)")
         .eq("member_id", myMemberId);
 
       if (cmErr) {
@@ -232,11 +237,17 @@ function ChatPage() {
       const unreadResults = await Promise.all(unreadPromises);
 
       const built: Channel[] = cm.map((r, i) => {
-        const ch = r.channel as unknown as { id: string; name: string; type: string };
+        const ch = r.channel as unknown as {
+          id: string;
+          name: string;
+          type: string;
+          created_by: string | null;
+        };
         return {
           id: ch.id,
           name: ch.name,
           type: ch.type,
+          created_by: ch.created_by,
           lastMessage: msgResults[i].data?.body ?? undefined,
           lastTime: msgResults[i].data?.created_at ?? undefined,
           unread: unreadResults[i].count ?? 0,
@@ -264,6 +275,40 @@ function ChatPage() {
   useEffect(() => {
     loadChannels();
   }, [loadChannels]);
+
+  async function deleteChannel(channelId: string) {
+    await supabase.from("chat_messages").delete().eq("channel_id", channelId);
+    await supabase.from("chat_members").delete().eq("channel_id", channelId);
+    await supabase.from("chat_channels").delete().eq("id", channelId);
+    if (activeChannelId === channelId) {
+      setActiveChannelId(null);
+      setShowThread(false);
+    }
+    setDeletingChannelId(null);
+    loadChannels();
+  }
+
+  async function loadChannelMembers(channelId: string) {
+    const { data } = await supabase
+      .from("chat_members")
+      .select("member_id, member:members(id, first_name, last_name, preferred_name)")
+      .eq("channel_id", channelId);
+    setChannelMembers(
+      (data ?? []).map((r) => {
+        const m = r.member as {
+          id: string;
+          first_name?: string;
+          last_name?: string;
+          preferred_name?: string;
+        };
+        return {
+          id: m.id,
+          name: m.preferred_name || [m.first_name, m.last_name].filter(Boolean).join(" ") || "Unknown",
+        };
+      }),
+    );
+    setMembersChannelId(channelId);
+  }
 
   const loadReactionsForMessages = useCallback(async (msgIds: string[]) => {
     if (!msgIds.length) return;
@@ -950,40 +995,58 @@ function ChatPage() {
                 No conversations yet
               </div>
             ) : (
-              channels.map((ch) => (
-                <button
-                  key={ch.id}
-                  type="button"
-                  onClick={() => openChannel(ch.id)}
-                  className={`w-full text-left px-4 py-4 border-b hover:bg-muted/40 transition-colors flex items-start gap-3 ${
-                    activeChannelId === ch.id ? "bg-muted/60" : ""
-                  }`}
-                >
-                  <div className="h-10 w-10 rounded-full bg-[#FF6600]/10 flex items-center justify-center shrink-0 text-[#FF6600]">
-                    <MessageSquare className="h-4 w-4" />
+              channels.map((ch) => {
+                const canDelete =
+                  ch.type !== "main" && (canManage || ch.created_by === myMemberId);
+                return (
+                  <div key={ch.id} className="relative group">
+                    <button
+                      type="button"
+                      onClick={() => openChannel(ch.id)}
+                      className={`w-full text-left px-4 py-4 border-b hover:bg-muted/40 transition-colors flex items-start gap-3 ${
+                        activeChannelId === ch.id ? "bg-muted/60" : ""
+                      }`}
+                    >
+                      <div className="h-10 w-10 rounded-full bg-[#FF6600]/10 flex items-center justify-center shrink-0 text-[#FF6600]">
+                        <MessageSquare className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-sm font-semibold truncate pr-6">{ch.name}</span>
+                          {ch.lastTime && (
+                            <span className="text-[10px] text-muted-foreground shrink-0">
+                              {fmtTime(ch.lastTime)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between gap-1 mt-0.5">
+                          <span className="text-xs text-muted-foreground truncate">
+                            {ch.lastMessage ?? "No messages yet"}
+                          </span>
+                          {ch.unread > 0 && (
+                            <Badge className="shrink-0 h-5 min-w-5 rounded-full text-[10px] px-2 bg-[#FF6600] text-white">
+                              {ch.unread}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                    {canDelete && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="absolute top-3 right-3 h-7 w-7 text-destructive opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeletingChannelId(ch.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="text-sm font-semibold truncate">{ch.name}</span>
-                      {ch.lastTime && (
-                        <span className="text-[10px] text-muted-foreground shrink-0">
-                          {fmtTime(ch.lastTime)}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between gap-1 mt-0.5">
-                      <span className="text-xs text-muted-foreground truncate">
-                        {ch.lastMessage ?? "No messages yet"}
-                      </span>
-                      {ch.unread > 0 && (
-                        <Badge className="shrink-0 h-5 min-w-5 rounded-full text-[10px] px-2 bg-[#FF6600] text-white">
-                          {ch.unread}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              ))
+                );
+              })
             )}
           </ScrollArea>
         </div>
@@ -1015,6 +1078,13 @@ function ChatPage() {
                 <div className="font-semibold text-sm truncate flex-1">
                   {activeChannel?.name ?? ""}
                 </div>
+                <button
+                  type="button"
+                  className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted shrink-0"
+                  onClick={() => activeChannelId && void loadChannelMembers(activeChannelId)}
+                >
+                  <Users className="h-4 w-4" />
+                </button>
                 <button
                   type="button"
                   className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted shrink-0"
@@ -1511,6 +1581,66 @@ function ChatPage() {
           <img src={lightboxUrl} className="max-w-full max-h-full object-contain" />
           <button className="absolute top-4 right-4 text-white text-2xl">✕</button>
         </div>
+      )}
+
+      {/* Delete channel confirmation */}
+      {deletingChannelId && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4"
+          onClick={() => setDeletingChannelId(null)}
+        >
+          <div
+            className="bg-white dark:bg-background rounded-xl shadow-xl max-w-sm w-full p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-semibold text-base mb-1">
+              Delete &apos;{channels.find((c) => c.id === deletingChannelId)?.name ?? ""}&apos;?
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              This will permanently delete all messages in this conversation.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setDeletingChannelId(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => void deleteChannel(deletingChannelId)}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Channel members panel */}
+      {membersChannelId && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-50" onClick={() => setMembersChannelId(null)} />
+          <div className="fixed bottom-0 left-0 w-full max-h-[60vh] bg-background rounded-t-2xl shadow-xl z-50 p-4 overflow-y-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-sm">Members</h3>
+              <button
+                type="button"
+                className="h-7 w-7 flex items-center justify-center rounded-full hover:bg-muted"
+                onClick={() => setMembersChannelId(null)}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-1">
+              {channelMembers.map((m) => (
+                <div key={m.id} className="flex items-center gap-3 px-1 py-2">
+                  <Avatar className="h-8 w-8 shrink-0">
+                    <AvatarFallback className="text-xs">{initials(m.name)}</AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm truncate">{m.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
       )}
     </AppShell>
   );
