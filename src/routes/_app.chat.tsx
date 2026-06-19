@@ -989,7 +989,7 @@ function ChatPage() {
         </div>
 
         {/* Right panel — message thread */}
-        <div className={`flex flex-col flex-1 min-w-0 ${showThread ? "flex" : "hidden md:flex"}`}>
+        <div className={`flex flex-col flex-1 min-w-0 overflow-hidden ${showThread ? "flex" : "hidden md:flex"}`}>
           {!activeChannelId ? (
             <div className="flex-1 flex items-center justify-center">
               <EmptyState
