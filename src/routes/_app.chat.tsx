@@ -973,7 +973,7 @@ function ChatPage() {
 
   return (
     <AppShell>
-      <div className="flex h-[calc(100dvh-7rem)] md:h-[calc(100dvh-6rem)] -mx-4 md:-mx-6 -mt-4 md:-mt-6 -mb-24 md:-mb-8 overflow-hidden rounded-none md:rounded-xl border bg-background">
+      <div className="flex h-[calc(100dvh-3.5rem-3.5rem)] md:h-[calc(100dvh-3.5rem-2rem)] -mx-4 md:-mx-6 -mt-4 md:-mt-6 mb-0 md:-mb-8 overflow-hidden rounded-none md:rounded-xl border bg-background">
         {/* Left panel — channel list */}
         <div
           className={`flex flex-col w-full md:w-72 border-r shrink-0 ${showThread ? "hidden md:flex" : "flex"}`}
@@ -1404,7 +1404,7 @@ function ChatPage() {
               {/* Input */}
               <div
                 className="px-4 py-3 border-t bg-background shrink-0 flex gap-2 items-end"
-                style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}
+                style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
               >
                 <button
                   onClick={() => fileInputRef.current?.click()}
