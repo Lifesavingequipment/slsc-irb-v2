@@ -1001,7 +1001,7 @@ function ChatPage() {
           ) : (
             <>
               {/* Thread header */}
-              <div className="flex items-center gap-3 px-4 py-3 border-b bg-background shrink-0 shadow-sm">
+              <div className="flex items-center gap-3 px-4 py-3 border-b bg-background shrink-0 shadow-sm sticky top-0 z-10">
                 <button
                   type="button"
                   className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted"
