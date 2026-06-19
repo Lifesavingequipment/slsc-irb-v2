@@ -1004,7 +1004,7 @@ function ChatPage() {
               <div className="flex items-center gap-3 px-4 py-3 border-b bg-muted/30 shrink-0">
                 <button
                   type="button"
-                  className="md:hidden h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted"
+                  className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted"
                   onClick={() => {
                     setShowThread(false);
                     setActiveChannelId(null);
