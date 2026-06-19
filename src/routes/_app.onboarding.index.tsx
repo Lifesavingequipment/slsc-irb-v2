@@ -139,16 +139,34 @@ function Onboarding() {
         .eq("club_id", clubId)
         .maybeSingle();
       if (!existingMember) {
-        const fullName: string = (user.user_metadata?.full_name as string | undefined) ?? "";
-        const spaceIdx = fullName.indexOf(" ");
-        const firstName = spaceIdx > 0 ? fullName.slice(0, spaceIdx) : fullName || null;
-        const lastName = spaceIdx > 0 ? fullName.slice(spaceIdx + 1) : null;
+        const { data: existingProfile } = await supabase
+          .from("members")
+          .select("first_name, last_name, email, phone")
+          .eq("auth_user_id", user.id)
+          .not("club_id", "eq", clubId)
+          .maybeSingle();
+
+        let firstName: string | null;
+        let lastName: string | null;
+        let email: string;
+        if (existingProfile) {
+          firstName = existingProfile.first_name;
+          lastName = existingProfile.last_name;
+          email = existingProfile.email ?? user.email ?? "";
+        } else {
+          const fullName: string = (user.user_metadata?.full_name as string | undefined) ?? "";
+          const spaceIdx = fullName.indexOf(" ");
+          firstName = spaceIdx > 0 ? fullName.slice(0, spaceIdx) : fullName || null;
+          lastName = spaceIdx > 0 ? fullName.slice(spaceIdx + 1) : null;
+          email = user.email ?? "";
+        }
         await supabase.from("members").insert({
           club_id: clubId,
           auth_user_id: user.id,
           first_name: firstName,
           last_name: lastName,
-          email: user.email ?? "",
+          email,
+          phone: existingProfile?.phone ?? undefined,
           membership_status: "pending",
         });
       }

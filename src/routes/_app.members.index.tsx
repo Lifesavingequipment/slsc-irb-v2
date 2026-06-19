@@ -119,13 +119,28 @@ function MembersPage() {
     const representedUserIds = new Set(nextRows.map((r) => r.user_id));
     for (const mem of mems ?? []) {
       if (mem.status === "pending" && !representedUserIds.has(mem.user_id)) {
+        // Look up their profile from members table in any club so they don't show as "Unnamed"
+        const { data: existingProfile } = await supabase
+          .from("members")
+          .select("first_name, last_name, email")
+          .eq("auth_user_id", mem.user_id)
+          .maybeSingle();
+
         nextRows.push({
           id: mem.id,
           membership_id: mem.id,
           user_id: mem.user_id,
           status: "pending",
-          email: null,
-          profile: null,
+          email: existingProfile?.email ?? null,
+          profile: existingProfile ? {
+            first_name: existingProfile.first_name,
+            last_name: existingProfile.last_name,
+            preferred_name: null,
+            phone: null,
+            driver_flag: false,
+            crew_flag: false,
+            patient_flag: false,
+          } : null,
         });
       }
     }
