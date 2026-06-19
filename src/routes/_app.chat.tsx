@@ -928,7 +928,7 @@ function ChatPage() {
 
   return (
     <AppShell>
-      <div className="flex h-[calc(100vh-8rem)] md:h-[calc(100vh-6rem)] -mx-4 md:-mx-6 -mt-4 md:-mt-6 overflow-hidden rounded-none md:rounded-xl border bg-background">
+      <div className="flex h-[calc(100vh-7rem)] md:h-[calc(100vh-6rem)] -mx-4 md:-mx-6 -mt-4 md:-mt-6 overflow-hidden rounded-none md:rounded-xl border bg-background">
         {/* Left panel — channel list */}
         <div
           className={`flex flex-col w-full md:w-72 border-r shrink-0 ${showThread ? "hidden md:flex" : "flex"}`}
@@ -1001,7 +1001,7 @@ function ChatPage() {
           ) : (
             <>
               {/* Thread header */}
-              <div className="flex items-center gap-3 px-4 py-3 border-b bg-muted/30 shrink-0">
+              <div className="flex items-center gap-3 px-4 py-3 border-b bg-background shrink-0 shadow-sm">
                 <button
                   type="button"
                   className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted"
