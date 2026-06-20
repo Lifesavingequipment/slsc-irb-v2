@@ -1,12 +1,21 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import {
-  Home, Calendar, Users, Settings,
-  ChevronDown, Wrench, LogOut, User as UserIcon, MessageSquare, Menu,
+  Home,
+  Calendar,
+  Users,
+  Settings,
+  ChevronDown,
+  Wrench,
+  LogOut,
+  User as UserIcon,
+  MessageSquare,
+  Menu,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useClub, useCanManage, useIsGuardian } from "@/lib/club-context";
 import { useAuth } from "@/lib/auth-context";
 import { signOutAndRedirect } from "@/lib/sign-out";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,7 +45,11 @@ function getNavItems(canManage: boolean, isGuardian: boolean) {
   ] as const;
 }
 
-export function AppShell({ title, action, children }: {
+export function AppShell({
+  title,
+  action,
+  children,
+}: {
   title?: string;
   action?: ReactNode;
   children: ReactNode;
@@ -49,8 +62,12 @@ export function AppShell({ title, action, children }: {
   const chatUnread = useChatUnread();
   const location = useLocation();
   const firstName = useMemberFirstName();
-  const approved = memberships.filter((m) => m.status === "approved");
-  const userInitial = firstName ? firstName[0].toUpperCase() : (user?.email ?? "?").trim().charAt(0).toUpperCase();
+  const approvedClubs = memberships.filter((m) => m.status === "approved");
+  const multiClub = approvedClubs.length > 1;
+  const userInitial = firstName
+    ? firstName[0].toUpperCase()
+    : (user?.email ?? "?").trim().charAt(0).toUpperCase();
+  const [clubSwitcherOpen, setClubSwitcherOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#f9fafb] flex">
@@ -70,20 +87,22 @@ export function AppShell({ title, action, children }: {
         </div>
 
         {/* Club switcher (multi-club only) */}
-        {approved.length > 1 && activeClub && (
+        {multiClub && activeClub && (
           <div className="px-3 pt-3 shrink-0">
             <DropdownMenu>
               <DropdownMenuTrigger className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-left">
                 <div className="flex-1 min-w-0">
                   <div className="text-white/50 text-[10px] uppercase tracking-wider">Club</div>
-                  <div className="text-white text-sm font-medium truncate">{activeClub.club.name}</div>
+                  <div className="text-white text-sm font-medium truncate">
+                    {activeClub.club.name}
+                  </div>
                 </div>
                 <ChevronDown className="h-3.5 w-3.5 text-white/50 shrink-0" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-52">
                 <DropdownMenuLabel>Switch club</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {approved.map((m) => (
+                {approvedClubs.map((m) => (
                   <DropdownMenuItem key={m.club_id} onSelect={() => setActiveClubId(m.club_id)}>
                     {m.club.name}
                   </DropdownMenuItem>
@@ -128,7 +147,9 @@ export function AppShell({ title, action, children }: {
               {userInitial}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-white text-xs font-medium truncate">{user?.email ?? "Account"}</div>
+              <div className="text-white text-xs font-medium truncate">
+                {user?.email ?? "Account"}
+              </div>
             </div>
           </div>
           <button
@@ -152,31 +173,29 @@ export function AppShell({ title, action, children }: {
                 <img src="/irb-logo.png" alt="Logo" className="h-9 w-9 rounded-lg object-cover" />
               </div>
               <div className="min-w-0">
-                {activeClub && approved.length > 1 ? (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger className="flex items-center gap-1 text-left max-w-full">
-                      <div className="min-w-0">
-                        <div className="text-[10px] uppercase tracking-wider opacity-70">Club</div>
-                        <div className="font-semibold truncate flex items-center gap-1">
-                          {activeClub.club.name}
-                          <ChevronDown className="h-3.5 w-3.5 opacity-70" />
-                        </div>
-                      </div>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      <DropdownMenuLabel>Switch club</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {approved.map((m) => (
-                        <DropdownMenuItem key={m.club_id} onSelect={() => setActiveClubId(m.club_id)}>
-                          {m.club.name}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                {multiClub ? (
+                  <button
+                    onClick={() => setClubSwitcherOpen(true)}
+                    className="flex items-center gap-1 text-left min-w-0"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-medium text-white/70 uppercase tracking-wide">
+                        CLUB
+                      </p>
+                      <p className="text-white font-bold text-base truncate leading-tight">
+                        {activeClub?.club.name}
+                      </p>
+                    </div>
+                    <ChevronDown className="h-4 w-4 text-white/70 shrink-0 mt-1" />
+                  </button>
                 ) : (
-                  <div>
-                    <div className="text-[10px] uppercase tracking-wider opacity-70">Club</div>
-                    <div className="font-semibold truncate">{activeClub?.club.name ?? "IRB Coaching"}</div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-medium text-white/70 uppercase tracking-wide">
+                      CLUB
+                    </p>
+                    <p className="text-white font-bold text-base truncate leading-tight">
+                      {activeClub?.club.name}
+                    </p>
                   </div>
                 )}
               </div>
@@ -218,7 +237,10 @@ export function AppShell({ title, action, children }: {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onSelect={(e) => { e.preventDefault(); void signOutAndRedirect(); }}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    void signOutAndRedirect();
+                  }}
                   className="cursor-pointer text-destructive focus:text-destructive"
                 >
                   <LogOut className="h-4 w-4 mr-2" /> Log out
@@ -241,7 +263,9 @@ export function AppShell({ title, action, children }: {
 
         {/* ── Mobile bottom tab bar (hidden on md+) ── */}
         <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-[#1e293b] safe-bottom">
-          <div className={`grid ${navItems.length === 5 ? "grid-cols-5" : navItems.length === 3 ? "grid-cols-3" : "grid-cols-4"}`}>
+          <div
+            className={`grid ${navItems.length === 5 ? "grid-cols-5" : navItems.length === 3 ? "grid-cols-3" : "grid-cols-4"}`}
+          >
             {navItems.map((item) => {
               const active = location.pathname.startsWith(item.to);
               const Icon = item.icon;
@@ -269,6 +293,64 @@ export function AppShell({ title, action, children }: {
           </div>
         </nav>
       </div>
+
+      {clubSwitcherOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/50 z-50"
+            onClick={() => setClubSwitcherOpen(false)}
+          />
+          {/* Sheet */}
+          <div className="fixed bottom-0 left-0 right-0 bg-background rounded-t-2xl shadow-xl z-50 p-4 pb-8">
+            <div className="w-10 h-1 bg-muted-foreground/30 rounded-full mx-auto mb-4" />
+            <h3 className="font-semibold text-base mb-3">Switch club</h3>
+            <div className="space-y-2">
+              {approvedClubs.map((club) => {
+                const isActive = club.club_id === activeClub?.club_id;
+                const role = club.roles[0] ?? "member";
+                const roleLabel =
+                  role === "owner" || role === "club_admin"
+                    ? "Admin"
+                    : role === "coach"
+                      ? "Coach"
+                      : role === "guardian"
+                        ? "Guardian"
+                        : "Member";
+                return (
+                  <button
+                    key={club.club_id}
+                    onClick={() => {
+                      setActiveClubId(club.club_id);
+                      setClubSwitcherOpen(false);
+                    }}
+                    className={cn(
+                      "w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-colors",
+                      isActive ? "border-[#FF6600] bg-[#FF6600]/5" : "border-border hover:bg-muted",
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "h-10 w-10 rounded-full flex items-center justify-center shrink-0 text-sm font-bold",
+                        isActive ? "bg-[#FF6600] text-white" : "bg-muted text-muted-foreground",
+                      )}
+                    >
+                      {club.club.name.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={cn("font-medium truncate", isActive && "text-[#FF6600]")}>
+                        {club.club.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{roleLabel}</p>
+                    </div>
+                    {isActive && <div className="h-2 w-2 rounded-full bg-[#FF6600] shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
