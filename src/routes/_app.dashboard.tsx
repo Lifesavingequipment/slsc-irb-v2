@@ -117,9 +117,9 @@ function Dashboard() {
     const list = (next7Sess.data ?? []) as { id: string; session_type: string; survey_enabled: boolean; starts_at: string }[];
     // Training count stays limited to next 7 days (matches "Next 7 days" section header)
     const trainingCount = list.filter((s) => s.session_type === "training" && s.starts_at <= in7Iso).length;
-    // RSVP counter: all upcoming sessions where user has no row in session_rsvps
+    // RSVP counter: upcoming sessions within the next 7 days where user has no row in session_rsvps
     const respondedIds = new Set(Object.keys(map));
-    const rsvpsPending = list.filter((s) => !respondedIds.has(s.id)).length;
+    const rsvpsPending = list.filter((s) => !respondedIds.has(s.id) && s.starts_at <= in7Iso).length;
     // Surveys counter: all upcoming sessions with survey_enabled — mirrors the surveys-pending filter
     const surveysPending = list.filter((s) => s.survey_enabled).length;
     setNext7({ trainingCount, rsvpsPending, surveysPending });

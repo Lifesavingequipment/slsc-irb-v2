@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { format, startOfWeek, endOfWeek, addWeeks } from "date-fns";
+import { format, startOfWeek, endOfWeek, addWeeks, addDays } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useClub, useCanManage } from "@/lib/club-context";
 import { useAuth } from "@/lib/auth-context";
@@ -175,7 +175,10 @@ function SessionsList() {
   // Apply filter from URL search params on top of the tab-derived list.
   const filteredRows = useMemo(() => {
     if (!filter) return visibleRows;
-    if (filter === "rsvp-pending") return visibleRows.filter((r) => !myRsvps[r.id]);
+    if (filter === "rsvp-pending") {
+      const in7Iso = addDays(new Date(), 7).toISOString();
+      return visibleRows.filter((r) => !myRsvps[r.id] && r.starts_at <= in7Iso);
+    }
     if (filter === "surveys-pending") return visibleRows.filter((r) => r.survey_enabled);
     return visibleRows;
   }, [visibleRows, filter, myRsvps]);
