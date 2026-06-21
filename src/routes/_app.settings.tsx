@@ -20,7 +20,7 @@ import {
 import { LocationsSection } from "@/components/settings/LocationsSection";
 import {
   LogOut, Plus, Trash2, ShieldAlert, HeartPulse, User, Mail, KeyRound,
-  Bell, MapPin, ChevronDown, MessageSquare, Check, Copy,
+  Bell, MapPin, ChevronDown, ChevronLeft, MessageSquare, Check, Copy,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -931,16 +931,32 @@ function SettingsPage() {
     return true;
   });
 
+  const deepLinkKey = section && (["profile", "email", "password", "notifications", "clubs", "locations"] as CollapsibleKey[]).includes(section as CollapsibleKey)
+    ? (section as CollapsibleKey)
+    : null;
+
   return (
     <AppShell>
-      <h1 className="text-2xl font-bold mb-1">Settings</h1>
-      <p className="text-xs text-muted-foreground mb-4">
-        Tap a section to expand.
-      </p>
+      {deepLinkKey ? (
+        <>
+          <button onClick={() => history.back()} className="flex items-center gap-1 text-sm text-muted-foreground mb-4">
+            <ChevronLeft className="h-4 w-4" /> Back
+          </button>
+          <h2 className="text-xl font-bold mb-4">{sectionMeta[deepLinkKey].title}</h2>
+          {renderBody(deepLinkKey)}
+        </>
+      ) : (
+        <>
+          <h1 className="text-2xl font-bold mb-1">Settings</h1>
+          <p className="text-xs text-muted-foreground mb-4">
+            Tap a section to expand.
+          </p>
 
-      <div className="space-y-3">
-        {visibleOrder.map((key) => renderSection(key))}
-      </div>
+          <div className="space-y-3">
+            {visibleOrder.map((key) => renderSection(key))}
+          </div>
+        </>
+      )}
 
       <FeedbackDialog
         open={feedbackOpen}
