@@ -549,15 +549,18 @@ function SessionDetail() {
       </Card>
 
       <Tabs defaultValue="rsvp" className="mt-4">
-        <TabsList className="flex overflow-x-auto w-full h-auto">
-          <TabsTrigger value="rsvp" className="text-xs flex-shrink-0 min-h-[40px] px-3">RSVPs</TabsTrigger>
-          <TabsTrigger value="plan" className="text-xs flex-shrink-0 min-h-[40px] px-3">Plan</TabsTrigger>
-          {session.survey_enabled && <TabsTrigger value="survey" className="text-xs flex-shrink-0 min-h-[40px] px-3">Survey</TabsTrigger>}
-          <TabsTrigger value="waves" className="text-xs flex-shrink-0 min-h-[40px] px-3">Waves</TabsTrigger>
-          <TabsTrigger value="gear" className="text-xs flex-shrink-0 min-h-[40px] px-3">Gear</TabsTrigger>
-          {(session.carpool_enabled || canManage) && <TabsTrigger value="carpool" className="text-xs flex-shrink-0 min-h-[40px] px-3">Carpool</TabsTrigger>}
-          <TabsTrigger value="attendance" className="text-xs flex-shrink-0 min-h-[40px] px-3">Attend</TabsTrigger>
-        </TabsList>
+        <div className="relative">
+          <TabsList className="flex overflow-x-auto scrollbar-hide w-full h-auto justify-start">
+            <TabsTrigger value="rsvp" className="text-xs flex-shrink-0 min-h-[40px] px-3">RSVPs</TabsTrigger>
+            <TabsTrigger value="plan" className="text-xs flex-shrink-0 min-h-[40px] px-3">Plan</TabsTrigger>
+            {session.survey_enabled && <TabsTrigger value="survey" className="text-xs flex-shrink-0 min-h-[40px] px-3">Survey</TabsTrigger>}
+            <TabsTrigger value="waves" className="text-xs flex-shrink-0 min-h-[40px] px-3">Waves</TabsTrigger>
+            <TabsTrigger value="gear" className="text-xs flex-shrink-0 min-h-[40px] px-3">Gear</TabsTrigger>
+            {(session.carpool_enabled || canManage) && <TabsTrigger value="carpool" className="text-xs flex-shrink-0 min-h-[40px] px-3">Carpool</TabsTrigger>}
+            <TabsTrigger value="attendance" className="text-xs flex-shrink-0 min-h-[40px] px-3">Attend</TabsTrigger>
+          </TabsList>
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-muted to-transparent" />
+        </div>
 
         <TabsContent value="rsvp" className="space-y-4 mt-4">
 
