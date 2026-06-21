@@ -20,7 +20,7 @@ import {
 import { LocationsSection } from "@/components/settings/LocationsSection";
 import {
   LogOut, Plus, Trash2, ShieldAlert, HeartPulse, User, Mail, KeyRound,
-  Bell, MapPin, ChevronDown, MessageSquare,
+  Bell, MapPin, ChevronDown, MessageSquare, Check, Copy,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -140,6 +140,11 @@ function SettingsPage() {
   } | null>(null);
   const [clubInfoBusy, setClubInfoBusy] = useState(false);
 
+  // Invite code (admin only)
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [inviteCodeBusy, setInviteCodeBusy] = useState(false);
+  const [inviteCopied, setInviteCopied] = useState(false);
+
   // Preferences
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   // All sections collapsed by default for a cleaner Settings landing.
@@ -213,7 +218,7 @@ function SettingsPage() {
   }, [user?.id, activeClubId]);
 
   useEffect(() => {
-    if (!activeClub || !isAdmin) { setClubInfo(null); return; }
+    if (!activeClub || !isAdmin) { setClubInfo(null); setInviteCode(null); return; }
     supabase.from("clubs")
       .select("club_name, contact_email, contact_phone, website, address, suburb, postcode, timezone")
       .eq("id", activeClub.club_id)
@@ -229,6 +234,16 @@ function SettingsPage() {
           postcode: data.postcode ?? "",
           timezone: data.timezone ?? "",
         });
+      });
+    supabase.from("club_invite_codes")
+      .select("code")
+      .eq("club_id", activeClub.club_id)
+      .eq("active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data: codeData }) => {
+        setInviteCode(codeData?.code ?? null);
       });
   }, [activeClub?.club_id, isAdmin]);
 
@@ -440,6 +455,30 @@ function SettingsPage() {
     setClubInfoBusy(false);
     if (error) toast.error("Failed to save: " + error.message);
     else { toast.success("Club information saved"); await refresh(); }
+  };
+
+  const regenerateInviteCode = async () => {
+    if (!activeClub) return;
+    setInviteCodeBusy(true);
+    // Deactivate existing codes
+    await supabase.from("club_invite_codes")
+      .update({ active: false })
+      .eq("club_id", activeClub.club_id);
+    // Generate new code
+    const newCode = "IRB-" + Math.random().toString(36).substring(2, 10).toUpperCase();
+    const { data } = await supabase.from("club_invite_codes")
+      .insert({ club_id: activeClub.club_id, code: newCode, active: true, created_by: user?.id })
+      .select("code").single();
+    setInviteCode(data?.code ?? newCode);
+    setInviteCodeBusy(false);
+    toast.success("New invite code generated");
+  };
+
+  const copyInviteCode = async () => {
+    if (!inviteCode) return;
+    await navigator.clipboard.writeText(inviteCode);
+    setInviteCopied(true);
+    setTimeout(() => setInviteCopied(false), 2000);
   };
 
   const sectionMeta: Record<SectionKey, { title: string; icon: React.ReactNode; subtitle?: string }> = useMemo(() => ({
@@ -854,6 +893,25 @@ function SettingsPage() {
                 <Button onClick={saveClubInfo} disabled={clubInfoBusy} className="w-full h-11">
                   {clubInfoBusy ? "Saving..." : "Save club information"}
                 </Button>
+              </div>
+            )}
+
+            {isAdmin && (
+              <div className="mt-4 space-y-3">
+                <h3 className="font-semibold text-sm">Invite code</h3>
+                <p className="text-xs text-muted-foreground">Share this code with new members. They enter it when joining to be added to your club.</p>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-muted rounded-lg px-4 py-3 font-mono text-lg font-bold tracking-widest text-center">
+                    {inviteCode ?? "—"}
+                  </div>
+                  <Button variant="outline" size="icon" className="h-12 w-12 shrink-0" onClick={copyInviteCode}>
+                    {inviteCopied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <Button variant="outline" className="w-full h-11" onClick={regenerateInviteCode} disabled={inviteCodeBusy}>
+                  {inviteCodeBusy ? "Generating..." : "↻ Generate new code"}
+                </Button>
+                <p className="text-xs text-muted-foreground">Generating a new code invalidates the old one.</p>
               </div>
             )}
           </div>

@@ -10,12 +10,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Waves, LogOut, Clock, CheckCircle2, Copy, Mail, Share2, Ticket, UserCog } from "lucide-react";
+import { Waves, LogOut, CheckCircle2, Copy, Mail, Share2, Ticket, UserCog } from "lucide-react";
 import { toast } from "sonner";
 import { SupportRequestDialog } from "@/components/SupportRequestDialog";
 import { AddressAutocomplete } from "@/components/settings/AddressAutocomplete";
 import { LocationPicker } from "@/components/LocationPicker";
-import { notifyJoinRequest } from "@/lib/notify";
 
 export const Route = createFileRoute("/_app/onboarding/")({
   head: () => ({ meta: [{ title: "Get started — IRB Coaching" }] }),
@@ -26,8 +25,6 @@ export const Route = createFileRoute("/_app/onboarding/")({
   component: Onboarding,
 });
 
-type ClubRow = { id: string; club_name: string; address: string | null };
-
 type CreatedClub = { id: string; name: string; inviteCode: string };
 
 function Onboarding() {
@@ -35,10 +32,10 @@ function Onboarding() {
   const { memberships, refresh } = useClub();
   const navigate = useNavigate();
   const search = Route.useSearch();
-  const [clubs, setClubs] = useState<ClubRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState<CreatedClub | null>(null);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [joinCode, setJoinCode] = useState("");
 
   // Create-club form
   const [name, setName] = useState("");
@@ -54,14 +51,6 @@ function Onboarding() {
       navigate({ to: "/dashboard", replace: true });
     }
   }, [memberships, navigate, created, search.add]);
-
-  useEffect(() => {
-    supabase.from("clubs").select("id, club_name, address").order("club_name").then(({ data }) => {
-      setClubs(data ?? []);
-    });
-  }, []);
-
-  const pendingIds = new Set(memberships.filter((m) => m.status === "pending").map((m) => m.club_id));
 
   const onCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,85 +93,17 @@ function Onboarding() {
     setCreated({ id: result.club_id, name: result.club_name, inviteCode: result.invite_code });
   };
 
-  const onRequestToJoin = async (clubId: string) => {
-    if (!user) return;
+  const redeemInviteCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !joinCode.trim()) return;
     setBusy(true);
-    const { data: existing } = await supabase
-      .from("club_memberships")
-      .select("status")
-      .eq("user_id", user.id)
-      .eq("club_id", clubId)
-      .maybeSingle();
-    let error = null;
-    let requested = false;
-    if (!existing) {
-      const res = await supabase.from("club_memberships").insert({
-        user_id: user.id, club_id: clubId, status: "pending", role: "member",
-      });
-      error = res.error;
-      requested = !res.error;
-    } else if (existing.status === "rejected") {
-      const res = await supabase
-        .from("club_memberships")
-        .update({ status: "pending" })
-        .eq("user_id", user.id)
-        .eq("club_id", clubId);
-      error = res.error;
-      requested = !res.error;
-    }
-    if (!error) {
-      // Ensure a members row exists so the admin's Pending tab can show this request
-      const { data: existingMember } = await supabase
-        .from("members")
-        .select("id")
-        .eq("auth_user_id", user.id)
-        .eq("club_id", clubId)
-        .maybeSingle();
-      if (!existingMember) {
-        const { data: nameData } = await supabase
-          .rpc("get_user_display_name", { p_user_id: user.id });
-
-        const existingProfile = nameData as { first_name: string; last_name: string; email: string } | null;
-
-        let firstName: string | null;
-        let lastName: string | null;
-        let email: string;
-        if (existingProfile) {
-          firstName = existingProfile.first_name;
-          lastName = existingProfile.last_name;
-          email = existingProfile.email ?? user.email ?? "";
-        } else {
-          const fullName: string = (user.user_metadata?.full_name as string | undefined) ?? "";
-          const spaceIdx = fullName.indexOf(" ");
-          firstName = spaceIdx > 0 ? fullName.slice(0, spaceIdx) : fullName || null;
-          lastName = spaceIdx > 0 ? fullName.slice(spaceIdx + 1) : null;
-          email = user.email ?? "";
-        }
-        await supabase.from("members").insert({
-          club_id: clubId,
-          auth_user_id: user.id,
-          first_name: firstName,
-          last_name: lastName,
-          email,
-          membership_status: "pending",
-        });
-      }
-
-      // Notify club admins of the new join request.
-      if (requested) {
-        const { data: m } = await supabase
-          .from("members")
-          .select("id, first_name, last_name")
-          .eq("auth_user_id", user.id)
-          .eq("club_id", clubId)
-          .maybeSingle();
-        if (m) void notifyJoinRequest(clubId, m);
-      }
-    }
+    const { error } = await supabase.rpc("redeem_club_invite_code", { _code: joinCode.trim().toUpperCase() });
     setBusy(false);
     if (error) { toast.error(error.message); return; }
-    toast.success("Request sent! A coach or admin will approve you shortly.");
+    toast.success("You've joined the club!");
+    setJoinCode("");
     await refresh();
+    navigate({ to: "/dashboard", replace: true });
   };
 
   if (created) {
@@ -250,32 +171,26 @@ function Onboarding() {
               <TabsTrigger value="create">Create a club</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="find" className="mt-4 space-y-2">
-              {clubs.length === 0 && (
-                <p className="text-sm text-muted-foreground py-6 text-center">
-                  No clubs yet. Create the first one.
-                </p>
-              )}
-              {clubs.map((c) => {
-                const pending = pendingIds.has(c.id);
-                return (
-                  <Card key={c.id} className="flex items-center justify-between rounded-xl border p-3">
-                    <div className="min-w-0">
-                      <div className="font-medium truncate">{c.club_name}</div>
-                      {c.address && <div className="text-xs text-muted-foreground truncate">{c.address}</div>}
-                    </div>
-                    {pending ? (
-                      <span className="text-xs flex items-center gap-1 text-warning-foreground bg-warning/30 px-2.5 py-1 rounded-full shrink-0">
-                        <Clock className="h-3 w-3" /> Request pending
-                      </span>
-                    ) : (
-                      <Button size="sm" variant="secondary" disabled={busy} onClick={() => onRequestToJoin(c.id)} className="shrink-0">
-                        Request to join
-                      </Button>
-                    )}
-                  </Card>
-                );
-              })}
+            <TabsContent value="find" className="mt-4 space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Enter your invite code to join a club. Ask a coach or admin at your club for the code.
+              </p>
+              <form onSubmit={redeemInviteCode} className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="join-code">Invite code</Label>
+                  <Input
+                    id="join-code"
+                    required
+                    value={joinCode}
+                    onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                    placeholder="IRB-XXXXXXXX"
+                    className="h-11 font-mono tracking-widest text-center"
+                  />
+                </div>
+                <Button type="submit" disabled={busy || !joinCode.trim()} className="w-full h-11">
+                  {busy ? "Joining…" : "Join club"}
+                </Button>
+              </form>
               {memberships.some((m) => m.status === "pending") && (
                 <p className="mt-3 text-xs text-muted-foreground flex items-center gap-1.5">
                   <CheckCircle2 className="h-3.5 w-3.5 text-success" />
