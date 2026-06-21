@@ -99,11 +99,24 @@ function RolesPageInner({ clubId }: { clubId: string }) {
     setLoading(true);
     const { data: memberData } = await supabase
       .from("members")
-      .select("id, auth_user_id, first_name, last_name, preferred_name, phone")
+      .select("id, auth_user_id, first_name, last_name, preferred_name, phone, membership_status")
       .eq("club_id", clubId)
-      .eq("membership_status", "active")
       .order("first_name");
-    const authIds = (memberData ?? []).map((m) => m.auth_user_id).filter(Boolean) as string[];
+
+    // club_memberships.status is the source of truth for approval; members.membership_status
+    // is a denormalized copy that can drift out of sync (e.g. approved elsewhere without the
+    // members row being updated), so fall back to it only when there's no membership row.
+    const { data: memberships } = await supabase
+      .from("club_memberships")
+      .select("user_id, status")
+      .eq("club_id", clubId);
+    const statusByUserId = new Map((memberships ?? []).map((x) => [x.user_id, x.status]));
+    const approvedMembers = (memberData ?? []).filter((m) => {
+      const status = (m.auth_user_id && statusByUserId.get(m.auth_user_id)) ?? m.membership_status;
+      return status === "approved" || status === "active";
+    });
+
+    const authIds = approvedMembers.map((m) => m.auth_user_id).filter(Boolean) as string[];
     const { data: r } = authIds.length
       ? await supabase.from("club_roles").select("user_id, role, is_primary_admin").eq("club_id", clubId).in("user_id", authIds)
       : { data: [] as { user_id: string; role: string; is_primary_admin: boolean }[] };
@@ -113,7 +126,7 @@ function RolesPageInner({ clubId }: { clubId: string }) {
       roleMap[x.user_id] = [...(roleMap[x.user_id] ?? []), x.role];
       if (x.is_primary_admin) adminMap[x.user_id] = true;
     });
-    const nextRows: Row[] = (memberData ?? []).map((m) => {
+    const nextRows: Row[] = approvedMembers.map((m) => {
       const key = m.auth_user_id ?? m.id;
       return {
         user_id: key,
