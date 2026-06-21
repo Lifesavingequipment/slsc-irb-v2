@@ -138,4 +138,9 @@
   }
   .safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 0.5rem); }
   .safe-top { padding-top: max(env(safe-area-inset-top), 0.5rem); }
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
 }
