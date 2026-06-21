@@ -181,8 +181,18 @@ function SessionDetail() {
     return new Date(session.rsvp_deadline).getTime() < Date.now();
   }, [session?.rsvp_deadline]);
 
+  const rsvpOpensAt = useMemo(() => {
+    if (!session?.starts_at) return null;
+    return new Date(new Date(session.starts_at).getTime() - 7 * 24 * 60 * 60 * 1000);
+  }, [session?.starts_at]);
+
+  const rsvpTooEarly = useMemo(() => {
+    if (!rsvpOpensAt) return false;
+    return rsvpOpensAt.getTime() > Date.now();
+  }, [rsvpOpensAt]);
+
   const rsvp = async (status: RsvpStatus) => {
-    if (!user || rsvpClosed) return;
+    if (!user || rsvpClosed || rsvpTooEarly) return;
     const prev = rsvps;
     // Optimistic: insert/replace this user's row immediately.
     setRsvps((cur) => {
@@ -204,7 +214,11 @@ function SessionDetail() {
     ).select("id, user_id, status").maybeSingle();
     if (error) {
       setRsvps(prev);
-      toast.error(error.message);
+      if (error.message?.includes("RSVP_TOO_EARLY")) {
+        toast.error("RSVPs open 7 days before the session.");
+      } else {
+        toast.error(error.message);
+      }
       return;
     }
     if (data) {
@@ -533,9 +547,10 @@ function SessionDetail() {
                     <Button
                       key={s}
                       variant={myRsvp === s ? "default" : "outline"}
-                      disabled={busy || rsvpClosed || blocked}
+                      disabled={busy || rsvpClosed || blocked || rsvpTooEarly}
                       onClick={() => rsvp(s)}
                       className="h-11"
+                      title={rsvpTooEarly && rsvpOpensAt ? `RSVP opens ${format(rsvpOpensAt, "d MMM")}` : undefined}
                     >
                       {STATUS_LABELS[s]}
                     </Button>
@@ -544,6 +559,9 @@ function SessionDetail() {
               </div>
               {rsvpClosed && (
                 <p className="mt-2 text-xs text-muted-foreground">The RSVP deadline has passed.</p>
+              )}
+              {!rsvpClosed && rsvpTooEarly && rsvpOpensAt && (
+                <p className="mt-2 text-xs text-muted-foreground">RSVP opens {format(rsvpOpensAt, "d MMM")}.</p>
               )}
               {session.survey_enabled && surveyStatus.required && !surveyStatus.complete && !canManage && (
                 <p className="mt-2 text-xs text-warning">Complete the pre-training survey above before you can RSVP.</p>
