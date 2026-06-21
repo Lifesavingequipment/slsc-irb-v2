@@ -113,20 +113,35 @@ function RolesPageInner({ clubId }: { clubId: string }) {
       roleMap[x.user_id] = [...(roleMap[x.user_id] ?? []), x.role];
       if (x.is_primary_admin) adminMap[x.user_id] = true;
     });
-    setRows(
-      (memberData ?? []).map((m) => {
-        const key = m.auth_user_id ?? m.id;
-        return {
-          user_id: key,
-          first_name: m.first_name ?? null,
-          last_name: m.last_name ?? null,
-          preferred_name: m.preferred_name ?? null,
-          phone: m.phone ?? null,
-          roles: roleMap[key] ?? [],
-          is_primary_admin: !!adminMap[key],
-        };
-      }),
-    );
+    const nextRows: Row[] = (memberData ?? []).map((m) => {
+      const key = m.auth_user_id ?? m.id;
+      return {
+        user_id: key,
+        first_name: m.first_name ?? null,
+        last_name: m.last_name ?? null,
+        preferred_name: m.preferred_name ?? null,
+        phone: m.phone ?? null,
+        roles: roleMap[key] ?? [],
+        is_primary_admin: !!adminMap[key],
+      };
+    });
+
+    // members.first_name/last_name can be blank (e.g. signup trigger ran
+    // before auth metadata had a name). Fall back to the get_user_display_name
+    // RPC, which also parses auth.users.full_name, so they still show up.
+    const unnamed = nextRows.filter((row) => !memberFullName(row, ""));
+    if (unnamed.length > 0) {
+      const fallbacks = await Promise.all(
+        unnamed.map((row) => supabase.rpc("get_user_display_name", { p_user_id: row.user_id })),
+      );
+      fallbacks.forEach(({ data }, i) => {
+        const profile = data as { first_name: string; last_name: string } | null;
+        if (profile?.first_name) unnamed[i].first_name = profile.first_name;
+        if (profile?.last_name) unnamed[i].last_name = profile.last_name;
+      });
+    }
+
+    setRows(nextRows);
     setLoading(false);
   }, [clubId]);
 
