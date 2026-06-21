@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
-import { useClub, useCanManage } from "@/lib/club-context";
+import { useClub, useCanManage, useIsAdmin } from "@/lib/club-context";
 import { AppShell } from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -91,8 +91,9 @@ const SECTION_ORDER: SectionKey[] = ["profile", "email", "password", "notificati
 
 function SettingsPage() {
   const { user, signOut } = useAuth();
-  const { activeClub, memberships, isPlatformOwner } = useClub();
+  const { activeClub, memberships, isPlatformOwner, refresh } = useClub();
   const canManage = useCanManage();
+  const isAdmin = useIsAdmin();
   const navigate = useNavigate();
   const confirm = useConfirm();
   const { section } = Route.useSearch();
@@ -125,6 +126,19 @@ function SettingsPage() {
   // Medical info (per active club)
   const [medical, setMedical] = useState<MedicalInfo | null>(null);
   const [savingMedical, setSavingMedical] = useState(false);
+
+  // Club information (admin only)
+  const [clubInfo, setClubInfo] = useState<{
+    club_name: string;
+    contact_email: string;
+    contact_phone: string;
+    website: string;
+    address: string;
+    suburb: string;
+    postcode: string;
+    timezone: string;
+  } | null>(null);
+  const [clubInfoBusy, setClubInfoBusy] = useState(false);
 
   // Preferences
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
@@ -197,6 +211,26 @@ function SettingsPage() {
         });
       });
   }, [user?.id, activeClubId]);
+
+  useEffect(() => {
+    if (!activeClub || !isAdmin) { setClubInfo(null); return; }
+    supabase.from("clubs")
+      .select("club_name, contact_email, contact_phone, website, address, suburb, postcode, timezone")
+      .eq("id", activeClub.club_id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setClubInfo({
+          club_name: data.club_name ?? "",
+          contact_email: data.contact_email ?? "",
+          contact_phone: data.contact_phone ?? "",
+          website: data.website ?? "",
+          address: data.address ?? "",
+          suburb: data.suburb ?? "",
+          postcode: data.postcode ?? "",
+          timezone: data.timezone ?? "",
+        });
+      });
+  }, [activeClub?.club_id, isAdmin]);
 
   // Load notification preferences from Supabase
   useEffect(() => {
@@ -397,6 +431,15 @@ function SettingsPage() {
     }
     setSavingMedical(false);
     toast.success("Medical info saved");
+  };
+
+  const saveClubInfo = async () => {
+    if (!clubInfo || !activeClub) return;
+    setClubInfoBusy(true);
+    const { error } = await supabase.from("clubs").update(clubInfo).eq("id", activeClub.club_id);
+    setClubInfoBusy(false);
+    if (error) toast.error("Failed to save: " + error.message);
+    else { toast.success("Club information saved"); await refresh(); }
   };
 
   const sectionMeta: Record<SectionKey, { title: string; icon: React.ReactNode; subtitle?: string }> = useMemo(() => ({
@@ -774,6 +817,45 @@ function SettingsPage() {
             <Button variant="outline" className="w-full mt-3" onClick={() => navigate({ to: "/onboarding" })}>
               Join or create another club
             </Button>
+
+            {isAdmin && clubInfo && (
+              <div className="mt-4 space-y-3">
+                <h3 className="font-semibold text-sm">Club information</h3>
+                <div className="space-y-2">
+                  <Label>Club name</Label>
+                  <Input value={clubInfo.club_name} onChange={(e) => setClubInfo((p) => p && ({ ...p, club_name: e.target.value }))} className="h-11" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Contact email</Label>
+                  <Input type="email" value={clubInfo.contact_email} onChange={(e) => setClubInfo((p) => p && ({ ...p, contact_email: e.target.value }))} className="h-11" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Contact phone</Label>
+                  <Input type="tel" value={clubInfo.contact_phone} onChange={(e) => setClubInfo((p) => p && ({ ...p, contact_phone: e.target.value }))} className="h-11" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Website</Label>
+                  <Input type="url" value={clubInfo.website} onChange={(e) => setClubInfo((p) => p && ({ ...p, website: e.target.value }))} className="h-11" placeholder="https://" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Address</Label>
+                  <Input value={clubInfo.address} onChange={(e) => setClubInfo((p) => p && ({ ...p, address: e.target.value }))} className="h-11" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <Label>Suburb</Label>
+                    <Input value={clubInfo.suburb} onChange={(e) => setClubInfo((p) => p && ({ ...p, suburb: e.target.value }))} className="h-11" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Postcode</Label>
+                    <Input value={clubInfo.postcode} onChange={(e) => setClubInfo((p) => p && ({ ...p, postcode: e.target.value }))} className="h-11" />
+                  </div>
+                </div>
+                <Button onClick={saveClubInfo} disabled={clubInfoBusy} className="w-full h-11">
+                  {clubInfoBusy ? "Saving..." : "Save club information"}
+                </Button>
+              </div>
+            )}
           </div>
         );
 
