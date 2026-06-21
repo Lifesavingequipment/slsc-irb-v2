@@ -14,8 +14,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import {
-  Calendar, MapPin, ExternalLink, ChevronLeft, Users, Trash2, Clock, Plus, Share2, Lock, Pencil, RotateCw,
+  Calendar, MapPin, ExternalLink, ChevronLeft, Users, Trash2, Clock, Plus, Share2, Lock, Pencil, RotateCw, Info,
 } from "lucide-react";
 import { toast } from "sonner";
 import { WavePanel } from "@/components/session/WavePanel";
@@ -464,26 +465,58 @@ function SessionDetail() {
         {!weatherData.loading && (weatherData.weather || (!weatherData.tooFarForWaves && weatherData.waves) || (weatherData.tides && weatherData.tides.length > 0)) && (
           <div className="mt-3 pt-3 border-t space-y-1 text-sm text-muted-foreground">
             {!weatherData.tooFarForWeather && weatherData.weather && (
-              <div>
-                {weatherData.weather.emoji} {weatherData.weather.label} · {weatherData.weather.maxTemp}°C · {weatherData.weather.windDir} {weatherData.weather.windSpeed} km/h
+              <div className="flex items-center gap-1">
+                <span>
+                  {weatherData.weather.emoji} {weatherData.weather.label} · {weatherData.weather.maxTemp}°C · {weatherData.weather.windDir} {weatherData.weather.windSpeed} km/h
+                </span>
+                {weatherData.weatherUpdatedAt && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label="Weather last updated time"
+                      >
+                        <Info className="h-3.5 w-3.5" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-2 text-xs" align="start">
+                      Updated {formatDistanceToNow(new Date(weatherData.weatherUpdatedAt), { addSuffix: true })}
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
             )}
-            {weatherData.weatherUpdatedAt ? (
-              <p className="text-xs text-muted-foreground mt-1">
-                Weather updated {formatDistanceToNow(new Date(weatherData.weatherUpdatedAt), { addSuffix: true })}
-              </p>
-            ) : weatherData.staleWarning ? (
+            {!weatherData.weatherUpdatedAt && weatherData.staleWarning && (
               <p className="text-xs text-amber-500 mt-1">⚠️ {weatherData.staleWarning}</p>
-            ) : null}
+            )}
             {!weatherData.tooFarForWaves && weatherData.waves && (
-              <div>
-                🌊 Surf:{" "}
-                {weatherData.waves.heightMax != null
-                  ? `~${Math.round(weatherData.waves.heightMax * 10) / 10}m`
-                  : "Approx. surf — coastal data unavailable"}
-                {weatherData.waves.periodMax != null ? ` · ${Math.round(weatherData.waves.periodMax)}s period` : ""}
-                {weatherData.waves.directionDominant != null ? ` · ${degreesToCompass(weatherData.waves.directionDominant)}` : ""}
-                {weatherData.waves.approx ? " (approx.)" : ""}
+              <div className="flex items-center gap-1">
+                <span>
+                  🌊 Surf:{" "}
+                  {weatherData.waves.heightMax != null
+                    ? `~${Math.round(weatherData.waves.heightMax * 10) / 10}m`
+                    : "Approx. surf — coastal data unavailable"}
+                  {weatherData.waves.periodMax != null ? ` · ${Math.round(weatherData.waves.periodMax)}s period` : ""}
+                  {weatherData.waves.directionDominant != null ? ` · ${degreesToCompass(weatherData.waves.directionDominant)}` : ""}
+                  {weatherData.waves.approx ? " (approx.)" : ""}
+                </span>
+                {weatherData.weatherUpdatedAt && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label="Surf data last updated time"
+                      >
+                        <Info className="h-3.5 w-3.5" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-2 text-xs" align="start">
+                      Updated {formatDistanceToNow(new Date(weatherData.weatherUpdatedAt), { addSuffix: true })}
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
             )}
             {weatherData.tides && weatherData.tides.length > 0 && (
