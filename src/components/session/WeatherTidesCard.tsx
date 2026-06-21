@@ -291,7 +291,8 @@ export function useWeatherTidesData({
       }
 
       const stale = minutesSince(cached?.weather_updated_at ?? null) >= intervalMinutes(startsAt);
-      if (!stale && cached?.weather) {
+      const missingTides = !cached?.tides;
+      if (!stale && cached?.weather && !missingTides) {
         return;
       }
 
