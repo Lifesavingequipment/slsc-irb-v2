@@ -20,7 +20,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { buildNameMap, memberFullName } from "@/lib/names";
 import { roleBadgeClass, roleLabel } from "@/lib/role-colors";
 import { notifyMembers, notifyMemberApproved } from "@/lib/notify";
-import { InviteShareCard } from "@/components/members/InviteShareCard";
 import { useRefetchOnFocus } from "@/hooks/use-refetch-on-focus";
 import { useConfirm } from "@/lib/confirm";
 
@@ -237,7 +236,6 @@ function MembersPage() {
       display={display}
       byName={byName}
       activeClubId={activeClub.club_id}
-      clubName={activeClub.club?.name}
       currentUserId={me}
       canManage={canManage}
       isAdmin={isAdmin}
@@ -251,7 +249,7 @@ function MembersPage() {
 
 function MembersPageInner({
   rows, roles, partners, partnerOf, display, byName,
-  activeClubId, clubName, currentUserId, canManage, isAdmin,
+  activeClubId, currentUserId, canManage, isAdmin,
   setStatus, removeMember, load, initialTab,
 }: {
   rows: Row[];
@@ -261,7 +259,6 @@ function MembersPageInner({
   display: (id: string) => string;
   byName: (a: Row, b: Row) => number;
   activeClubId: string;
-  clubName?: string;
   currentUserId: string | null;
   canManage: boolean;
   isAdmin: boolean;
@@ -305,16 +302,6 @@ function MembersPageInner({
   return (
     <AppShell>
       <h1 className="text-2xl font-bold mb-4">Members</h1>
-
-      <div className="mb-4">
-        <InviteShareCard
-          clubId={activeClubId}
-          clubName={clubName}
-          canManage={isAdmin}
-          isAdmin={isAdmin}
-          currentUserId={currentUserId}
-        />
-      </div>
 
       {canManage && (
         <Link
