@@ -1,0 +1,12 @@
+branch=$(git rev-parse --abbrev-ref HEAD)
+
+if [ "$branch" != "master" ]; then
+  echo ""
+  echo "=========================================================="
+  echo "  WARNING: You are pushing branch '$branch', not 'master'."
+  echo "  CLAUDE.md requires all work to be committed and pushed"
+  echo "  directly to 'master'. Feature branches are not used in"
+  echo "  this project."
+  echo "=========================================================="
+  echo ""
+fi
