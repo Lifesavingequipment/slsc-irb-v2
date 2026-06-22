@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
   User, Mail, KeyRound, Bell, Building2, MapPin, ShieldAlert, MessageSquare,
-  PlusCircle, LogOut, Users, ChevronRight, RefreshCw, Copy, Check,
+  PlusCircle, LogOut, Users, ChevronRight, RefreshCw, Copy, Check, MessageSquareText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
@@ -61,6 +61,26 @@ function MoreRow({ icon: Icon, iconBg, label, sublabel, to, search, onClick, des
   );
 }
 
+function buildInviteMessage(code: string): string {
+  return `Welcome to IRB Training App
+Link: https://slsc-irb-v2.vercel.app
+Invite code: ${code}
+
+Download to iPhone
+1. Open the link in Safari (must be Safari, not Chrome)
+2. Tap the Share button (box with arrow at bottom of screen)
+3. Tap "Add to Home Screen"
+4. Name it "IRB Training" → tap Add
+5. App icon appears on your home screen.
+
+Download to Android
+1. Open the link in Chrome
+2. Tap the three dots menu (top right)
+3. Tap "Add to Home Screen"
+4. Tap Add
+5. App icon appears on your home screen.`;
+}
+
 function InviteCodeRow() {
   const { activeClub } = useClub();
   const [open, setOpen] = useState(false);
@@ -87,6 +107,12 @@ function InviteCodeRow() {
     await navigator.clipboard.writeText(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyInviteMessage = async () => {
+    if (!code) return;
+    await navigator.clipboard.writeText(buildInviteMessage(code));
+    toast.success("Invite message copied!");
   };
 
   const regenerate = async () => {
@@ -152,6 +178,14 @@ function InviteCodeRow() {
               <RefreshCw className="h-3.5 w-3.5" /> Regenerate
             </button>
           )}
+          <button
+            type="button"
+            onClick={copyInviteMessage}
+            disabled={!code}
+            className="w-full text-xs font-medium px-2.5 py-1.5 rounded-md border inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
+          >
+            <MessageSquareText className="h-3.5 w-3.5" /> Copy invite message
+          </button>
         </div>
       )}
     </div>
