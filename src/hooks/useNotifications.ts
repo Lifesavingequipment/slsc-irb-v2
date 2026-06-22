@@ -71,16 +71,24 @@ export function useNotifications() {
 
   const markAllRead = useCallback(async () => {
     if (!memberId) return;
-    await supabase
+    const { error } = await supabase
       .from("notifications")
       .update({ is_read: true })
       .eq("member_id", memberId)
       .eq("is_read", false);
+    if (error) {
+      console.error("[useNotifications] markAllRead error", error);
+      return;
+    }
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
   }, [memberId]);
 
   const markRead = useCallback(async (id: string) => {
-    await supabase.from("notifications").update({ is_read: true }).eq("id", id);
+    const { error } = await supabase.from("notifications").update({ is_read: true }).eq("id", id);
+    if (error) {
+      console.error("[useNotifications] markRead error", error);
+      return;
+    }
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
   }, []);
 
