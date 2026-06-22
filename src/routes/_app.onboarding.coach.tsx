@@ -16,6 +16,7 @@ import { Waves, LogOut, CalendarPlus, MapPin, SkipForward } from "lucide-react";
 import { toast } from "sonner";
 import { DateTimePicker } from "@/components/ui/datetime-picker";
 import { LocationPicker } from "@/components/LocationPicker";
+import { prefetchSessionTides } from "@/lib/session-weather";
 
 export const Route = createFileRoute("/_app/onboarding/coach")({
   head: () => ({ meta: [{ title: "Set up your first session — IRB Coaching" }] }),
@@ -91,7 +92,7 @@ function CoachOnboarding() {
     if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
 
     setBusy(true);
-    const { error } = await supabase.from("sessions").insert({
+    const { data: inserted, error } = await supabase.from("sessions").insert({
       club_id: clubId,
       title: parsed.data.title,
       session_type: parsed.data.session_type,
@@ -101,7 +102,7 @@ function CoachOnboarding() {
       ends_at: parsed.data.ends_at ? new Date(parsed.data.ends_at).toISOString() : null,
       notes: parsed.data.notes || null,
       created_by: user.id,
-    });
+    }).select("id").single();
     setBusy(false);
     if (error) {
       // Coach role might not yet be granted — RLS will block. Surface a friendly message.
@@ -112,6 +113,7 @@ function CoachOnboarding() {
       );
       return;
     }
+    if (inserted) void prefetchSessionTides(inserted.id);
     toast.success("First session scheduled.");
     clearStash();
     navigate({ to: "/dashboard", replace: true });

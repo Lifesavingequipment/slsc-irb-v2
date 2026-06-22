@@ -89,7 +89,6 @@ function SessionDetail() {
   const surveyStatus = usePretrainingSurveyStatus(sessionId, user?.id ?? null);
   const weatherData = useWeatherTidesData({
     sessionId,
-    location: session?.location ?? null,
     startsAt: session?.starts_at ?? new Date().toISOString(),
   });
 
@@ -481,6 +480,7 @@ function SessionDetail() {
               <div className="flex items-center gap-1">
                 <span>
                   {weatherData.weather.emoji} {weatherData.weather.label} · {weatherData.weather.maxTemp}°C · {weatherData.weather.windDir} {weatherData.weather.windSpeed} km/h
+                  {weatherData.weather.uvIndex != null ? ` · UV ${weatherData.weather.uvIndex}` : ""}
                 </span>
                 {weatherData.weatherUpdatedAt && (
                   <Popover>
@@ -499,9 +499,6 @@ function SessionDetail() {
                   </Popover>
                 )}
               </div>
-            )}
-            {!weatherData.weatherUpdatedAt && weatherData.staleWarning && (
-              <p className="text-xs text-amber-500 mt-1">⚠️ {weatherData.staleWarning}</p>
             )}
             {!weatherData.tooFarForWaves && weatherData.waves && (
               <div className="flex items-center gap-1">

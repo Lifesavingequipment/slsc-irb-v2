@@ -1,0 +1,20 @@
+name: Hourly weather refresh
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # every hour, on the hour (UTC)
+  workflow_dispatch:       # allow manual trigger
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call hourly-weather-refresh edge function
+        run: |
+          curl -X POST \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/hourly-weather-refresh" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json" \
+            --fail-with-body
+        timeout-minutes: 10

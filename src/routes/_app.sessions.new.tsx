@@ -23,6 +23,7 @@ import { CoachSetupSection, type VehicleDraft } from "@/components/session/Coach
 import { invalidateSessionsCache } from "./_app.sessions.index";
 import { addDays, addMonths, addWeeks, format as fmt } from "date-fns";
 import { notifyNewSession, currentMemberId } from "@/lib/notify";
+import { prefetchSessionTides } from "@/lib/session-weather";
 import { Badge } from "@/components/ui/badge";
 
 type QType = "yes_no" | "text" | "single_choice";
@@ -245,6 +246,8 @@ function NewSession() {
     }
     // First created session = the original start (used for carpool/survey scaffolding).
     const created = insertedSessions[0];
+
+    insertedSessions.forEach((s) => { void prefetchSessionTides(s.id); });
 
     // Insert survey questions for every occurrence.
     if (survey && questions.filter((q) => q.question_text.trim()).length > 0) {

@@ -2080,6 +2080,66 @@ export type Database = {
           },
         ]
       }
+      location_weather_cache: {
+        Row: {
+          club_id: string
+          created_at: string | null
+          lat: number | null
+          lng: number | null
+          location_id: string
+          tides: Json | null
+          tides_date: string | null
+          tides_updated_at: string | null
+          updated_at: string | null
+          waves: Json | null
+          weather: Json | null
+          weather_updated_at: string | null
+        }
+        Insert: {
+          club_id: string
+          created_at?: string | null
+          lat?: number | null
+          lng?: number | null
+          location_id: string
+          tides?: Json | null
+          tides_date?: string | null
+          tides_updated_at?: string | null
+          updated_at?: string | null
+          waves?: Json | null
+          weather?: Json | null
+          weather_updated_at?: string | null
+        }
+        Update: {
+          club_id?: string
+          created_at?: string | null
+          lat?: number | null
+          lng?: number | null
+          location_id?: string
+          tides?: Json | null
+          tides_date?: string | null
+          tides_updated_at?: string | null
+          updated_at?: string | null
+          waves?: Json | null
+          weather?: Json | null
+          weather_updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_weather_cache_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "location_weather_cache_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: true
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       locations: {
         Row: {
           address: string | null

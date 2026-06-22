@@ -13,7 +13,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useIsPlatformOwner } from "@/lib/platform-owner";
 import { useRefetchOnFocus } from "@/hooks/use-refetch-on-focus";
 import { useMemberFirstName } from "@/hooks/useMemberFirstName";
-import { useWeatherTidesData } from "@/components/session/WeatherTidesCard";
+import { useWeatherTidesData, useLocationWeatherData } from "@/components/session/WeatherTidesCard";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/dashboard")({
@@ -499,11 +499,7 @@ function TodayConditionsCard() {
 }
 
 function TodayConditionsCardContent({ location }: { location: DefaultLoc }) {
-  const { weather, waves, tides } = useWeatherTidesData({
-    sessionId: `today-${location.id}-${format(new Date(), "yyyy-MM-dd")}`,
-    location: location.address || location.name,
-    startsAt: new Date().toISOString(),
-  });
+  const { weather, waves, tides } = useLocationWeatherData({ locationId: location.id });
 
   if (!weather && waves?.heightMax == null && (!tides || tides.length === 0)) return null;
 
@@ -516,6 +512,7 @@ function TodayConditionsCardContent({ location }: { location: DefaultLoc }) {
         {weather && (
           <span className="flex items-center gap-1">
             {weather.emoji} {weather.maxTemp}°C · {weather.windSpeed}km/h {weather.windDir}
+            {weather.uvIndex != null ? ` · UV ${weather.uvIndex}` : ""}
           </span>
         )}
         {waves?.heightMax != null && (
@@ -551,7 +548,6 @@ function NextSessionCard({ session, myRsvp, canManage }: {
 }) {
   const { weather, waves, tides } = useWeatherTidesData({
     sessionId: session.id,
-    location: session.location,
     startsAt: session.starts_at,
   });
 
@@ -582,6 +578,7 @@ function NextSessionCard({ session, myRsvp, canManage }: {
               {weather && (
                 <span className="flex items-center gap-1">
                   {weather.emoji} {weather.maxTemp}°C · {weather.windSpeed}km/h {weather.windDir}
+                  {weather.uvIndex != null ? ` · UV ${weather.uvIndex}` : ""}
                 </span>
               )}
               {waves?.heightMax != null && (
