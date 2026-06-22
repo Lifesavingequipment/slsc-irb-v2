@@ -2,8 +2,30 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Copy, RefreshCw, Ticket } from "lucide-react";
+import { Copy, MessageSquareText, RefreshCw, Ticket } from "lucide-react";
 import { toast } from "sonner";
+
+const APP_URL = "https://slsc-irb-v2.vercel.app";
+
+function buildInviteMessage(code: string): string {
+  return `Welcome to IRB Training App
+Link: ${APP_URL}
+Invite code: ${code}
+
+Download to iPhone
+1. Open the link in Safari (must be Safari, not Chrome)
+2. Tap the Share button (box with arrow at bottom of screen)
+3. Tap "Add to Home Screen"
+4. Name it "IRB Training" → tap Add
+5. App icon appears on your home screen.
+
+Download to Android
+1. Open the link in Chrome
+2. Tap the three dots menu (top right)
+3. Tap "Add to Home Screen"
+4. Tap Add
+5. App icon appears on your home screen.`;
+}
 
 type InviteCode = {
   id: string;
@@ -85,6 +107,16 @@ export function InviteCodeCard({
     }
   };
 
+  const copyMessage = async () => {
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(buildInviteMessage(code.code));
+      toast.success("Invite message copied to clipboard");
+    } catch {
+      toast.error("Could not copy");
+    }
+  };
+
   if (loading) return null;
   if (!code && !canManage) return null;
 
@@ -107,17 +139,22 @@ export function InviteCodeCard({
           <p className="mt-2 text-xs text-muted-foreground">
             Share this code with new members. They can enter it on the sign-up page to join.
           </p>
-          {canManage && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="mt-2 h-8"
-              disabled={busy}
-              onClick={generate}
-            >
-              <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Regenerate
+          <div className="mt-2 flex items-center gap-2">
+            <Button size="sm" variant="outline" className="h-8" onClick={copyMessage}>
+              <MessageSquareText className="h-3.5 w-3.5 mr-1.5" /> Copy invite message
             </Button>
-          )}
+            {canManage && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8"
+                disabled={busy}
+                onClick={generate}
+              >
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Regenerate
+              </Button>
+            )}
+          </div>
         </>
       ) : (
         <>
