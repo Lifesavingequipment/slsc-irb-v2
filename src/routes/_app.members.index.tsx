@@ -773,7 +773,7 @@ function MemberRow({ row, displayName, partnerName, roles, canManage, canRemove,
       {isExpanded && isAdmin && isOwnerRole && (
         <div className="mt-2 text-[10px] uppercase text-muted-foreground">Owner role is locked</div>
       )}
-      {isExpanded && canManage && activeClubId && (
+      {isExpanded && canManage && activeClubId && !roles.some((r) => r !== "member") && (
         <GuardiansSection clubId={activeClubId} childMemberId={row.id} />
       )}
     </Card>
