@@ -30,12 +30,12 @@ function TemplatesPage() {
   if (!activeClub) return <AppShell><div className="py-12 text-center text-sm text-muted-foreground">Loading…</div></AppShell>;
   if (loading) return <AppShell><div className="py-12 text-center text-sm text-muted-foreground">Loading…</div></AppShell>;
   const canEdit = isAdmin || perms.manage_templates;
-  if (!canEdit) return <Navigate to="/settings" replace />;
+  if (!canEdit) return <Navigate to="/more" replace />;
 
   return (
     <AppShell title="Templates">
-      <Link to="/settings" className="inline-flex items-center text-sm text-muted-foreground mb-3">
-        <ChevronLeft className="h-4 w-4" /> Settings
+      <Link to="/more" className="inline-flex items-center text-sm text-muted-foreground mb-3">
+        <ChevronLeft className="h-4 w-4" /> More
       </Link>
       <div className="flex items-center gap-2 mb-3">
         <Library className="h-5 w-5 text-primary" />

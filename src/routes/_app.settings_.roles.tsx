@@ -80,7 +80,7 @@ function RolesPage() {
   if (!activeClub) {
     return <AppShell><div className="py-12 text-center text-sm text-muted-foreground">Loading…</div></AppShell>;
   }
-  if (!isAdmin) return <Navigate to="/settings" replace />;
+  if (!isAdmin) return <Navigate to="/more" replace />;
 
   return <RolesPageInner clubId={activeClub.club_id} />;
 }
@@ -228,8 +228,8 @@ function RolesPageInner({ clubId }: { clubId: string }) {
 
   return (
     <AppShell title="Roles & Permissions">
-      <Link to="/settings" className="inline-flex items-center text-sm text-muted-foreground mb-3">
-        <ChevronLeft className="h-4 w-4" /> Settings
+      <Link to="/more" className="inline-flex items-center text-sm text-muted-foreground mb-3">
+        <ChevronLeft className="h-4 w-4" /> More
       </Link>
 
       <Card className="p-4 mb-4 space-y-3">
