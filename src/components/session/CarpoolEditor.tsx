@@ -58,14 +58,24 @@ export function CarpoolEditor({
     if (!clubId || !canPickAnyDriver) return;
     let cancelled = false;
     (async () => {
-      const { data: memData } = await supabase
-        .from("members")
-        .select("id, auth_user_id, first_name, last_name, preferred_name")
-        .eq("club_id", clubId)
-        .eq("membership_status", "active")
-        .order("first_name");
+      const [{ data: memData }, { data: memberships }] = await Promise.all([
+        supabase
+          .from("members")
+          .select("id, auth_user_id, first_name, last_name, preferred_name, membership_status")
+          .eq("club_id", clubId)
+          .order("first_name"),
+        supabase.from("club_memberships").select("user_id, status").eq("club_id", clubId),
+      ]);
       if (cancelled) return;
-      const rows: Member[] = (memData ?? []).map((m) => ({
+      // club_memberships.status is the source of truth for approval; members.membership_status
+      // is a denormalized copy that can drift out of sync, so fall back to it only when there's
+      // no membership row for this club.
+      const statusByUserId = new Map((memberships ?? []).map((x) => [x.user_id, x.status]));
+      const activeMembers = (memData ?? []).filter((m) => {
+        const status = (m.auth_user_id && statusByUserId.get(m.auth_user_id)) ?? m.membership_status;
+        return status === "approved" || status === "active";
+      });
+      const rows: Member[] = activeMembers.map((m) => ({
         user_id: m.auth_user_id ?? m.id,
         display_name: memberFullName(m, "Member"),
       }));

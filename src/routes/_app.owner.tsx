@@ -435,7 +435,7 @@ function ClubMembersCard({ club }: { club: Club }) {
     if (userIds.length === 0) { setMembers([]); setLoaded(true); setLoading(false); return; }
 
     const [{ data: memberData }, { data: profileData }] = await Promise.all([
-      supabase.from("members").select("auth_user_id, first_name, last_name").in("auth_user_id", userIds),
+      supabase.from("members").select("auth_user_id, first_name, last_name").eq("club_id", club.id).in("auth_user_id", userIds),
       supabase.from("profiles").select("id, email, full_name").in("id", userIds),
     ]);
 

@@ -156,13 +156,23 @@ function SessionDetail() {
   useEffect(() => {
     if (!session?.club_id) return;
     (async () => {
-      const { data: memData } = await supabase
-        .from("members")
-        .select("id, auth_user_id, first_name, last_name, preferred_name, driver_flag, crew_flag")
-        .eq("club_id", session.club_id)
-        .eq("membership_status", "active")
-        .order("first_name");
-      const list: Member[] = (memData ?? []).map((m) => ({
+      const [{ data: memData }, { data: memberships }] = await Promise.all([
+        supabase
+          .from("members")
+          .select("id, auth_user_id, first_name, last_name, preferred_name, driver_flag, crew_flag, membership_status")
+          .eq("club_id", session.club_id)
+          .order("first_name"),
+        supabase.from("club_memberships").select("user_id, status").eq("club_id", session.club_id),
+      ]);
+      // club_memberships.status is the source of truth for approval; members.membership_status
+      // is a denormalized copy that can drift out of sync, so fall back to it only when there's
+      // no membership row for this club.
+      const statusByUserId = new Map((memberships ?? []).map((x) => [x.user_id, x.status]));
+      const activeMembers = (memData ?? []).filter((m) => {
+        const status = (m.auth_user_id && statusByUserId.get(m.auth_user_id)) ?? m.membership_status;
+        return status === "approved" || status === "active";
+      });
+      const list: Member[] = activeMembers.map((m) => ({
         id: m.id,
         auth_user_id: m.auth_user_id ?? null,
         user_id: m.auth_user_id ?? m.id,
