@@ -14,7 +14,9 @@ function formatTideTime(iso: string): string {
   return `${h}:${min} ${ampm}`;
 }
 
-async function geocode(location: string): Promise<{ lat: number; lng: number }> {
+// Returns null when an address can't be resolved — callers must skip and log
+// a warning rather than falling back to guessed coordinates.
+async function geocode(location: string): Promise<{ lat: number; lng: number } | null> {
   const m = location.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
   if (m) return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
   try {
@@ -25,7 +27,7 @@ async function geocode(location: string): Promise<{ lat: number; lng: number }> 
     const data = await res.json();
     if (data?.[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
   } catch { /**/ }
-  return { lat: -28.0167, lng: 153.4 };
+  return null;
 }
 
 async function fetchTides(lat: number, lng: number, date: string) {
@@ -65,7 +67,7 @@ Deno.serve(async (req: Request) => {
   // --- Backstop: sessions today still missing tides ---
   const { data: sessions } = await supabase
     .from('sessions')
-    .select('id, starts_at, location')
+    .select('id, starts_at, location, location_id')
     .gte('starts_at', `${todayDate}T00:00:00.000Z`)
     .lte('starts_at', `${todayDate}T23:59:59.999Z`)
     .not('location', 'is', null);
@@ -79,16 +81,28 @@ Deno.serve(async (req: Request) => {
 
     const existingMap = new Map((existing ?? []).map((e: { session_id: string; tides: unknown; lat: number; lng: number }) => [e.session_id, e]));
 
-    for (const session of sessions as { id: string; starts_at: string; location: string }[]) {
+    for (const session of sessions as { id: string; starts_at: string; location: string; location_id: string | null }[]) {
       const cached = existingMap.get(session.id);
       if (cached?.tides) {
         results.push({ id: session.id, status: 'session: skipped (tides already cached)' });
         continue;
       }
 
-      const coords = cached?.lat && cached?.lng
-        ? { lat: cached.lat, lng: cached.lng }
-        : await geocode(session.location);
+      let coords: { lat: number; lng: number } | null =
+        cached?.lat != null && cached?.lng != null ? { lat: cached.lat, lng: cached.lng } : null;
+
+      if (!coords && session.location_id) {
+        const { data: savedLoc } = await supabase.from('locations').select('lat, lng').eq('id', session.location_id).maybeSingle();
+        if (savedLoc?.lat != null && savedLoc?.lng != null) coords = { lat: savedLoc.lat, lng: savedLoc.lng };
+      }
+
+      if (!coords) coords = await geocode(session.location);
+
+      if (!coords) {
+        console.warn(`[daily-tide-refresh] No valid coordinates for session ${session.id} (location: "${session.location}") — skipping.`);
+        results.push({ id: session.id, status: 'session: skipped (no valid coordinates)' });
+        continue;
+      }
 
       const tides = await fetchTides(coords.lat, coords.lng, todayDate);
 
@@ -115,10 +129,10 @@ Deno.serve(async (req: Request) => {
   // cached tides aren't already for today.
   const { data: homeLocations } = await supabase
     .from('locations')
-    .select('id, club_id, name, address')
+    .select('id, club_id, name, address, lat, lng')
     .eq('is_default', true);
 
-  for (const loc of (homeLocations ?? []) as { id: string; club_id: string; name: string; address: string | null }[]) {
+  for (const loc of (homeLocations ?? []) as { id: string; club_id: string; name: string; address: string | null; lat: number | null; lng: number | null }[]) {
     const { data: existingLoc } = await supabase
       .from('location_weather_cache')
       .select('lat, lng, tides_date')
@@ -130,9 +144,18 @@ Deno.serve(async (req: Request) => {
       continue;
     }
 
-    const coords = existingLoc?.lat != null && existingLoc?.lng != null
-      ? { lat: existingLoc.lat, lng: existingLoc.lng }
-      : await geocode(loc.address || loc.name);
+    let coords: { lat: number; lng: number } | null =
+      existingLoc?.lat != null && existingLoc?.lng != null ? { lat: existingLoc.lat, lng: existingLoc.lng }
+      : loc.lat != null && loc.lng != null ? { lat: loc.lat, lng: loc.lng }
+      : null;
+
+    if (!coords) coords = await geocode(loc.address || loc.name);
+
+    if (!coords) {
+      console.warn(`[daily-tide-refresh] No valid coordinates for location ${loc.id} ("${loc.name}") — skipping.`);
+      results.push({ id: loc.id, status: 'location: skipped (no valid coordinates)' });
+      continue;
+    }
 
     const tides = await fetchTides(coords.lat, coords.lng, todayDate);
 

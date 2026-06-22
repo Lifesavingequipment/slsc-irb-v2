@@ -2,18 +2,24 @@ import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Loader2, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isValidLat, isValidLng, type Coords } from "@/lib/geocode";
 
 type NominatimResult = {
   place_id: number;
   display_name: string;
+  lat: string;
+  lon: string;
 };
 
 type Props = {
   id?: string;
   value: string;
   onChange: (value: string) => void;
-  /** Fired when a suggestion is picked from the dropdown (not on plain typing). */
-  onSelect?: (value: string) => void;
+  /**
+   * Fired when a suggestion is picked from the dropdown (not on plain typing).
+   * Includes the coordinates Nominatim resolved for that suggestion.
+   */
+  onSelect?: (value: string, coords: Coords) => void;
   placeholder?: string;
   className?: string;
 };
@@ -93,7 +99,11 @@ export function AddressAutocomplete({ id, value, onChange, onSelect, placeholder
   const select = (s: NominatimResult) => {
     skipFetch.current = true;
     onChange(s.display_name);
-    onSelect?.(s.display_name);
+    const lat = parseFloat(s.lat);
+    const lng = parseFloat(s.lon);
+    if (isValidLat(lat) && isValidLng(lng)) {
+      onSelect?.(s.display_name, { lat, lng });
+    }
     setOpen(false);
     setSuggestions([]);
     setHighlight(-1);

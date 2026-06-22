@@ -24,7 +24,9 @@ function getTimezone(lat:number,lng:number):string {
   return 'auto';
 }
 
-async function geocode(location:string):Promise<{lat:number;lng:number}> {
+// Returns null when an address can't be resolved — callers must skip and log
+// a warning rather than falling back to guessed coordinates.
+async function geocode(location:string):Promise<{lat:number;lng:number}|null> {
   const m=location.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
   if (m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
   try {
@@ -32,7 +34,7 @@ async function geocode(location:string):Promise<{lat:number;lng:number}> {
     const data=await res.json();
     if (data?.[0]) return {lat:parseFloat(data[0].lat),lng:parseFloat(data[0].lon)};
   } catch {/**/}
-  return {lat:-28.0167,lng:153.4};
+  return null;
 }
 
 async function fetchWeather(lat:number,lng:number,date:string,tz:string) {
@@ -93,22 +95,33 @@ Deno.serve(async (req: Request) => {
   // --- Sessions in the next 7 days ---
   const { data: sessions } = await supabase
     .from('sessions')
-    .select('id, starts_at, location')
+    .select('id, starts_at, location, location_id')
     .gte('starts_at', rangeStart)
     .lte('starts_at', rangeEnd)
     .not('location', 'is', null);
 
   let sessionsProcessed = 0;
-  for (const session of (sessions ?? []) as { id: string; starts_at: string; location: string }[]) {
+  for (const session of (sessions ?? []) as { id: string; starts_at: string; location: string; location_id: string | null }[]) {
     const { data: existing } = await supabase
       .from('session_weather_cache')
       .select('lat, lng')
       .eq('session_id', session.id)
       .maybeSingle();
 
-    const coords = existing?.lat != null && existing?.lng != null
-      ? { lat: existing.lat, lng: existing.lng }
-      : await geocode(session.location);
+    let coords: { lat: number; lng: number } | null =
+      existing?.lat != null && existing?.lng != null ? { lat: existing.lat, lng: existing.lng } : null;
+
+    if (!coords && session.location_id) {
+      const { data: savedLoc } = await supabase.from('locations').select('lat, lng').eq('id', session.location_id).maybeSingle();
+      if (savedLoc?.lat != null && savedLoc?.lng != null) coords = { lat: savedLoc.lat, lng: savedLoc.lng };
+    }
+
+    if (!coords) coords = await geocode(session.location);
+
+    if (!coords) {
+      console.warn(`[hourly-weather-refresh] No valid coordinates for session ${session.id} (location: "${session.location}") — skipping.`);
+      continue;
+    }
 
     const date = session.starts_at.slice(0, 10);
     const tz = getTimezone(coords.lat, coords.lng);
@@ -134,20 +147,28 @@ Deno.serve(async (req: Request) => {
   // --- Each club's home/default location, for the dashboard Today panel ---
   const { data: homeLocations } = await supabase
     .from('locations')
-    .select('id, club_id, name, address')
+    .select('id, club_id, name, address, lat, lng')
     .eq('is_default', true);
 
   let locationsProcessed = 0;
-  for (const loc of (homeLocations ?? []) as { id: string; club_id: string; name: string; address: string | null }[]) {
+  for (const loc of (homeLocations ?? []) as { id: string; club_id: string; name: string; address: string | null; lat: number | null; lng: number | null }[]) {
     const { data: existing } = await supabase
       .from('location_weather_cache')
       .select('lat, lng')
       .eq('location_id', loc.id)
       .maybeSingle();
 
-    const coords = existing?.lat != null && existing?.lng != null
-      ? { lat: existing.lat, lng: existing.lng }
-      : await geocode(loc.address || loc.name);
+    let coords: { lat: number; lng: number } | null =
+      existing?.lat != null && existing?.lng != null ? { lat: existing.lat, lng: existing.lng }
+      : loc.lat != null && loc.lng != null ? { lat: loc.lat, lng: loc.lng }
+      : null;
+
+    if (!coords) coords = await geocode(loc.address || loc.name);
+
+    if (!coords) {
+      console.warn(`[hourly-weather-refresh] No valid coordinates for location ${loc.id} ("${loc.name}") — skipping.`);
+      continue;
+    }
 
     const tz = getTimezone(coords.lat, coords.lng);
 

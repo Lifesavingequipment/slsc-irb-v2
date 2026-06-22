@@ -2148,6 +2148,8 @@ export type Database = {
           created_by: string | null
           id: string
           is_default: boolean
+          lat: number | null
+          lng: number | null
           name: string
           updated_at: string
         }
@@ -2158,6 +2160,8 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_default?: boolean
+          lat?: number | null
+          lng?: number | null
           name: string
           updated_at?: string
         }
@@ -2168,6 +2172,8 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_default?: boolean
+          lat?: number | null
+          lng?: number | null
           name?: string
           updated_at?: string
         }
@@ -4336,6 +4342,8 @@ export type Database = {
           p_logo_url?: string
           p_name: string
           p_venue_address?: string
+          p_venue_lat?: number
+          p_venue_lng?: number
           p_venue_name?: string
         }
         Returns: Json

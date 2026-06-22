@@ -55,7 +55,9 @@ function getTimezone(lat:number,lng:number):string {
   return 'auto';
 }
 
-async function geocode(location:string):Promise<{lat:number;lng:number}> {
+// Returns null when an address can't be resolved — callers must skip and log
+// a warning rather than falling back to guessed coordinates.
+async function geocode(location:string):Promise<{lat:number;lng:number}|null> {
   const m=location.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
   if (m) return {lat:parseFloat(m[1]),lng:parseFloat(m[2])};
   try {
@@ -63,7 +65,7 @@ async function geocode(location:string):Promise<{lat:number;lng:number}> {
     const data=await res.json();
     if (data?.[0]) return {lat:parseFloat(data[0].lat),lng:parseFloat(data[0].lon)};
   } catch {/**/}
-  return {lat:-28.0167,lng:153.4};
+  return null;
 }
 
 async function fetchWeather(lat:number,lng:number,date:string,tz:string) {
@@ -127,7 +129,7 @@ Deno.serve(async (req:Request)=>{
   const {session_id,force_weather=false,force_tides=false}=body;
   if (!session_id) return new Response(JSON.stringify({error:'session_id required'}),{status:400});
 
-  const {data:session,error:sessErr}=await supabase.from('sessions').select('id,starts_at,ends_at,location').eq('id',session_id).maybeSingle();
+  const {data:session,error:sessErr}=await supabase.from('sessions').select('id,starts_at,ends_at,location,location_id').eq('id',session_id).maybeSingle();
   if (sessErr||!session) return new Response(JSON.stringify({error:'Session not found'}),{status:404});
 
   const sessionEnded=session.ends_at?new Date(session.ends_at)<new Date():new Date(session.starts_at)<new Date();
@@ -144,7 +146,16 @@ Deno.serve(async (req:Request)=>{
   }
 
   const location=session.location??'';
-  const coords=existing?.lat&&existing?.lng?{lat:existing.lat,lng:existing.lng}:await geocode(location);
+  let coords:{lat:number;lng:number}|null=existing?.lat&&existing?.lng?{lat:existing.lat,lng:existing.lng}:null;
+  if (!coords&&session.location_id) {
+    const {data:savedLoc}=await supabase.from('locations').select('lat,lng').eq('id',session.location_id).maybeSingle();
+    if (savedLoc?.lat!=null&&savedLoc?.lng!=null) coords={lat:savedLoc.lat,lng:savedLoc.lng};
+  }
+  if (!coords) coords=await geocode(location);
+  if (!coords) {
+    console.warn(`[fetch-session-weather] No valid coordinates for session ${session_id} (location: "${location}") — skipping weather/tide fetch.`);
+    return new Response(JSON.stringify({session_id,error:'No valid coordinates for this location',skipped:true}),{headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+  }
   const date=new Date(session.starts_at).toISOString().slice(0,10);
   const tz=getTimezone(coords.lat,coords.lng);
   const daysAway=daysUntil(session.starts_at);

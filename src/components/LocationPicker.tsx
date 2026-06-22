@@ -4,10 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { AddressAutocomplete } from "@/components/settings/AddressAutocomplete";
-import { Check, ChevronDown, X } from "lucide-react";
+import { LocationMapPreview } from "@/components/settings/LocationMapPreview";
+import { Check, ChevronDown, X, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { isValidLat, isValidLng, type Coords } from "@/lib/geocode";
 
 // Matches the dropdown's max-h-48.
 const DROPDOWN_MAX_HEIGHT = 192;
@@ -61,7 +64,12 @@ export function LocationPicker({
   const [saving, setSaving] = useState(false);
 
   // Inline "Save this location?" prompt, shown after a fresh address is selected.
-  const [savePrompt, setSavePrompt] = useState<{ address: string; name: string } | null>(null);
+  // Requires a map confirmation (or manual coordinates) before it can be saved.
+  const [savePrompt, setSavePrompt] = useState<{ address: string; name: string; coords: Coords } | null>(null);
+  const [manualMode, setManualMode] = useState(false);
+  const [manualLat, setManualLat] = useState("");
+  const [manualLng, setManualLng] = useState("");
+  const [manualError, setManualError] = useState<string | null>(null);
 
   // Guards a refetch-induced flicker; we keep the latest clubId we loaded for.
   const loadedFor = useRef<string | null>(null);
@@ -129,6 +137,7 @@ export function LocationPicker({
 
   const pickSaved = (l: SavedLocation) => {
     setSavePrompt(null);
+    setManualMode(false);
     setDropdownOpen(false);
     onChange(formatLocation(l));
     onLocationIdChange?.(l.id);
@@ -138,16 +147,33 @@ export function LocationPicker({
   const handleTyped = (v: string) => {
     onChange(v);
     onLocationIdChange?.(null);
-    if (!v.trim()) setSavePrompt(null);
+    if (!v.trim()) {
+      setSavePrompt(null);
+      setManualMode(false);
+    }
   };
 
-  // A suggestion was picked from the autocomplete dropdown — offer to save it.
-  const handleSelected = (address: string) => {
+  // A suggestion was picked from the autocomplete dropdown — offer to save it,
+  // with the coordinates Nominatim resolved for it pending map confirmation.
+  const handleSelected = (address: string, coords: Coords) => {
     onLocationIdChange?.(null);
     const exists = locations.some((l) => l.address === address || formatLocation(l) === address);
     if (clubId && !exists) {
-      setSavePrompt({ address, name: address.split(",")[0].trim() });
+      setSavePrompt({ address, name: address.split(",")[0].trim(), coords });
+      setManualMode(false);
+      setManualError(null);
     }
+  };
+
+  const applyManualCoords = () => {
+    if (!savePrompt) return;
+    const lat = parseFloat(manualLat);
+    const lng = parseFloat(manualLng);
+    if (!isValidLat(lat)) { setManualError("Latitude must be a number between -90 and 90."); return; }
+    if (!isValidLng(lng)) { setManualError("Longitude must be a number between -180 and 180."); return; }
+    setManualError(null);
+    setSavePrompt({ ...savePrompt, coords: { lat, lng } });
+    setManualMode(false);
   };
 
   const saveNewLocation = async () => {
@@ -164,6 +190,8 @@ export function LocationPicker({
         club_id: clubId,
         name,
         address: savePrompt.address.trim() || null,
+        lat: savePrompt.coords.lat,
+        lng: savePrompt.coords.lng,
         created_by: user?.id ?? null,
       })
       .select("id, name, address")
@@ -252,32 +280,56 @@ export function LocationPicker({
       {savePrompt && (
         <div className="rounded-lg border bg-muted/30 p-2.5 space-y-2">
           <div className="text-xs font-medium">Save this location?</div>
-          <div className="flex items-center gap-2">
-            <Input
-              value={savePrompt.name}
-              onChange={(e) => setSavePrompt((p) => (p ? { ...p, name: e.target.value } : p))}
-              placeholder="Location name"
-              className="h-8 text-sm"
-            />
-            <Button
-              type="button"
-              size="sm"
-              className="h-8 shrink-0"
-              disabled={saving}
-              onClick={saveNewLocation}
-            >
-              <Check className="h-3.5 w-3.5 mr-1" /> Save
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-8 shrink-0"
-              onClick={() => setSavePrompt(null)}
-            >
-              <X className="h-3.5 w-3.5 mr-1" /> Skip
-            </Button>
-          </div>
+          <Input
+            value={savePrompt.name}
+            onChange={(e) => setSavePrompt((p) => (p ? { ...p, name: e.target.value } : p))}
+            placeholder="Location name"
+            className="h-8 text-sm"
+          />
+
+          {!manualMode ? (
+            <>
+              <LocationMapPreview coords={savePrompt.coords} className="h-28" />
+              <p className="text-xs text-muted-foreground">Pinned at the resolved address — is this correct?</p>
+              <div className="flex items-center gap-2">
+                <Button type="button" size="sm" className="h-8 shrink-0" disabled={saving} onClick={saveNewLocation}>
+                  <Check className="h-3.5 w-3.5 mr-1" /> Looks right, save
+                </Button>
+                <Button type="button" size="sm" variant="ghost" className="h-8 shrink-0" onClick={() => setSavePrompt(null)}>
+                  <X className="h-3.5 w-3.5 mr-1" /> Skip
+                </Button>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setManualMode(true); setManualLat(String(savePrompt.coords.lat)); setManualLng(String(savePrompt.coords.lng)); }}
+                className="text-xs text-muted-foreground underline-offset-2 hover:underline flex items-center gap-1"
+              >
+                <Pencil className="h-3 w-3" /> Not quite right — enter coordinates manually
+              </button>
+            </>
+          ) : (
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Latitude</Label>
+                  <Input inputMode="decimal" placeholder="-28.0167" value={manualLat} onChange={(e) => setManualLat(e.target.value)} className="h-8 text-sm" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Longitude</Label>
+                  <Input inputMode="decimal" placeholder="153.4" value={manualLng} onChange={(e) => setManualLng(e.target.value)} className="h-8 text-sm" />
+                </div>
+              </div>
+              {manualError && <p className="text-xs text-destructive">{manualError}</p>}
+              <div className="flex items-center gap-2">
+                <Button type="button" size="sm" className="h-8 shrink-0" onClick={applyManualCoords}>
+                  <Check className="h-3.5 w-3.5 mr-1" /> Use these coordinates
+                </Button>
+                <Button type="button" size="sm" variant="ghost" className="h-8 shrink-0" onClick={() => setManualMode(false)}>
+                  <X className="h-3.5 w-3.5 mr-1" /> Cancel
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

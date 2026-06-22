@@ -10,9 +10,17 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Plus, Trash2, Pencil, X, Check, Home } from "lucide-react";
 import { toast } from "sonner";
-import { AddressAutocomplete } from "./AddressAutocomplete";
+import { LocationCoordsField } from "./LocationCoordsField";
+import type { Coords } from "@/lib/geocode";
 
-type Loc = { id: string; name: string; address: string | null; is_default: boolean };
+type Loc = {
+  id: string;
+  name: string;
+  address: string | null;
+  is_default: boolean;
+  lat: number | null;
+  lng: number | null;
+};
 
 export function LocationsSection() {
   const { user } = useAuth();
@@ -24,10 +32,12 @@ export function LocationsSection() {
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
+  const [coords, setCoords] = useState<Coords | null>(null);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editAddress, setEditAddress] = useState("");
+  const [editCoords, setEditCoords] = useState<Coords | null>(null);
 
   const clubId = activeClub?.club_id;
 
@@ -36,7 +46,7 @@ export function LocationsSection() {
     setLoading(true);
     const { data, error } = await supabase
       .from("locations")
-      .select("id, name, address, is_default")
+      .select("id, name, address, is_default, lat, lng")
       .eq("club_id", clubId)
       .order("name");
     setLoading(false);
@@ -50,16 +60,22 @@ export function LocationsSection() {
     e.preventDefault();
     if (!clubId || !user) return;
     if (!name.trim()) { toast.error("Name is required."); return; }
+    if (address.trim() && !coords) {
+      toast.error("Confirm the address's location on the map, or enter coordinates manually, before saving.");
+      return;
+    }
     setSaving(true);
     const { error } = await supabase.from("locations").insert({
       club_id: clubId,
       name: name.trim(),
       address: address.trim() || null,
+      lat: coords?.lat ?? null,
+      lng: coords?.lng ?? null,
       created_by: user.id,
     });
     setSaving(false);
     if (error) { toast.error(error.message); return; }
-    setName(""); setAddress("");
+    setName(""); setAddress(""); setCoords(null);
     toast.success("Location added");
     refresh();
   };
@@ -68,13 +84,23 @@ export function LocationsSection() {
     setEditingId(loc.id);
     setEditName(loc.name);
     setEditAddress(loc.address ?? "");
+    setEditCoords(loc.lat != null && loc.lng != null ? { lat: loc.lat, lng: loc.lng } : null);
   };
 
   const saveEdit = async (id: string) => {
     if (!editName.trim()) { toast.error("Name is required."); return; }
+    if (editAddress.trim() && !editCoords) {
+      toast.error("Confirm the address's location on the map, or enter coordinates manually, before saving.");
+      return;
+    }
     const { error } = await supabase
       .from("locations")
-      .update({ name: editName.trim(), address: editAddress.trim() || null })
+      .update({
+        name: editName.trim(),
+        address: editAddress.trim() || null,
+        lat: editCoords?.lat ?? null,
+        lng: editCoords?.lng ?? null,
+      })
       .eq("id", id);
     if (error) { toast.error(error.message); return; }
     setEditingId(null);
@@ -140,7 +166,14 @@ export function LocationsSection() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="loc-addr">Address (optional)</Label>
-            <AddressAutocomplete id="loc-addr" placeholder="e.g. 80 Pacific Ave, Miami QLD 4220" value={address} onChange={setAddress} />
+            <LocationCoordsField
+              id="loc-addr"
+              placeholder="e.g. 80 Pacific Ave, Miami QLD 4220"
+              address={address}
+              onAddressChange={setAddress}
+              coords={coords}
+              onCoordsChange={setCoords}
+            />
           </div>
           <Button type="submit" disabled={saving}>{saving ? "Saving…" : "Add location"}</Button>
         </form>
@@ -164,7 +197,13 @@ export function LocationsSection() {
                 {editingId === l.id ? (
                   <div className="space-y-2">
                     <Input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Name" />
-                    <AddressAutocomplete value={editAddress} onChange={setEditAddress} placeholder="Address" />
+                    <LocationCoordsField
+                      address={editAddress}
+                      onAddressChange={setEditAddress}
+                      coords={editCoords}
+                      onCoordsChange={setEditCoords}
+                      placeholder="Address"
+                    />
                     <div className="flex gap-2">
                       <Button size="sm" onClick={() => saveEdit(l.id)}>
                         <Check className="h-4 w-4 mr-1" /> Save

@@ -14,7 +14,8 @@ import { Waves, LogOut, CheckCircle2, Copy, Mail, Share2, Ticket, UserCog } from
 import { toast } from "sonner";
 import { SupportRequestDialog } from "@/components/SupportRequestDialog";
 import { AddressAutocomplete } from "@/components/settings/AddressAutocomplete";
-import { LocationPicker } from "@/components/LocationPicker";
+import { LocationCoordsField } from "@/components/settings/LocationCoordsField";
+import type { Coords } from "@/lib/geocode";
 
 export const Route = createFileRoute("/_app/onboarding/")({
   head: () => ({ meta: [{ title: "Get started — IRB Coaching" }] }),
@@ -44,6 +45,7 @@ function Onboarding() {
   const [logoUrl, setLogoUrl] = useState("");
   const [venueName, setVenueName] = useState("");
   const [venueAddress, setVenueAddress] = useState("");
+  const [venueCoords, setVenueCoords] = useState<Coords | null>(null);
 
   useEffect(() => {
     if (created || search.add) return;
@@ -66,6 +68,10 @@ function Onboarding() {
       logo_url: logoUrl, venue_name: venueName, venue_address: venueAddress,
     });
     if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
+    if (parsed.data.venue_address && !venueCoords) {
+      toast.error("Confirm the venue address's location on the map, or enter coordinates manually, before continuing.");
+      return;
+    }
     if (!user) return;
     setBusy(true);
 
@@ -84,6 +90,8 @@ function Onboarding() {
       p_logo_url: parsed.data.logo_url || undefined,
       p_venue_name: parsed.data.venue_name || undefined,
       p_venue_address: parsed.data.venue_address || undefined,
+      p_venue_lat: venueCoords?.lat ?? undefined,
+      p_venue_lng: venueCoords?.lng ?? undefined,
     });
     setBusy(false);
     if (error || !data) { toast.error(`Club creation failed: ${error?.message ?? "unknown error"}`); return; }
@@ -229,7 +237,14 @@ function Onboarding() {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="venueAddress">Address</Label>
-                    <LocationPicker id="venueAddress" clubId={null} value={venueAddress} onChange={setVenueAddress} placeholder="80 Pacific Ave, Miami QLD 4220" />
+                    <LocationCoordsField
+                      id="venueAddress"
+                      address={venueAddress}
+                      onAddressChange={setVenueAddress}
+                      coords={venueCoords}
+                      onCoordsChange={setVenueCoords}
+                      placeholder="80 Pacific Ave, Miami QLD 4220"
+                    />
                   </div>
                 </div>
 
