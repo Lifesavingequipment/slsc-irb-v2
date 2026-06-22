@@ -123,6 +123,7 @@ function RolesPageInner({ clubId }: { clubId: string }) {
     const roleMap: Record<string, string[]> = {};
     const adminMap: Record<string, boolean> = {};
     (r ?? []).forEach((x) => {
+      if (!x.user_id || !x.role) return;
       roleMap[x.user_id] = [...(roleMap[x.user_id] ?? []), x.role];
       if (x.is_primary_admin) adminMap[x.user_id] = true;
     });
@@ -370,7 +371,7 @@ function PermissionsCard({ clubId }: { clubId: string }) {
       const map: Record<string, Record<string, boolean>> = {};
       (data ?? []).forEach((row) => {
         map[row.role] = map[row.role] ?? {};
-        map[row.role][row.permission] = row.enabled;
+        map[row.role][row.permission] = row.enabled ?? false;
       });
       setPerms(map);
       setLoading(false);

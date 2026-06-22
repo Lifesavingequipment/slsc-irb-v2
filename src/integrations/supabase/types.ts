@@ -489,6 +489,10 @@ export type Database = {
       }
       chat_messages: {
         Row: {
+          attachment_name: string | null
+          attachment_size: number | null
+          attachment_type: string | null
+          attachment_url: string | null
           body: string
           channel_id: string | null
           created_at: string | null
@@ -499,6 +503,10 @@ export type Database = {
           sender_id: string | null
         }
         Insert: {
+          attachment_name?: string | null
+          attachment_size?: number | null
+          attachment_type?: string | null
+          attachment_url?: string | null
           body: string
           channel_id?: string | null
           created_at?: string | null
@@ -509,6 +517,10 @@ export type Database = {
           sender_id?: string | null
         }
         Update: {
+          attachment_name?: string | null
+          attachment_size?: number | null
+          attachment_type?: string | null
+          attachment_url?: string | null
           body?: string
           channel_id?: string | null
           created_at?: string | null
@@ -2075,6 +2087,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          is_default: boolean
           name: string
           updated_at: string
         }
@@ -2084,6 +2097,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          is_default?: boolean
           name: string
           updated_at?: string
         }
@@ -2093,6 +2107,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          is_default?: boolean
           name?: string
           updated_at?: string
         }
@@ -2177,6 +2192,45 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      member_guardians: {
+        Row: {
+          child_member_id: string
+          club_id: string
+          created_at: string | null
+          guardian_user_id: string
+          id: string
+        }
+        Insert: {
+          child_member_id: string
+          club_id: string
+          created_at?: string | null
+          guardian_user_id: string
+          id?: string
+        }
+        Update: {
+          child_member_id?: string
+          club_id?: string
+          created_at?: string | null
+          guardian_user_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_guardians_child_member_id_fkey"
+            columns: ["child_member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "member_guardians_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       member_medical_info: {
         Row: {
@@ -2735,6 +2789,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      onboarding_support_requests: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          message: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          message: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          message?: string
+          name?: string
+        }
+        Relationships: []
       }
       patrol_attendance: {
         Row: {
@@ -3499,6 +3577,7 @@ export type Database = {
         Row: {
           answer_bool: boolean | null
           answer_choice: string | null
+          answer_choices: string[] | null
           answer_text: string | null
           club_id: string
           created_at: string
@@ -3511,6 +3590,7 @@ export type Database = {
         Insert: {
           answer_bool?: boolean | null
           answer_choice?: string | null
+          answer_choices?: string[] | null
           answer_text?: string | null
           club_id: string
           created_at?: string
@@ -3523,6 +3603,7 @@ export type Database = {
         Update: {
           answer_bool?: boolean | null
           answer_choice?: string | null
+          answer_choices?: string[] | null
           answer_text?: string | null
           club_id?: string
           created_at?: string
@@ -3719,6 +3800,56 @@ export type Database = {
           },
           {
             foreignKeyName: "session_training_plans_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: true
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_weather_cache: {
+        Row: {
+          created_at: string | null
+          lat: number | null
+          lng: number | null
+          session_id: string
+          tides: Json | null
+          tides_fetch_attempted_at: string | null
+          tides_updated_at: string | null
+          updated_at: string | null
+          waves: Json | null
+          weather: Json | null
+          weather_updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          lat?: number | null
+          lng?: number | null
+          session_id: string
+          tides?: Json | null
+          tides_fetch_attempted_at?: string | null
+          tides_updated_at?: string | null
+          updated_at?: string | null
+          waves?: Json | null
+          weather?: Json | null
+          weather_updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          lat?: number | null
+          lng?: number | null
+          session_id?: string
+          tides?: Json | null
+          tides_fetch_attempted_at?: string | null
+          tides_updated_at?: string | null
+          updated_at?: string | null
+          waves?: Json | null
+          weather?: Json | null
+          weather_updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_weather_cache_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: true
             referencedRelation: "sessions"
@@ -4135,8 +4266,23 @@ export type Database = {
         Args: { _club_id: string; _perm: string; _user_id: string }
         Returns: boolean
       }
+      create_club: {
+        Args: {
+          p_address?: string
+          p_description?: string
+          p_email: string
+          p_first_name: string
+          p_last_name: string
+          p_logo_url?: string
+          p_name: string
+          p_venue_address?: string
+          p_venue_name?: string
+        }
+        Returns: Json
+      }
       get_my_club_id: { Args: never; Returns: string }
       get_platform_stats: { Args: never; Returns: Json }
+      get_user_display_name: { Args: { p_user_id: string }; Returns: Json }
       grant_platform_owner: { Args: { _email: string }; Returns: string }
       has_role:
         | {
@@ -4157,6 +4303,13 @@ export type Database = {
         Returns: boolean
       }
       is_platform_owner: { Args: { _user_id: string }; Returns: boolean }
+      list_club_admin_emails: {
+        Args: never
+        Returns: {
+          club_id: string
+          email: string
+        }[]
+      }
       list_platform_coaches: {
         Args: never
         Returns: {

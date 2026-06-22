@@ -15,11 +15,10 @@ import { SessionsCalendar } from "@/components/session/SessionsCalendar";
 
 export const Route = createFileRoute("/_app/sessions/")({
   head: () => ({ meta: [{ title: "Sessions — IRB Coaching" }] }),
-  validateSearch: (search: Record<string, unknown>) => ({
-    filter: search.filter === "surveys-pending" || search.filter === "rsvp-pending"
-      ? (search.filter as "surveys-pending" | "rsvp-pending")
-      : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>): { filter?: "surveys-pending" | "rsvp-pending" } =>
+    search.filter === "surveys-pending" || search.filter === "rsvp-pending"
+      ? { filter: search.filter }
+      : {},
   component: SessionsList,
 });
 

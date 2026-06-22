@@ -93,7 +93,7 @@ export function usePermissions(): PermissionsState {
       .then(({ data }) => {
         if (cancelled) return;
         const perms: Record<string, boolean> = {};
-        (data ?? []).forEach((row) => { perms[row.permission] = row.enabled; });
+        (data ?? []).forEach((row) => { perms[row.permission] = row.enabled ?? false; });
         cacheRef.current = { clubId, role, perms };
         setState({
           isOwner: false,

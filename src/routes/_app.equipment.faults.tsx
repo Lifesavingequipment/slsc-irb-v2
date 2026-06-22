@@ -91,7 +91,7 @@ function FaultsPage() {
         .in("auth_user_id", userIds)
         .eq("club_id", activeClub.club_id);
       const map: Record<string, string> = {};
-      (memData ?? []).forEach((m) => { map[m.auth_user_id] = memberFullName(m, "Unknown"); });
+      (memData ?? []).forEach((m) => { if (m.auth_user_id) map[m.auth_user_id] = memberFullName(m, "Unknown"); });
       setMemberNames(map);
     }
   }, [activeClub?.club_id]);
@@ -134,7 +134,8 @@ function FaultsPage() {
         .eq("auth_user_id", row.reported_by)
         .eq("club_id", activeClub.club_id)
         .maybeSingle();
-      if (data) setMemberNames((cur) => ({ ...cur, [data.auth_user_id]: memberFullName(data, "Unknown") }));
+      const authUserId = data?.auth_user_id;
+      if (authUserId) setMemberNames((cur) => ({ ...cur, [authUserId]: memberFullName(data, "Unknown") }));
     }
   };
 

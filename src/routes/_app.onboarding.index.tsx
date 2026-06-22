@@ -79,11 +79,11 @@ function Onboarding() {
       p_first_name: firstName,
       p_last_name: lastName,
       p_email: user.email ?? "",
-      p_address: parsed.data.location || null,
-      p_description: parsed.data.description || null,
-      p_logo_url: parsed.data.logo_url || null,
-      p_venue_name: parsed.data.venue_name || null,
-      p_venue_address: parsed.data.venue_address || null,
+      p_address: parsed.data.location || undefined,
+      p_description: parsed.data.description || undefined,
+      p_logo_url: parsed.data.logo_url || undefined,
+      p_venue_name: parsed.data.venue_name || undefined,
+      p_venue_address: parsed.data.venue_address || undefined,
     });
     setBusy(false);
     if (error || !data) { toast.error(`Club creation failed: ${error?.message ?? "unknown error"}`); return; }

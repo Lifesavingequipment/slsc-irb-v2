@@ -25,14 +25,16 @@ export function useChatUnread(): number {
     if (!cm || cm.length === 0) { setUnread(0); return; }
 
     const counts = await Promise.all(
-      cm.map((r) =>
-        supabase
-          .from("chat_messages")
-          .select("id", { count: "exact", head: true })
-          .eq("channel_id", r.channel_id)
-          .gt("created_at", r.last_read_at ?? "1970-01-01")
-          .neq("sender_id", m.id)
-      )
+      cm
+        .filter((r) => r.channel_id != null)
+        .map((r) =>
+          supabase
+            .from("chat_messages")
+            .select("id", { count: "exact", head: true })
+            .eq("channel_id", r.channel_id as string)
+            .gt("created_at", r.last_read_at ?? "1970-01-01")
+            .neq("sender_id", m.id)
+        )
     );
     const total = counts.reduce((sum, r) => sum + (r.count ?? 0), 0);
     setUnread(total);

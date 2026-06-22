@@ -100,9 +100,9 @@ function EquipmentDetail() {
         .select("auth_user_id, first_name, last_name, preferred_name")
         .in("auth_user_id", ids)
         .eq("club_id", (e as Equipment).club_id);
-      (memData ?? []).forEach((m) => { nameMap[m.auth_user_id] = memberFullName(m, "Unknown"); });
+      (memData ?? []).forEach((m) => { if (m.auth_user_id) nameMap[m.auth_user_id] = memberFullName(m, "Unknown"); });
     }
-    setFaults(rows.map((r) => ({ ...r, reporter_name: nameMap[r.reported_by] ?? null })));
+    setFaults(rows.map((r) => ({ ...r, reporter_name: (r.reported_by && nameMap[r.reported_by]) ?? null })));
   }, [equipmentId]);
 
   useEffect(() => { load(); }, [load]);

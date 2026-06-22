@@ -42,7 +42,7 @@ type ClubMember = {
   last_name: string;
   email: string;
   role: string;
-  status: string;
+  status: "pending" | "approved" | "rejected";
 };
 
 type Club = {
@@ -50,7 +50,7 @@ type Club = {
   club_name: string;
   state_region: string | null;
   address: string | null;
-  created_at: string;
+  created_at: string | null;
   member_count: number;
   role_counts: RoleCount;
   session_total: number;
@@ -67,7 +67,7 @@ type FeedbackRow = {
   message: string;
   status: string;
   admin_notes: string | null;
-  created_at: string;
+  created_at: string | null;
   club_name: string | null;
   submitter_name: string | null;
 };
@@ -298,7 +298,7 @@ function OwnerDashboard() {
                       <StatusBadge status={f.status} />
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {f.submitter_name ?? "Anonymous"}{f.club_name ? ` · ${f.club_name}` : ""} · {new Date(f.created_at).toLocaleString()}
+                      {f.submitter_name ?? "Anonymous"}{f.club_name ? ` · ${f.club_name}` : ""} · {f.created_at ? new Date(f.created_at).toLocaleString() : "—"}
                     </div>
                   </div>
                   <Select
@@ -338,7 +338,7 @@ function OwnerDashboard() {
 }
 
 function ClubDetailView({ club, onBack }: { club: Club; onBack: () => void }) {
-  const memberSince = new Date(club.created_at).toLocaleDateString("en-AU", { month: "short", year: "numeric" });
+  const memberSince = club.created_at ? new Date(club.created_at).toLocaleDateString("en-AU", { month: "short", year: "numeric" }) : "—";
   const lastSessionLabel = club.last_session_at
     ? `Last training: ${new Date(club.last_session_at).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}`
     : "No sessions yet";
@@ -440,7 +440,7 @@ function ClubMembersCard({ club }: { club: Club }) {
     ]);
 
     const memberMap: Record<string, { first_name: string; last_name: string }> = {};
-    (memberData ?? []).forEach((m) => { memberMap[m.auth_user_id] = { first_name: m.first_name, last_name: m.last_name }; });
+    (memberData ?? []).forEach((m) => { if (m.auth_user_id) memberMap[m.auth_user_id] = { first_name: m.first_name, last_name: m.last_name }; });
 
     const emailMap: Record<string, string> = {};
     const profileNameMap: Record<string, string> = {};
@@ -460,7 +460,7 @@ function ClubMembersCard({ club }: { club: Club }) {
           first_name: fromMembers?.first_name ?? profileFirst ?? "Unknown",
           last_name: fromMembers?.last_name ?? profileRest.join(" ") ?? "",
           email: emailMap[m.user_id] ?? "—",
-          role: m.role,
+          role: m.role ?? "member",
           status: m.status,
         };
       }),
@@ -474,8 +474,8 @@ function ClubMembersCard({ club }: { club: Club }) {
     setOpen((v) => !v);
   };
 
-  const updateMember = async (membershipId: string, patch: { role?: string; status?: string }) => {
-    const update: Record<string, string> = {};
+  const updateMember = async (membershipId: string, patch: { role?: string; status?: "pending" | "approved" | "rejected" }) => {
+    const update: { role?: string; status?: "pending" | "approved" | "rejected"; approved_at?: string } = {};
     if (patch.role) update.role = patch.role;
     if (patch.status) {
       update.status = patch.status;
@@ -522,7 +522,7 @@ function ClubMembersCard({ club }: { club: Club }) {
 const ROLES = ["member", "coach", "club_admin"] as const;
 const STATUSES = ["pending", "approved", "rejected"] as const;
 
-function MemberRow({ member, onSave }: { member: ClubMember; onSave: (patch: { role?: string; status?: string }) => Promise<void> }) {
+function MemberRow({ member, onSave }: { member: ClubMember; onSave: (patch: { role?: string; status?: "pending" | "approved" | "rejected" }) => Promise<void> }) {
   const [role, setRole] = useState(member.role);
   const [status, setStatus] = useState(member.status);
   const [saving, setSaving] = useState(false);
@@ -531,7 +531,7 @@ function MemberRow({ member, onSave }: { member: ClubMember; onSave: (patch: { r
 
   const save = async () => {
     setSaving(true);
-    const patch: { role?: string; status?: string } = {};
+    const patch: { role?: string; status?: "pending" | "approved" | "rejected" } = {};
     if (role !== member.role) patch.role = role;
     if (status !== member.status) patch.status = status;
     await onSave(patch);
@@ -570,7 +570,7 @@ function MemberRow({ member, onSave }: { member: ClubMember; onSave: (patch: { r
           </SelectContent>
         </Select>
 
-        <Select value={status} onValueChange={setStatus}>
+        <Select value={status} onValueChange={(v) => setStatus(v as "pending" | "approved" | "rejected")}>
           <SelectTrigger className="h-7 w-[100px] text-xs">
             <SelectValue />
           </SelectTrigger>
@@ -604,7 +604,7 @@ function StatCard({ value, label }: { value: number; label: string }) {
 }
 
 function ClubCard({ club, onViewClub }: { club: Club; onViewClub: () => void }) {
-  const memberSince = new Date(club.created_at).toLocaleDateString("en-AU", { month: "short", year: "numeric" });
+  const memberSince = club.created_at ? new Date(club.created_at).toLocaleDateString("en-AU", { month: "short", year: "numeric" }) : "—";
 
   const lastSessionLabel = club.last_session_at
     ? `Last training: ${new Date(club.last_session_at).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}`

@@ -208,6 +208,7 @@ function CarpoolPage() {
     setEditCarpool(null);
     load();
 
+    if (!session) return;
     void notifyGoingMembers(sessionId, {
       club_id: session.club_id,
       notification_type: "carpool_update",

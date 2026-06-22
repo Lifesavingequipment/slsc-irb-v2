@@ -47,7 +47,7 @@ type Row = {
   id: string;                   // members.id
   membership_id: string | null; // club_memberships.id (null for members without auth accounts)
   user_id: string;              // auth_user_id if present, else members.id as fallback key
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "active"; // "active" is a legacy value from members.membership_status
   email: string | null;
   profile: {
     first_name: string | null;
@@ -153,6 +153,7 @@ function MembersPage() {
       .eq("club_id", activeClub.club_id);
     const map: Record<string, string[]> = {};
     (r ?? []).forEach((x) => {
+      if (!x.user_id || !x.role) return;
       map[x.user_id] = [...(map[x.user_id] ?? []), x.role];
     });
     setRoles(map);
@@ -175,7 +176,7 @@ function MembersPage() {
   useEffect(() => { load(); }, [load]);
   useRefetchOnFocus(load);
 
-  const setStatus = async (member: Row, status: Row["status"]) => {
+  const setStatus = async (member: Row, status: "pending" | "approved" | "rejected") => {
     if (!clubId) return;
     const { error } = await supabase
       .from("club_memberships")
@@ -262,7 +263,7 @@ function MembersPageInner({
   currentUserId: string | null;
   canManage: boolean;
   isAdmin: boolean;
-  setStatus: (member: Row, status: Row["status"]) => void;
+  setStatus: (member: Row, status: "pending" | "approved" | "rejected") => void;
   removeMember: (memberId: string, membershipId: string | null, userId: string) => void;
   load: () => void;
   initialTab?: "approved" | "pending" | "partners";
@@ -640,8 +641,12 @@ function MemberRow({ row, displayName, partnerName, roles, canManage, canRemove,
     setOptimistic(next);
     setSaving(true);
     const flagKey = `${role.toLowerCase()}_flag` as "driver_flag" | "crew_flag" | "patient_flag";
+    const patch =
+      flagKey === "driver_flag" ? { driver_flag: !wasActive }
+      : flagKey === "crew_flag" ? { crew_flag: !wasActive }
+      : { patient_flag: !wasActive };
     const { error } = await supabase.from("members")
-      .update({ [flagKey]: !wasActive })
+      .update(patch)
       .eq("id", row.id);
     setSaving(false);
     if (error) {
@@ -809,6 +814,7 @@ function GuardiansSection({ clubId, childMemberId }: { clubId: string; childMemb
     setLinks(guardianIds.map((id) => ({ guardian_user_id: id, name: nameOf.get(id) ?? "Guardian" })));
     setAvailable(
       (roleRows ?? [])
+        .filter((r): r is typeof r & { user_id: string } => r.user_id != null)
         .map((r) => ({ user_id: r.user_id, name: nameOf.get(r.user_id) ?? "Guardian" }))
         .filter((g) => !guardianIds.includes(g.user_id)),
     );

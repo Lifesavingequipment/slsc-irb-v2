@@ -55,7 +55,7 @@ type Message = {
   id: string;
   sender_id: string | null;
   body: string;
-  created_at: string;
+  created_at: string | null;
   edited_at?: string | null;
   deleted_at?: string | null;
   reply_to_id?: string | null;
@@ -84,7 +84,8 @@ function initials(name: string) {
   );
 }
 
-function fmtTime(iso: string): string {
+function fmtTime(iso: string | null): string {
+  if (!iso) return "";
   const d = new Date(iso);
   const now = new Date();
   const isToday = d.toDateString() === now.toDateString();
@@ -105,7 +106,7 @@ function isGrouped(msgs: Message[], idx: number): boolean {
   const curr = msgs[idx];
   if (prev.sender_id !== curr.sender_id) return false;
   if (prev.deleted_at || curr.deleted_at) return false;
-  return new Date(curr.created_at).getTime() - new Date(prev.created_at).getTime() < 120000;
+  return new Date(curr.created_at ?? 0).getTime() - new Date(prev.created_at ?? 0).getTime() < 120000;
 }
 // A message is "last in group" if the next message has a different sender or is > 2 min later.
 function isLastInGroup(msgs: Message[], idx: number): boolean {
@@ -208,7 +209,8 @@ function ChatPage() {
       }
       if (!cm) return;
 
-      const channelIds = cm.map((r) => r.channel_id);
+      const validCm = cm.filter((r): r is typeof r & { channel_id: string } => r.channel_id != null);
+      const channelIds = validCm.map((r) => r.channel_id);
       if (channelIds.length === 0) {
         setChannels([]);
         return;
@@ -227,7 +229,7 @@ function ChatPage() {
       const msgResults = await Promise.all(msgPromises);
 
       // Unread counts
-      const unreadPromises = cm.map((r) =>
+      const unreadPromises = validCm.map((r) =>
         supabase
           .from("chat_messages")
           .select("id", { count: "exact", head: true })
@@ -236,7 +238,7 @@ function ChatPage() {
       );
       const unreadResults = await Promise.all(unreadPromises);
 
-      const built: Channel[] = cm.map((r, i) => {
+      const built: Channel[] = validCm.map((r, i) => {
         const ch = r.channel as unknown as {
           id: string;
           name: string;
@@ -383,7 +385,7 @@ function ChatPage() {
       });
 
       const firstUnread = lastReadAt
-        ? built.find((m) => new Date(m.created_at).getTime() > new Date(lastReadAt).getTime())
+        ? built.find((m) => new Date(m.created_at ?? 0).getTime() > new Date(lastReadAt).getTime())
         : undefined;
       setFirstUnreadId(firstUnread?.id ?? null);
       setMessages(built);

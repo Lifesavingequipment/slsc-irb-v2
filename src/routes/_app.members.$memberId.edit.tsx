@@ -200,7 +200,7 @@ function EditMember() {
       const { error: pErr } = await supabase.from("members").update({
         first_name: firstName.trim(),
         last_name: lastName.trim(),
-        email: email.trim() || null,
+        email: email.trim(),
         phone: phone.trim() || null,
         driver_flag: preferredRoles.includes("driver"),
         crew_flag: preferredRoles.includes("crew"),

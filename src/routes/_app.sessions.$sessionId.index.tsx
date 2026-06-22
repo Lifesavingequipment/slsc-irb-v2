@@ -214,6 +214,7 @@ function SessionDetail() {
         {
           id: existing?.id ?? `optimistic-${user.id}`,
           user_id: user.id,
+          member_id: existing?.member_id ?? null,
           status,
           profile: existing?.profile ?? null,
         },
@@ -254,6 +255,7 @@ function SessionDetail() {
         {
           id: existing?.id ?? `optimistic-${userId}`,
           user_id: userId,
+          member_id: existing?.member_id ?? null,
           status,
           profile: existing?.profile ?? null,
         },
@@ -299,6 +301,7 @@ function SessionDetail() {
         {
           id: `optimistic-${userId}`,
           user_id: userId,
+          member_id: member?.id ?? null,
           status,
           profile: member ? { display_name: member.display_name } : null,
         },
