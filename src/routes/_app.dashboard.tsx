@@ -499,9 +499,22 @@ function TodayConditionsCard() {
 }
 
 function TodayConditionsCardContent({ location }: { location: DefaultLoc }) {
-  const { weather, waves, tides } = useLocationWeatherData({ locationId: location.id });
+  const { loading, weather, waves, tides } = useLocationWeatherData({ locationId: location.id });
 
-  if (!weather && waves?.heightMax == null && (!tides || tides.length === 0)) return null;
+  const hasData = !!weather || waves?.heightMax != null || !!(tides && tides.length > 0);
+
+  if (!hasData) {
+    return (
+      <Card className="p-4 bg-white border border-[#e5e7eb] shadow-none mb-4">
+        <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+          Today at {location.name}
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {loading ? "Loading conditions…" : "Conditions are still loading — check back shortly."}
+        </p>
+      </Card>
+    );
+  }
 
   return (
     <Card className="p-4 bg-white border border-[#e5e7eb] shadow-none mb-4">

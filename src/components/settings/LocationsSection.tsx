@@ -12,6 +12,7 @@ import { MapPin, Plus, Trash2, Pencil, X, Check, Home } from "lucide-react";
 import { toast } from "sonner";
 import { LocationCoordsField } from "./LocationCoordsField";
 import type { Coords } from "@/lib/geocode";
+import { prefetchLocationWeather } from "@/lib/session-weather";
 
 type Loc = {
   id: string;
@@ -122,6 +123,7 @@ export function LocationsSection() {
     if (error) { toast.error(error.message); return; }
     toast.success("Home beach set");
     refresh();
+    prefetchLocationWeather(id);
   };
 
   const remove = async (id: string, locName: string) => {
