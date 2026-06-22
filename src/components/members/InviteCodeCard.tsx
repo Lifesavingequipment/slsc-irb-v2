@@ -111,7 +111,7 @@ export function InviteCodeCard({
     if (!code) return;
     try {
       await navigator.clipboard.writeText(buildInviteMessage(code.code));
-      toast.success("Invite message copied to clipboard");
+      toast.success("Invite message copied!");
     } catch {
       toast.error("Could not copy");
     }
@@ -139,21 +139,15 @@ export function InviteCodeCard({
           <p className="mt-2 text-xs text-muted-foreground">
             Share this code with new members. They can enter it on the sign-up page to join.
           </p>
-          <div className="mt-2 flex items-center gap-2">
-            <Button size="sm" variant="outline" className="h-8" onClick={copyMessage}>
-              <MessageSquareText className="h-3.5 w-3.5 mr-1.5" /> Copy invite message
-            </Button>
+          <div className="mt-2 flex flex-col items-stretch gap-2">
             {canManage && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-8"
-                disabled={busy}
-                onClick={generate}
-              >
+              <Button size="sm" variant="ghost" className="h-8" disabled={busy} onClick={generate}>
                 <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Regenerate
               </Button>
             )}
+            <Button size="sm" variant="outline" className="h-8" onClick={copyMessage}>
+              <MessageSquareText className="h-3.5 w-3.5 mr-1.5" /> Copy invite message
+            </Button>
           </div>
         </>
       ) : (
