@@ -326,7 +326,7 @@ function SettingsPage() {
       if (result?.sent === false) {
         toast.error(result.reason ?? "No push subscription found");
       } else {
-        toast.success("Test push sent — check your device");
+        toast.success(`Test push delivered to ${result.recipients} device(s)`);
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not send test push");
