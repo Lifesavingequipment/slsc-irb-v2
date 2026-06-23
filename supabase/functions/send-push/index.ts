@@ -41,11 +41,13 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  // api.onesignal.com (new REST API, os_v2_app_ key) targets devices via include_subscription_ids,
-  // not the legacy include_player_ids. See https://documentation.onesignal.com/reference/create-notification.
+  // OneSignal's OpenAPI spec (https://github.com/OneSignal/api) has no
+  // include_subscription_ids field at all — include_player_ids is the
+  // (deprecated-in-name-only) field that now takes Subscription IDs.
   const onesignalReqBody = {
     app_id: ONESIGNAL_APP_ID,
-    include_subscription_ids: playerIds,
+    include_player_ids: playerIds,
+    target_channel: 'push',
     headings: { en: title },
     contents: { en: body },
     ...(url ? { url } : {}),
