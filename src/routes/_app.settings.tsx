@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useConfirm } from "@/lib/confirm";
+import { enablePushNotifications, disablePushNotifications, sendTestPush } from "@/lib/push";
 
 export const Route = createFileRoute("/_app/settings")({
   head: () => ({ meta: [{ title: "Settings — IRB Coaching" }] }),
@@ -147,6 +148,12 @@ function SettingsPage() {
 
   // Preferences
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
+
+  // Push notifications (OneSignal)
+  const [memberId, setMemberId] = useState<string | null>(null);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [testPushBusy, setTestPushBusy] = useState(false);
   // All sections collapsed by default for a cleaner Settings landing.
   const [open, setOpen] = useState<Record<SectionKey, boolean>>({
     profile: false, email: false, password: false, notifications: false,
@@ -266,6 +273,67 @@ function SettingsPage() {
         });
       });
   }, [user?.id]);
+
+  // Resolve current member id (per active club) and push subscription status
+  useEffect(() => {
+    if (!user || !activeClubId) { setMemberId(null); setPushEnabled(false); return; }
+    supabase.from("members")
+      .select("id")
+      .eq("auth_user_id", user.id).eq("club_id", activeClubId).maybeSingle()
+      .then(({ data: m }) => {
+        setMemberId(m?.id ?? null);
+        if (!m?.id) { setPushEnabled(false); return; }
+        supabase.from("push_subscriptions")
+          .select("id", { head: true, count: "exact" })
+          .eq("member_id", m.id)
+          .then(({ count }) => setPushEnabled((count ?? 0) > 0));
+      });
+  }, [user?.id, activeClubId]);
+
+  const handleEnablePush = async () => {
+    if (!memberId || !activeClubId) return;
+    setPushBusy(true);
+    try {
+      await enablePushNotifications(memberId, activeClubId);
+      setPushEnabled(true);
+      toast.success("Push notifications enabled");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not enable push notifications");
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
+  const handleDisablePush = async () => {
+    if (!memberId) return;
+    setPushBusy(true);
+    try {
+      await disablePushNotifications(memberId);
+      setPushEnabled(false);
+      toast.success("Push notifications disabled");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not disable push notifications");
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
+  const handleTestPush = async () => {
+    if (!memberId) return;
+    setTestPushBusy(true);
+    try {
+      const result = await sendTestPush(memberId);
+      if (result?.sent === false) {
+        toast.error(result.reason ?? "No push subscription found");
+      } else {
+        toast.success("Test push sent — check your device");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not send test push");
+    } finally {
+      setTestPushBusy(false);
+    }
+  };
 
   const persistPrefs = async (next: Prefs) => {
     if (!user) return;
@@ -829,6 +897,36 @@ function SettingsPage() {
             <p className="text-[11px] text-muted-foreground pt-2">
               Preferences save automatically. Push delivery rolls out separately.
             </p>
+
+            <div className="pt-3 mt-2 border-t space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-medium">Push notifications</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {pushEnabled ? "Enabled on this device" : "Not enabled on this device"}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant={pushEnabled ? "outline" : "default"}
+                  disabled={pushBusy || !memberId}
+                  onClick={pushEnabled ? handleDisablePush : handleEnablePush}
+                >
+                  {pushBusy ? "Working…" : pushEnabled ? "Disable" : "Enable push notifications"}
+                </Button>
+              </div>
+              {pushEnabled && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full"
+                  disabled={testPushBusy}
+                  onClick={handleTestPush}
+                >
+                  {testPushBusy ? "Sending…" : "Send test push to myself"}
+                </Button>
+              )}
+            </div>
           </div>
         );
 

@@ -3270,6 +3270,45 @@ export type Database = {
         }
         Relationships: []
       }
+      push_subscriptions: {
+        Row: {
+          club_id: string
+          created_at: string
+          id: string
+          member_id: string
+          onesignal_player_id: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          id?: string
+          member_id: string
+          onesignal_player_id: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          id?: string
+          member_id?: string
+          onesignal_player_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_subscriptions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       qualifications: {
         Row: {
           category: string
