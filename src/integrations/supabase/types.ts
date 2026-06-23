@@ -3277,6 +3277,7 @@ export type Database = {
           id: string
           member_id: string
           onesignal_player_id: string
+          onesignal_user_id: string | null
         }
         Insert: {
           club_id: string
@@ -3284,6 +3285,7 @@ export type Database = {
           id?: string
           member_id: string
           onesignal_player_id: string
+          onesignal_user_id?: string | null
         }
         Update: {
           club_id?: string
@@ -3291,6 +3293,7 @@ export type Database = {
           id?: string
           member_id?: string
           onesignal_player_id?: string
+          onesignal_user_id?: string | null
         }
         Relationships: [
           {

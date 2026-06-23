@@ -24,7 +24,7 @@ Deno.serve(async (req: Request) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   const { data: subs, error } = await supabase
     .from('push_subscriptions')
-    .select('onesignal_player_id')
+    .select('onesignal_user_id, onesignal_player_id')
     .in('member_id', member_ids);
 
   if (error) {
@@ -34,20 +34,22 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const playerIds = Array.from(new Set((subs ?? []).map((s) => s.onesignal_player_id)));
-  if (playerIds.length === 0) {
-    return new Response(JSON.stringify({ sent: false, reason: 'No push subscriptions for these members' }), {
+  // The current OneSignal API (api.onesignal.com, os_v2_app_ keys) targets
+  // recipients by OneSignal user ID via include_aliases — include_player_ids
+  // does not match subscriptions created by the v16 Web SDK.
+  const userIds = Array.from(
+    new Set((subs ?? []).map((s) => s.onesignal_user_id).filter((id): id is string => !!id)),
+  );
+  if (userIds.length === 0) {
+    return new Response(JSON.stringify({ sent: false, reason: 'No push subscriptions with a OneSignal user id for these members' }), {
       headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
     });
   }
 
-  // OneSignal's OpenAPI spec (https://github.com/OneSignal/api) has no
-  // include_subscription_ids field at all — include_player_ids is the
-  // (deprecated-in-name-only) field that now takes Subscription IDs.
   const onesignalReqBody = {
     app_id: ONESIGNAL_APP_ID,
-    include_player_ids: playerIds,
     target_channel: 'push',
+    include_aliases: { onesignal_id: userIds },
     headings: { en: title },
     contents: { en: body },
     ...(url ? { url } : {}),

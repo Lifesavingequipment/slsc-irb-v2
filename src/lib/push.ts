@@ -5,6 +5,7 @@ type PushSubscriptionChangeEvent = { current: { id: string | null } };
 type OneSignalSdk = {
   Notifications: { requestPermission: () => Promise<boolean> };
   User: {
+    onesignalId: string | null;
     PushSubscription: {
       id: string | null;
       optOut: () => Promise<void>;
@@ -65,18 +66,33 @@ function waitForPushSubscriptionId(OneSignal: OneSignalSdk, timeoutMs = 15000): 
   });
 }
 
+// The OneSignal user id is normally already set by the time the push
+// subscription id resolves, but poll briefly in case it lags behind.
+async function waitForOnesignalUserId(OneSignal: OneSignalSdk, timeoutMs = 5000): Promise<string> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (OneSignal.User.onesignalId) return OneSignal.User.onesignalId;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  throw new Error("Timed out waiting for OneSignal to assign a user id.");
+}
+
 // Soft opt-in: only call this from an explicit user tap, never on page load.
 export async function enablePushNotifications(memberId: string, clubId: string) {
   return withOneSignal(async (OneSignal) => {
     const granted = await OneSignal.Notifications.requestPermission();
     if (!granted) throw new Error("Push permission was not granted.");
     const playerId = await waitForPushSubscriptionId(OneSignal);
+    const onesignalUserId = await waitForOnesignalUserId(OneSignal);
     // Re-enabling can follow a stale/incorrect saved id (e.g. from before this
-    // fix) — drop any existing rows for this member so the correct id replaces it.
+    // fix) — drop any existing rows for this member so the correct ids replace it.
     await supabase.from("push_subscriptions").delete().eq("member_id", memberId);
-    const { error } = await supabase
-      .from("push_subscriptions")
-      .insert({ member_id: memberId, club_id: clubId, onesignal_player_id: playerId });
+    const { error } = await supabase.from("push_subscriptions").insert({
+      member_id: memberId,
+      club_id: clubId,
+      onesignal_player_id: playerId,
+      onesignal_user_id: onesignalUserId,
+    });
     if (error) throw error;
     return playerId;
   });
