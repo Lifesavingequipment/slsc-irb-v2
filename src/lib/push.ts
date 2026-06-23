@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 type PushSubscriptionChangeEvent = { current: { id: string | null } };
 
 type OneSignalSdk = {
+  login: (externalId: string) => Promise<void>;
   Notifications: { requestPermission: () => Promise<boolean> };
   User: {
     onesignalId: string | null;
@@ -84,6 +85,9 @@ export async function enablePushNotifications(memberId: string, clubId: string) 
     if (!granted) throw new Error("Push permission was not granted.");
     const playerId = await waitForPushSubscriptionId(OneSignal);
     const onesignalUserId = await waitForOnesignalUserId(OneSignal);
+    // Set the OneSignal External ID to our member id only after the subscription
+    // is confirmed — this is the primary targeting handle send-push relies on.
+    await OneSignal.login(memberId);
     // Re-enabling can follow a stale/incorrect saved id (e.g. from before this
     // fix) — drop any existing rows for this member so the correct ids replace it.
     await supabase.from("push_subscriptions").delete().eq("member_id", memberId);

@@ -1,7 +1,3 @@
-import { createClient } from 'jsr:@supabase/supabase-js@2';
-
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
-const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const ONESIGNAL_APP_ID = 'f625ba7b-3998-43ff-8be4-a4a1fc08ef0b';
 const ONESIGNAL_REST_API_KEY = Deno.env.get('ONESIGNAL_REST_API_KEY') ?? '';
 
@@ -21,35 +17,15 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-  const { data: subs, error } = await supabase
-    .from('push_subscriptions')
-    .select('onesignal_user_id, onesignal_player_id')
-    .in('member_id', member_ids);
-
-  if (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-    });
-  }
-
-  // The current OneSignal API (api.onesignal.com, os_v2_app_ keys) targets
-  // recipients by OneSignal user ID via include_aliases — include_player_ids
-  // does not match subscriptions created by the v16 Web SDK.
-  const userIds = Array.from(
-    new Set((subs ?? []).map((s) => s.onesignal_user_id).filter((id): id is string => !!id)),
-  );
-  if (userIds.length === 0) {
-    return new Response(JSON.stringify({ sent: false, reason: 'No push subscriptions with a OneSignal user id for these members' }), {
-      headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-    });
-  }
+  // member_id IS the OneSignal External ID — the client calls OneSignal.login(memberId)
+  // once the push subscription is confirmed, so we can target directly without
+  // looking up push_subscriptions for a OneSignal-assigned id.
+  const externalIds = Array.from(new Set(member_ids as string[]));
 
   const onesignalReqBody = {
     app_id: ONESIGNAL_APP_ID,
     target_channel: 'push',
-    include_aliases: { onesignal_id: userIds },
+    include_aliases: { external_id: externalIds },
     headings: { en: title },
     contents: { en: body },
     ...(url ? { url } : {}),
