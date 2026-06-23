@@ -41,11 +41,11 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const onesignalRes = await fetch('https://onesignal.com/api/v1/notifications', {
+  const onesignalRes = await fetch('https://api.onesignal.com/notifications', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Basic ${ONESIGNAL_REST_API_KEY}`,
+      Authorization: `Key ${ONESIGNAL_REST_API_KEY}`,
     },
     body: JSON.stringify({
       app_id: ONESIGNAL_APP_ID,
