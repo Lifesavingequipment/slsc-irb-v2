@@ -7,6 +7,35 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+async function onesignalGet(url: string) {
+  console.log('[debug-onesignal] GET', url);
+  const res = await fetch(url, {
+    headers: { Authorization: `Key ${ONESIGNAL_REST_API_KEY}` },
+  });
+  let body: unknown;
+  try { body = await res.json(); } catch { body = await res.text(); }
+  console.log('[debug-onesignal] GET status:', res.status);
+  console.log('[debug-onesignal] GET body:', JSON.stringify(body));
+  return { status: res.status, body };
+}
+
+async function onesignalPost(label: string, payload: unknown) {
+  console.log(`[debug-onesignal] POST attempt ${label}:`, JSON.stringify(payload));
+  const res = await fetch('https://api.onesignal.com/notifications', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Key ${ONESIGNAL_REST_API_KEY}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  let body: unknown;
+  try { body = await res.json(); } catch { body = await res.text(); }
+  console.log(`[debug-onesignal] POST attempt ${label} status:`, res.status);
+  console.log(`[debug-onesignal] POST attempt ${label} body:`, JSON.stringify(body));
+  return { status: res.status, body };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
@@ -14,43 +43,75 @@ Deno.serve(async (req: Request) => {
     ? `${ONESIGNAL_REST_API_KEY.slice(0, 6)}...${ONESIGNAL_REST_API_KEY.slice(-4)}`
     : '(empty)';
 
-  console.log('[debug-onesignal] app_id:', ONESIGNAL_APP_ID);
-  console.log('[debug-onesignal] key preview:', keyPreview);
+  // GET full user data to inspect subscription types
+  const userResult = await onesignalGet(
+    `https://api.onesignal.com/apps/${ONESIGNAL_APP_ID}/users/by/external_id/${TEST_EXTERNAL_ID}`
+  );
 
-  // GET app info
-  const appUrl = `https://api.onesignal.com/apps/${ONESIGNAL_APP_ID}`;
-  console.log('[debug-onesignal] GET', appUrl);
-  const appRes = await fetch(appUrl, {
-    headers: { Authorization: `Key ${ONESIGNAL_REST_API_KEY}` },
-  });
-  let appBody: unknown;
-  try { appBody = await appRes.json(); } catch { appBody = await appRes.text(); }
-  console.log('[debug-onesignal] app status:', appRes.status);
-  console.log('[debug-onesignal] app body:', JSON.stringify(appBody));
+  const userBody = userResult.body as Record<string, unknown>;
+  const identity = (userBody?.identity ?? {}) as Record<string, string>;
+  const subscriptions = (userBody?.subscriptions ?? []) as Array<Record<string, unknown>>;
+  const onesignalId: string = identity?.onesignal_id ?? '';
 
-  // GET user by external_id
-  const userUrl = `https://api.onesignal.com/apps/${ONESIGNAL_APP_ID}/users/by/external_id/${TEST_EXTERNAL_ID}`;
-  console.log('[debug-onesignal] GET', userUrl);
-  const userRes = await fetch(userUrl, {
-    headers: { Authorization: `Key ${ONESIGNAL_REST_API_KEY}` },
+  // Find first push subscription (type contains "Push")
+  const pushSub = subscriptions.find(s => String(s.type ?? '').toLowerCase().includes('push'));
+  const targetSub = pushSub ?? subscriptions[0];
+  const subscriptionId: string = (targetSub?.id as string) ?? '';
+  const subscriptionType: string = (targetSub?.type as string) ?? '';
+
+  console.log('[debug-onesignal] onesignal_id:', onesignalId);
+  console.log('[debug-onesignal] subscriptions:', JSON.stringify(subscriptions));
+  console.log('[debug-onesignal] target subscription id:', subscriptionId);
+  console.log('[debug-onesignal] target subscription type:', subscriptionType);
+
+  // Attempt A — include_aliases with external_id + target_channel
+  const attemptA = await onesignalPost('A', {
+    app_id: ONESIGNAL_APP_ID,
+    target_channel: 'push',
+    include_aliases: { external_id: [TEST_EXTERNAL_ID] },
+    headings: { en: 'Test A' },
+    contents: { en: 'Test A' },
   });
-  let userBody: unknown;
-  try { userBody = await userRes.json(); } catch { userBody = await userRes.text(); }
-  console.log('[debug-onesignal] user status:', userRes.status);
-  console.log('[debug-onesignal] user body:', JSON.stringify(userBody));
+
+  // Attempt B — include_aliases with onesignal_id + target_channel
+  const attemptB = await onesignalPost('B', {
+    app_id: ONESIGNAL_APP_ID,
+    target_channel: 'push',
+    include_aliases: { onesignal_id: [onesignalId] },
+    headings: { en: 'Test B' },
+    contents: { en: 'Test B' },
+  });
+
+  // Attempt C — include_subscription_ids directly (using first push subscription)
+  const attemptC = await onesignalPost('C', {
+    app_id: ONESIGNAL_APP_ID,
+    include_subscription_ids: [subscriptionId],
+    headings: { en: 'Test C' },
+    contents: { en: 'Test C' },
+  });
+
+  const recipientsA = (attemptA.body as Record<string, unknown>)?.recipients ?? 0;
+  const recipientsB = (attemptB.body as Record<string, unknown>)?.recipients ?? 0;
+  const recipientsC = (attemptC.body as Record<string, unknown>)?.recipients ?? 0;
+
+  const winner = (recipientsA as number) > 0 ? 'A'
+    : (recipientsB as number) > 0 ? 'B'
+    : (recipientsC as number) > 0 ? 'C'
+    : 'none';
 
   return new Response(JSON.stringify({
     key_preview: keyPreview,
     app_id: ONESIGNAL_APP_ID,
     external_id_tested: TEST_EXTERNAL_ID,
-    app: {
-      status: appRes.status,
-      body: appBody,
-    },
-    user: {
-      status: userRes.status,
-      body: userBody,
-    },
+    live_onesignal_id: onesignalId,
+    live_subscription_id: subscriptionId,
+    live_subscription_type: subscriptionType,
+    all_subscriptions: subscriptions,
+    user_fetch: { status: userResult.status },
+    winner,
+    attempt_A: { status: attemptA.status, body: attemptA.body, recipients: recipientsA },
+    attempt_B: { status: attemptB.status, body: attemptB.body, recipients: recipientsB },
+    attempt_C: { status: attemptC.status, body: attemptC.body, recipients: recipientsC },
   }, null, 2), {
     headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
   });
