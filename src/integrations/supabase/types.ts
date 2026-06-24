@@ -3272,28 +3272,31 @@ export type Database = {
       }
       push_subscriptions: {
         Row: {
+          auth: string
           club_id: string
           created_at: string
+          endpoint: string
           id: string
           member_id: string
-          onesignal_player_id: string
-          onesignal_user_id: string | null
+          p256dh: string
         }
         Insert: {
+          auth: string
           club_id: string
           created_at?: string
+          endpoint: string
           id?: string
           member_id: string
-          onesignal_player_id: string
-          onesignal_user_id?: string | null
+          p256dh: string
         }
         Update: {
+          auth?: string
           club_id?: string
           created_at?: string
+          endpoint?: string
           id?: string
           member_id?: string
-          onesignal_player_id?: string
-          onesignal_user_id?: string | null
+          p256dh?: string
         }
         Relationships: [
           {

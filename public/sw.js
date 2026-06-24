@@ -58,3 +58,37 @@ self.addEventListener('fetch', (event) => {
     fetch(event.request).catch(() => caches.match('/') || new Response('Offline', { status: 503 }))
   );
 });
+
+// ─── Native Web Push ──────────────────────────────────────────────────────────
+
+self.addEventListener('push', (event) => {
+  let data = { title: 'IRB Training', body: '', url: '/' };
+  if (event.data) {
+    try {
+      data = { ...data, ...event.data.json() };
+    } catch {
+      data.body = event.data.text();
+    }
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: '/irb-icon-192.png',
+      badge: '/irb-icon-192.png',
+      data: { url: data.url },
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || '/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const c of list) {
+        if (c.url === url && 'focus' in c) return c.focus();
+      }
+      return clients.openWindow(url);
+    })
+  );
+});
