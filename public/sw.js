@@ -5,6 +5,7 @@ const STATIC_ASSETS = [
   '/irb-logo.png',
   '/irb-icon-192.png',
   '/irb-icon-512.png',
+  '/irb-badge-96.png',
   '/apple-touch-icon.png',
 ];
 
@@ -74,7 +75,7 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(data.title, {
       body: data.body,
       icon: '/irb-icon-192.png',
-      badge: '/irb-icon-192.png',
+      badge: '/irb-badge-96.png',
       data: { url: data.url },
     })
   );
