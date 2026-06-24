@@ -1,115 +1,96 @@
 import { supabase } from "@/integrations/supabase/client";
 
-type PushSubscriptionChangeEvent = { current: { id: string | null } };
+// Public VAPID key — safe to commit (not a secret).
+const VAPID_PUBLIC_KEY =
+  "BCPIBQAWzNo4m1XXLfrnhtb02TNIXk_F6q-oCMEUMjJnp5jirbO__ILS6FZPFoinORn2VRjXzskK2VrhJvwx9eQ";
 
-type OneSignalSdk = {
-  login: (externalId: string) => Promise<void>;
-  Notifications: { requestPermission: () => Promise<boolean> };
-  User: {
-    onesignalId: string | null;
-    PushSubscription: {
-      id: string | null;
-      optOut: () => Promise<void>;
-      addEventListener: (
-        event: "change",
-        listener: (event: PushSubscriptionChangeEvent) => void,
-      ) => void;
-      removeEventListener: (
-        event: "change",
-        listener: (event: PushSubscriptionChangeEvent) => void,
-      ) => void;
-    };
+function urlBase64ToUint8Array(b64: string): Uint8Array {
+  const padding = "=".repeat((4 - (b64.length % 4)) % 4);
+  const base64 = (b64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  const output = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) output[i] = raw.charCodeAt(i);
+  return output;
+}
+
+async function getSwRegistration(): Promise<ServiceWorkerRegistration> {
+  await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+  return navigator.serviceWorker.ready;
+}
+
+// Returns true if this browser has an active push subscription whose endpoint
+// is stored in the DB for this member.
+export async function checkPushEnabled(memberId: string): Promise<boolean> {
+  if (!("PushManager" in window)) return false;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration("/");
+    if (!reg) return false;
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return false;
+    const { count } = await supabase
+      .from("push_subscriptions")
+      .select("id", { head: true, count: "exact" })
+      .eq("member_id", memberId)
+      .eq("endpoint", sub.endpoint)
+      .then(({ count }) => ({ count }));
+    return (count ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
+export async function enablePushNotifications(memberId: string, clubId: string): Promise<void> {
+  if (!("PushManager" in window)) {
+    throw new Error("Push notifications are not supported on this browser.");
+  }
+  const reg = await getSwRegistration();
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") throw new Error("Push notification permission was not granted.");
+
+  const subscription = await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+  });
+
+  const json = subscription.toJSON() as {
+    endpoint: string;
+    keys: { p256dh: string; auth: string };
   };
-};
 
-declare global {
-  interface Window {
-    OneSignalDeferred?: Array<(OneSignal: OneSignalSdk) => void | Promise<void>>;
-  }
-}
-
-function withOneSignal<T>(fn: (OneSignal: OneSignalSdk) => Promise<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    window.OneSignalDeferred.push(async (OneSignal) => {
-      try {
-        resolve(await fn(OneSignal));
-      } catch (err) {
-        reject(err);
-      }
-    });
-  });
-}
-
-// The push subscription id is null until OneSignal finishes registering the
-// subscription with its backend — that can happen just after permission is
-// granted, so wait for the "change" event rather than reading .id immediately.
-function waitForPushSubscriptionId(OneSignal: OneSignalSdk, timeoutMs = 15000): Promise<string> {
-  const existing = OneSignal.User.PushSubscription.id;
-  if (existing) return Promise.resolve(existing);
-
-  return new Promise((resolve, reject) => {
-    const onChange = (event: PushSubscriptionChangeEvent) => {
-      if (event.current.id) {
-        cleanup();
-        resolve(event.current.id);
-      }
-    };
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new Error("Timed out waiting for OneSignal to register the push subscription."));
-    }, timeoutMs);
-    const cleanup = () => {
-      clearTimeout(timer);
-      OneSignal.User.PushSubscription.removeEventListener("change", onChange);
-    };
-    OneSignal.User.PushSubscription.addEventListener("change", onChange);
-  });
-}
-
-// The OneSignal user id is normally already set by the time the push
-// subscription id resolves, but poll briefly in case it lags behind.
-async function waitForOnesignalUserId(OneSignal: OneSignalSdk, timeoutMs = 5000): Promise<string> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (OneSignal.User.onesignalId) return OneSignal.User.onesignalId;
-    await new Promise((resolve) => setTimeout(resolve, 200));
-  }
-  throw new Error("Timed out waiting for OneSignal to assign a user id.");
-}
-
-// Soft opt-in: only call this from an explicit user tap, never on page load.
-export async function enablePushNotifications(memberId: string, clubId: string) {
-  return withOneSignal(async (OneSignal) => {
-    const granted = await OneSignal.Notifications.requestPermission();
-    if (!granted) throw new Error("Push permission was not granted.");
-    const playerId = await waitForPushSubscriptionId(OneSignal);
-    const onesignalUserId = await waitForOnesignalUserId(OneSignal);
-    // Set the OneSignal External ID to our member id only after the subscription
-    // is confirmed — this is the primary targeting handle send-push relies on.
-    await OneSignal.login(memberId);
-    // Re-enabling can follow a stale/incorrect saved id (e.g. from before this
-    // fix) — drop any existing rows for this member so the correct ids replace it.
-    await supabase.from("push_subscriptions").delete().eq("member_id", memberId);
-    const { error } = await supabase.from("push_subscriptions").insert({
+  const { error } = await supabase.from("push_subscriptions").upsert(
+    {
       member_id: memberId,
       club_id: clubId,
-      onesignal_player_id: playerId,
-      onesignal_user_id: onesignalUserId,
-    });
-    if (error) throw error;
-    return playerId;
-  });
+      endpoint: json.endpoint,
+      p256dh: json.keys.p256dh,
+      auth: json.keys.auth,
+    },
+    { onConflict: "endpoint" },
+  );
+  if (error) throw error;
 }
 
-export async function disablePushNotifications(memberId: string) {
+export async function disablePushNotifications(memberId: string): Promise<void> {
+  try {
+    const reg = await navigator.serviceWorker.getRegistration("/");
+    if (reg) {
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) {
+        await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
+        await sub.unsubscribe();
+        return;
+      }
+    }
+  } catch {
+    // fall through
+  }
+  // Fallback: clear all DB rows for this member
   await supabase.from("push_subscriptions").delete().eq("member_id", memberId);
-  await withOneSignal(async (OneSignal) => {
-    await OneSignal.User.PushSubscription.optOut();
-  });
 }
 
-export async function sendTestPush(memberId: string) {
+export async function sendTestPush(
+  memberId: string,
+): Promise<{ sent: boolean; recipients?: number; reason?: string }> {
   const {
     data: { session },
   } = await supabase.auth.getSession();

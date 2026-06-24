@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useConfirm } from "@/lib/confirm";
-import { enablePushNotifications, disablePushNotifications, sendTestPush } from "@/lib/push";
+import { enablePushNotifications, disablePushNotifications, sendTestPush, checkPushEnabled } from "@/lib/push";
 
 export const Route = createFileRoute("/_app/settings")({
   head: () => ({ meta: [{ title: "Settings — IRB Coaching" }] }),
@@ -283,10 +283,7 @@ function SettingsPage() {
       .then(({ data: m }) => {
         setMemberId(m?.id ?? null);
         if (!m?.id) { setPushEnabled(false); return; }
-        supabase.from("push_subscriptions")
-          .select("id", { head: true, count: "exact" })
-          .eq("member_id", m.id)
-          .then(({ count }) => setPushEnabled((count ?? 0) > 0));
+        checkPushEnabled(m.id).then(setPushEnabled);
       });
   }, [user?.id, activeClubId]);
 
