@@ -74,6 +74,7 @@ type Prefs = {
   notify_join_requests: boolean;
   notify_fault_reports: boolean;
   notify_carpool_pending: boolean;
+  notify_chat_messages: boolean;
 };
 
 const DEFAULT_PREFS: Prefs = {
@@ -84,6 +85,7 @@ const DEFAULT_PREFS: Prefs = {
   notify_join_requests: true,
   notify_fault_reports: true,
   notify_carpool_pending: true,
+  notify_chat_messages: true,
 };
 
 type SectionKey = "profile" | "email" | "password" | "notifications" | "clubs" | "locations" | "roles" | "templates" | "feedback";
@@ -258,7 +260,7 @@ function SettingsPage() {
   useEffect(() => {
     if (!user) return;
     supabase.from("member_preferences")
-      .select("notify_session_reminders, notify_new_sessions, notify_carpool_updates, notify_equipment, notify_join_requests, notify_fault_reports, notify_carpool_pending")
+      .select("notify_session_reminders, notify_new_sessions, notify_carpool_updates, notify_equipment, notify_join_requests, notify_fault_reports, notify_carpool_pending, notify_chat_messages")
       .eq("user_id", user.id).maybeSingle()
       .then(({ data }) => {
         if (!data) return;
@@ -270,6 +272,7 @@ function SettingsPage() {
           notify_join_requests: data.notify_join_requests,
           notify_fault_reports: data.notify_fault_reports,
           notify_carpool_pending: data.notify_carpool_pending,
+          notify_chat_messages: data.notify_chat_messages ?? true,
         });
       });
   }, [user?.id]);
@@ -856,6 +859,12 @@ function SettingsPage() {
               desc="Let me know when a coach adds a new session in my club."
               checked={prefs.notify_new_sessions}
               onChange={(v) => updatePref("notify_new_sessions", v)}
+            />
+            <PrefRow
+              title="Chat messages"
+              desc="Someone sends a message in a channel I'm in."
+              checked={prefs.notify_chat_messages}
+              onChange={(v) => updatePref("notify_chat_messages", v)}
             />
             <PrefRow
               title="Carpool updates"
