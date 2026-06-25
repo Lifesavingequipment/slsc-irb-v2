@@ -163,6 +163,7 @@ function ChatPage() {
   const longPressFiredRef = useRef(false);
   const initialScrollDoneRef = useRef(false);
   const messageIdsRef = useRef<string[]>([]);
+  const messagesRef = useRef<Message[]>([]);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
@@ -465,6 +466,12 @@ function ChatPage() {
     [myMemberId],
   );
 
+  // Keep messagesRef in sync so markRead can read the latest messages without
+  // taking messages as a reactive dep (which would cause subscription churn).
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
   const markRead = useCallback(
     async (channelId: string) => {
       if (!myMemberId) return;
@@ -475,8 +482,9 @@ function ChatPage() {
         .eq("channel_id", channelId)
         .eq("member_id", myMemberId);
       setChannels((prev) => prev.map((c) => (c.id === channelId ? { ...c, unread: 0 } : c)));
-      if (messages.length > 0) {
-        const latestId = messages[messages.length - 1].id;
+      const msgs = messagesRef.current;
+      if (msgs.length > 0) {
+        const latestId = msgs[msgs.length - 1].id;
         await supabase
           .from("message_reads")
           .upsert(
@@ -485,7 +493,7 @@ function ChatPage() {
           );
       }
     },
-    [myMemberId, messages],
+    [myMemberId],
   );
 
   // Subscribe to realtime changes for a channel. Uses a wildcard event ('*') so
