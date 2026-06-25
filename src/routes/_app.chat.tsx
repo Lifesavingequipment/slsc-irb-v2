@@ -902,7 +902,8 @@ function ChatPage() {
     const { data } = await supabase
       .from("members")
       .select("id, first_name, last_name, preferred_name")
-      .eq("club_id", activeClub.club_id);
+      .eq("club_id", activeClub.club_id)
+      .eq("membership_status", "active");
     setClubMembers(
       (data ?? [])
         .filter((m) => m.id !== myMemberId)
@@ -923,6 +924,35 @@ function ChatPage() {
   const createChat = async () => {
     if (!activeClub || !myMemberId || selectedMembers.length === 0) return;
     setCreating(true);
+
+    // For DMs, find an existing channel between these two participants before creating.
+    if (chatType === "direct" && selectedMembers.length === 1) {
+      const otherMemberId = selectedMembers[0];
+      const { data: myMemberships } = await supabase
+        .from("chat_members")
+        .select("channel_id, channel:chat_channels(type)")
+        .eq("member_id", myMemberId);
+      const myDirectIds = (myMemberships ?? [])
+        .filter((r) => (r.channel as { type: string } | null)?.type === "direct")
+        .map((r) => r.channel_id)
+        .filter(Boolean) as string[];
+      if (myDirectIds.length > 0) {
+        const { data: overlap } = await supabase
+          .from("chat_members")
+          .select("channel_id")
+          .eq("member_id", otherMemberId)
+          .in("channel_id", myDirectIds)
+          .limit(1);
+        if (overlap && overlap.length > 0) {
+          setCreating(false);
+          setNewChatOpen(false);
+          await loadChannels();
+          void openChannel(overlap[0].channel_id!);
+          return;
+        }
+      }
+    }
+
     const name =
       chatName.trim() ||
       (chatType === "direct"
@@ -1021,11 +1051,9 @@ function ChatPage() {
         >
           <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
             <h2 className="font-semibold text-sm">Messages</h2>
-            {canManage && (
-              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={openNewChat}>
-                <Plus className="h-4 w-4" />
-              </Button>
-            )}
+            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={openNewChat}>
+              <Plus className="h-4 w-4" />
+            </Button>
           </div>
 
           <ScrollArea className="flex-1 min-h-0">
