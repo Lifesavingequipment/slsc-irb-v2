@@ -15,6 +15,7 @@ import { useRefetchOnFocus } from "@/hooks/use-refetch-on-focus";
 import { useMemberFirstName } from "@/hooks/useMemberFirstName";
 import { useWeatherTidesData, useLocationWeatherData } from "@/components/session/WeatherTidesCard";
 import { cn } from "@/lib/utils";
+import { PushPromptBanner } from "@/components/PushPromptBanner";
 
 export const Route = createFileRoute("/_app/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — IRB Coaching" }] }),
@@ -213,6 +214,7 @@ function Dashboard() {
         {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
       </div>
 
+      <PushPromptBanner />
       <TodayConditionsCard />
 
       {isGuardian && guardianChildren.length > 0 && (
