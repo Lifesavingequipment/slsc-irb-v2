@@ -75,7 +75,6 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(data.title, {
       body: data.body,
       icon: '/irb-icon-192.png',
-      badge: '/irb-badge-96.png',
       data: { url: data.url },
     })
   );
