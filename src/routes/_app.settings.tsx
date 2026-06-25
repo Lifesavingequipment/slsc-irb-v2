@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useConfirm } from "@/lib/confirm";
-import { enablePushNotifications, disablePushNotifications, sendTestPush } from "@/lib/push";
+import { enablePushNotifications, disablePushNotifications } from "@/lib/push";
 
 export const Route = createFileRoute("/_app/settings")({
   head: () => ({ meta: [{ title: "Settings — IRB Coaching" }] }),
@@ -155,7 +155,6 @@ function SettingsPage() {
   const [memberId, setMemberId] = useState<string | null>(null);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
-  const [testPushBusy, setTestPushBusy] = useState(false);
   // All sections collapsed by default for a cleaner Settings landing.
   const [open, setOpen] = useState<Record<SectionKey, boolean>>({
     profile: false, email: false, password: false, notifications: false,
@@ -321,22 +320,6 @@ function SettingsPage() {
     }
   };
 
-  const handleTestPush = async () => {
-    if (!memberId) return;
-    setTestPushBusy(true);
-    try {
-      const result = await sendTestPush(memberId);
-      if (result?.sent === false) {
-        toast.error(result.reason ?? "No push subscription found");
-      } else {
-        toast.success(`Test push delivered to ${result.recipients} device(s)`);
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not send test push");
-    } finally {
-      setTestPushBusy(false);
-    }
-  };
 
   const persistPrefs = async (next: Prefs) => {
     if (!user) return;
@@ -924,17 +907,6 @@ function SettingsPage() {
                   {pushBusy ? "Working…" : pushEnabled ? "Disable" : "Enable push notifications"}
                 </Button>
               </div>
-              {pushEnabled && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full"
-                  disabled={testPushBusy}
-                  onClick={handleTestPush}
-                >
-                  {testPushBusy ? "Sending…" : "Send test push to myself"}
-                </Button>
-              )}
             </div>
           </div>
         );
