@@ -257,6 +257,37 @@ function ChatPage() {
         };
       });
 
+      // For DM channels, resolve the other participant's name so the current
+      // user doesn't see their own name as the conversation title.
+      const directBuilt = built.filter((c) => c.type === "direct");
+      if (directBuilt.length > 0) {
+        const directIds = directBuilt.map((c) => c.id);
+        const { data: otherCm } = await supabase
+          .from("chat_members")
+          .select("channel_id, member:members(first_name, last_name, preferred_name)")
+          .in("channel_id", directIds)
+          .neq("member_id", myMemberId);
+        const nameByChannel: Record<string, string> = {};
+        (otherCm ?? []).forEach((r) => {
+          const m = r.member as {
+            first_name?: string;
+            last_name?: string;
+            preferred_name?: string;
+          } | null;
+          if (m && r.channel_id) {
+            nameByChannel[r.channel_id] =
+              m.preferred_name ||
+              [m.first_name, m.last_name].filter(Boolean).join(" ") ||
+              "Direct";
+          }
+        });
+        built.forEach((c) => {
+          if (c.type === "direct" && nameByChannel[c.id]) {
+            c.name = nameByChannel[c.id];
+          }
+        });
+      }
+
       // Sort: main first, then by last message time desc
       built.sort((a, b) => {
         if (a.type === "main") return -1;
