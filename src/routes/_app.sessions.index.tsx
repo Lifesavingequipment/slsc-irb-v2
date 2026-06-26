@@ -184,14 +184,15 @@ function SessionsList() {
 
 
   return (
-    <AppShell
-      action={canManage ? (
-        <Button asChild size="sm" variant="secondary" className="h-9">
-          <Link to="/sessions/new"><Plus className="h-4 w-4 mr-1" /> New</Link>
-        </Button>
-      ) : undefined}
-    >
-      <h1 className="text-2xl font-bold mb-3">Sessions</h1>
+    <AppShell>
+      <div className="flex items-center justify-between mb-3">
+        <h1 className="text-2xl font-bold">Sessions</h1>
+        {canManage && (
+          <Button asChild size="sm" variant="secondary" className="h-9">
+            <Link to="/sessions/new"><Plus className="h-4 w-4 mr-1" /> New</Link>
+          </Button>
+        )}
+      </div>
 
       {filter && (
         <div className="mb-4 flex items-center gap-2 px-3 py-2.5 rounded-lg bg-muted text-sm">
