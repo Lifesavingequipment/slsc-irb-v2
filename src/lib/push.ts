@@ -69,19 +69,22 @@ export async function enablePushNotifications(memberId: string, clubId: string) 
     const { error: deleteError } = await supabase.from("push_subscriptions").delete().eq("member_id", memberId);
     if (deleteError) console.error("[push] delete existing subscription failed:", deleteError);
 
-    console.log("[push] inserting new push_subscriptions row...");
-    const { error } = await supabase.from("push_subscriptions").insert({
-      member_id: memberId,
-      club_id: clubId,
-      endpoint: subscription.endpoint,
-      p256dh,
-      auth,
-    });
+    console.log("[push] upserting push_subscriptions row...");
+    const { error } = await supabase.from("push_subscriptions").upsert(
+      {
+        member_id: memberId,
+        club_id: clubId,
+        endpoint: subscription.endpoint,
+        p256dh,
+        auth,
+      },
+      { onConflict: "endpoint" },
+    );
     if (error) {
-      console.error("[push] insert push_subscriptions failed:", error);
+      console.error("[push] upsert push_subscriptions failed:", error);
       throw error;
     }
-    console.log("[push] push_subscriptions insert succeeded");
+    console.log("[push] push_subscriptions upsert succeeded");
 
     // Register the same subscription for any other clubs this user belongs to.
     // Errors here are non-fatal — the primary subscription already succeeded.
@@ -116,7 +119,7 @@ export async function enablePushNotifications(memberId: string, clubId: string) 
                 p256dh,
                 auth,
               })),
-              { onConflict: "member_id" },
+              { onConflict: "endpoint" },
             );
             if (upsertError) console.warn("[push] secondary club upsert failed:", upsertError);
           }
