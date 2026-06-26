@@ -1533,8 +1533,8 @@ function ChatPage() {
 
               {/* Input */}
               <div
-                className="px-3 py-2 border-t bg-background shrink-0 flex gap-1.5 items-end"
-                style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)' }}
+                className="px-3 py-1.5 border-t bg-background shrink-0 flex gap-1.5 items-end"
+                style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 6px)' }}
               >
                 <button
                   onClick={() => fileInputRef.current?.click()}
@@ -1570,7 +1570,7 @@ function ChatPage() {
                     }, 2000);
                   }}
                   placeholder="Type a message…"
-                  className="flex-1 min-h-[36px] max-h-[120px] overflow-y-auto resize-none py-1.5 text-sm"
+                  className="flex-1 min-h-[32px] max-h-[120px] overflow-y-auto resize-none py-1 text-sm"
                   rows={1}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
