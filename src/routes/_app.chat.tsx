@@ -167,6 +167,8 @@ function ChatPage() {
   const messagesRef = useRef<Message[]>([]);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const prevMessageCountRef = useRef(0);
 
   const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
@@ -189,6 +191,15 @@ function ChatPage() {
     });
   }, [activeClub]);
 
+  // Reset thread state when switching clubs so stale channels/messages don't show.
+  useEffect(() => {
+    setActiveChannelId(null);
+    setMessages([]);
+    setShowThread(false);
+    initialScrollDoneRef.current = false;
+    prevMessageCountRef.current = 0;
+  }, [activeClub?.club_id]);
+
   const loadChannels = useCallback(async () => {
     if (!myMemberId || !activeClub) return;
     setLoading(true);
@@ -200,10 +211,10 @@ function ChatPage() {
         console.error("ensureMainChannel failed (non-fatal):", e);
       }
 
-      // Load channels I'm in
+      // Load channels I'm in that belong to the active club
       const { data: cm, error: cmErr } = await supabase
         .from("chat_members")
-        .select("channel_id, last_read_at, channel:chat_channels(id, name, type, created_by)")
+        .select("channel_id, last_read_at, channel:chat_channels(id, name, type, created_by, club_id)")
         .eq("member_id", myMemberId);
 
       if (cmErr) {
@@ -212,7 +223,11 @@ function ChatPage() {
       }
       if (!cm) return;
 
-      const validCm = cm.filter((r): r is typeof r & { channel_id: string } => r.channel_id != null);
+      const validCm = cm.filter((r): r is typeof r & { channel_id: string } => {
+        if (r.channel_id == null) return false;
+        const ch = r.channel as { club_id?: string } | null;
+        return ch?.club_id === activeClub.club_id;
+      });
       const channelIds = validCm.map((r) => r.channel_id);
       if (channelIds.length === 0) {
         setChannels([]);
@@ -757,20 +772,36 @@ function ChatPage() {
   );
 
   useEffect(() => {
-    if (messages.length === 0) return;
+    const currentLen = messages.length;
+    const prevLen = prevMessageCountRef.current;
+    prevMessageCountRef.current = currentLen;
+
+    if (currentLen === 0) return;
+
     if (!initialScrollDoneRef.current) {
       initialScrollDoneRef.current = true;
-      requestAnimationFrame(() => {
-        if (firstUnreadId) {
-          unreadDividerRef.current?.scrollIntoView({ block: "center" });
-        } else {
-          bottomRef.current?.scrollIntoView();
+      if (firstUnreadId) {
+        unreadDividerRef.current?.scrollIntoView({ block: "center" });
+      } else {
+        const el = scrollContainerRef.current;
+        if (el) {
+          el.scrollTop = el.scrollHeight;
+          setTimeout(() => {
+            if (scrollContainerRef.current) {
+              scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+            }
+          }, 100);
         }
-      });
+      }
       return;
     }
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, firstUnreadId]);
+
+    // Scroll to bottom when a new message is added (realtime or sent)
+    if (currentLen > prevLen) {
+      const el = scrollContainerRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    }
+  }, [messages.length, firstUnreadId]);
 
   useEffect(() => {
     messageIdsRef.current = messages.map((m) => m.id);
@@ -1235,7 +1266,7 @@ function ChatPage() {
               )}
 
               {/* Messages */}
-              <ScrollArea className="flex-1 min-h-0 px-4 py-3">
+              <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
                 <div>
                   {messages.length === 0 && (
                     <div className="text-center text-sm text-muted-foreground py-8">
@@ -1421,7 +1452,7 @@ function ChatPage() {
                   })}
                   <div ref={bottomRef} />
                 </div>
-              </ScrollArea>
+              </div>
 
               {/* Reply preview */}
               {replyingTo && (
