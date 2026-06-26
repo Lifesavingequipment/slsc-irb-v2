@@ -890,23 +890,20 @@ function SettingsPage() {
               Preferences save automatically. Push delivery rolls out separately.
             </p>
 
-            <div className="pt-3 mt-2 border-t space-y-2">
-              <div className="flex items-center justify-between">
-                <div>
+            <div className="pt-3 mt-2 border-t">
+              <label className="flex items-start justify-between gap-3 py-2.5 cursor-pointer">
+                <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium">Push notifications</div>
-                  <div className="text-[11px] text-muted-foreground">
+                  <div className="text-xs text-muted-foreground">
                     {pushEnabled ? "Enabled on this device" : "Not enabled on this device"}
                   </div>
                 </div>
-                <Button
-                  size="sm"
-                  variant={pushEnabled ? "outline" : "default"}
+                <Switch
+                  checked={pushEnabled}
                   disabled={pushBusy || !memberId}
-                  onClick={pushEnabled ? handleDisablePush : handleEnablePush}
-                >
-                  {pushBusy ? "Working…" : pushEnabled ? "Disable" : "Enable push notifications"}
-                </Button>
-              </div>
+                  onCheckedChange={(v) => v ? handleEnablePush() : handleDisablePush()}
+                />
+              </label>
             </div>
           </div>
         );
