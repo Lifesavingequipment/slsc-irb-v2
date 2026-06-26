@@ -55,6 +55,43 @@ export async function enablePushNotifications(memberId: string, clubId: string) 
   });
   if (error) throw error;
 
+  // Register the same subscription for any other clubs this user belongs to.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) {
+    const { data: otherMemberships } = await supabase
+      .from("club_memberships")
+      .select("club_id")
+      .eq("user_id", user.id)
+      .eq("status", "approved")
+      .neq("club_id", clubId);
+
+    if (otherMemberships?.length) {
+      const { data: otherMembers } = await supabase
+        .from("members")
+        .select("id, club_id")
+        .eq("auth_user_id", user.id)
+        .in(
+          "club_id",
+          otherMemberships.map((m) => m.club_id),
+        );
+
+      if (otherMembers?.length) {
+        await supabase.from("push_subscriptions").upsert(
+          otherMembers.map((m) => ({
+            member_id: m.id,
+            club_id: m.club_id,
+            endpoint: subscription.endpoint,
+            p256dh,
+            auth,
+          })),
+          { onConflict: "member_id" },
+        );
+      }
+    }
+  }
+
   return subscription.endpoint;
 }
 
