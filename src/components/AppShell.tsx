@@ -27,6 +27,7 @@ import {
 import { NotificationBell } from "@/components/NotificationBell";
 import { useChatUnread } from "@/hooks/useChatUnread";
 import { useMemberFirstName } from "@/hooks/useMemberFirstName";
+import { useNotifications } from "@/hooks/useNotifications";
 
 function getNavItems(canManage: boolean, isGuardian: boolean) {
   if (isGuardian) {
@@ -60,6 +61,7 @@ export function AppShell({
   const isGuardian = useIsGuardian();
   const navItems = getNavItems(canManage, isGuardian);
   const chatUnread = useChatUnread();
+  const { unreadCount: notifUnread } = useNotifications();
   const location = useLocation();
   const firstName = useMemberFirstName();
   const approvedClubs = memberships.filter((m) => m.status === "approved");
@@ -117,7 +119,9 @@ export function AppShell({
           {navItems.map((item) => {
             const active = location.pathname.startsWith(item.to);
             const Icon = item.icon;
-            const badge = item.to === "/chat" && chatUnread > 0 ? chatUnread : 0;
+            const badge =
+              item.to === "/chat" && chatUnread > 0 ? chatUnread :
+              item.to === "/more" && notifUnread > 0 ? notifUnread : 0;
             return (
               <Link
                 key={item.to}
@@ -269,7 +273,9 @@ export function AppShell({
             {navItems.map((item) => {
               const active = location.pathname.startsWith(item.to);
               const Icon = item.icon;
-              const badge = item.to === "/chat" && chatUnread > 0 ? chatUnread : 0;
+              const badge =
+                item.to === "/chat" && chatUnread > 0 ? chatUnread :
+                item.to === "/more" && notifUnread > 0 ? notifUnread : 0;
               return (
                 <Link
                   key={item.to}
