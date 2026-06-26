@@ -51,11 +51,20 @@ export function AppShell({
   action,
   children,
   hideBottomNav,
+  fullBleed,
 }: {
   title?: string;
   action?: ReactNode;
   children: ReactNode;
   hideBottomNav?: boolean;
+  /**
+   * When set, the shell becomes a fixed-height (100dvh), non-scrolling column
+   * and <main> is a bounded flex container that fills the area between the
+   * header and the bottom nav. The page's content owns its own scrolling and
+   * fills the box via normal flow — no position:fixed / portal escape hatches,
+   * so there is nothing painted behind it for a previous route to bleed through.
+   */
+  fullBleed?: boolean;
 }) {
   const { activeClub, memberships, setActiveClubId } = useClub();
   const { user } = useAuth();
@@ -74,7 +83,9 @@ export function AppShell({
   const [clubSwitcherOpen, setClubSwitcherOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#f9fafb] flex">
+    <div
+      className={cn("bg-[#f9fafb] flex", fullBleed ? "h-[100dvh] overflow-hidden" : "min-h-screen")}
+    >
       {/* ── Desktop sidebar (≥768px) ── */}
       <aside className="hidden md:flex flex-col fixed inset-y-0 left-0 w-60 bg-[#1e293b] z-30">
         {/* Logo row */}
@@ -169,7 +180,12 @@ export function AppShell({
       </aside>
 
       {/* ── Content column ── */}
-      <div className="flex flex-col flex-1 md:ml-60 min-h-screen w-0">
+      <div
+        className={cn(
+          "flex flex-col flex-1 md:ml-60 w-0",
+          fullBleed ? "h-[100dvh] min-h-0 overflow-hidden" : "min-h-screen",
+        )}
+      >
         {/* Top header */}
         <header className="safe-top sticky top-0 z-20 bg-[#FF6600] text-white shadow-md shrink-0">
           <div className="px-4 pt-3 pb-3 flex items-center gap-3">
@@ -263,10 +279,21 @@ export function AppShell({
         </header>
 
         {/* Page content */}
-        <main className={cn(
-          "flex-1 overflow-x-hidden px-4 pt-4 md:px-6 md:pt-6 max-w-4xl mx-auto w-full md:pb-8",
-          hideBottomNav ? "pb-0 overflow-hidden" : "pb-24",
-        )}>
+        <main
+          className={cn(
+            fullBleed
+              ? cn(
+                  "flex-1 min-h-0 w-full flex flex-col overflow-hidden",
+                  // Reserve room for the fixed mobile bottom nav (hidden on md+).
+                  !hideBottomNav &&
+                    "pb-[calc(56px+max(env(safe-area-inset-bottom),0.5rem))] md:pb-0",
+                )
+              : cn(
+                  "flex-1 overflow-x-hidden px-4 pt-4 md:px-6 md:pt-6 max-w-4xl mx-auto w-full md:pb-8",
+                  hideBottomNav ? "pb-0 overflow-hidden" : "pb-24",
+                ),
+          )}
+        >
           {children}
         </main>
 

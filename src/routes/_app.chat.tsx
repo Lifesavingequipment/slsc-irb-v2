@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClub, useCanManage } from "@/lib/club-context";
@@ -1100,13 +1099,12 @@ function ChatPage() {
   const threadPanel = (
     <div
       className={cn(
-        "flex flex-col flex-1 min-w-0 overflow-hidden",
-        showThread ? "fixed inset-0 z-50 bg-white dark:bg-background" : "hidden md:flex",
+        "flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden bg-background",
+        // In-flow: fills the bounded AppShell <main>. On mobile it replaces the
+        // channel list when a thread is open; on md+ it sits beside the list.
+        showThread ? "flex" : "hidden md:flex",
       )}
-      style={showThread ? {
-        paddingTop: 'env(safe-area-inset-top)',
-        paddingBottom: `${keyboardHeight}px`,
-      } : undefined}
+      style={showThread ? { paddingBottom: `${keyboardHeight}px` } : undefined}
     >
       {!activeChannelId ? (
         <div className="flex-1 flex items-center justify-center">
@@ -1529,19 +1527,17 @@ function ChatPage() {
   );
 
   return (
-    <AppShell hideBottomNav={showThread}>
-      <div
-        className={cn(
-          "overflow-hidden border bg-background flex",
-          "md:relative md:inset-auto md:h-[calc(100dvh-3.5rem-2rem)] md:-mx-6 md:-mt-6 md:-mb-8 md:rounded-xl md:z-auto",
-          "fixed inset-x-0 z-10 top-[60px]",
-        )}
-        style={{
-          bottom: `calc(72px + ${keyboardHeight}px + env(safe-area-inset-bottom, 0px))`,
-        }}
-      >
+    <AppShell fullBleed hideBottomNav={showThread}>
+      <div className="flex flex-1 min-h-0 w-full overflow-hidden bg-background">
         {/* Left panel — channel list */}
-        <div className="flex flex-col w-full md:w-72 border-r shrink-0">
+        <div
+          className={cn(
+            "flex flex-col w-full md:w-72 border-r shrink-0 min-h-0",
+            // On mobile, the list and the open thread are mutually exclusive;
+            // on md+ both are always visible side by side.
+            showThread ? "hidden md:flex" : "flex",
+          )}
+        >
           <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
             <h2 className="font-semibold text-sm">Messages</h2>
             <Button size="icon" variant="ghost" className="h-8 w-8" onClick={openNewChat}>
@@ -1613,7 +1609,7 @@ function ChatPage() {
           </ScrollArea>
         </div>
 
-        {showThread ? createPortal(threadPanel, document.body) : threadPanel}
+        {threadPanel}
       </div>
 
       {/* New chat dialog */}
