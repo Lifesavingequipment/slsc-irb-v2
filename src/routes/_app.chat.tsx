@@ -1096,14 +1096,12 @@ function ChatPage() {
   };
 
   return (
-    <AppShell>
+    <AppShell hideBottomNav={showThread}>
       <div
         className="fixed md:relative inset-x-0 top-[60px] md:inset-auto md:h-[calc(100dvh-3.5rem-2rem)] md:-mx-6 md:-mt-6 md:-mb-8 overflow-hidden md:rounded-xl border bg-background flex z-10 md:z-auto"
         style={{
           paddingTop: 'env(safe-area-inset-top)',
-          bottom: keyboardHeight > 0
-            ? `calc(72px + ${keyboardHeight}px + env(safe-area-inset-bottom, 0px))`
-            : `calc(72px + env(safe-area-inset-bottom, 0px))`,
+          bottom: `calc(${showThread ? 0 : 72}px + ${keyboardHeight}px + env(safe-area-inset-bottom, 0px))`,
         }}
       >
         {/* Left panel — channel list */}
@@ -1306,13 +1304,13 @@ function ChatPage() {
                         >
                           {!isMe &&
                             (lastInGroup ? (
-                              <Avatar className="h-7 w-7 shrink-0">
-                                <AvatarFallback className="text-[10px]">
+                              <Avatar className="h-8 w-8 shrink-0">
+                                <AvatarFallback className="text-[11px] bg-muted-foreground/15 text-foreground">
                                   {initials(msg.senderName ?? "?")}
                                 </AvatarFallback>
                               </Avatar>
                             ) : (
-                              <div className="h-7 w-7 shrink-0" />
+                              <div className="h-8 w-8 shrink-0" />
                             ))}
                           <div
                             className={`max-w-[75%] flex flex-col ${isMe ? "items-end" : "items-start"}`}
@@ -1533,18 +1531,18 @@ function ChatPage() {
 
               {/* Input */}
               <div
-                className="px-3 py-1.5 border-t bg-background shrink-0 flex gap-1.5 items-end"
-                style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 6px)' }}
+                className="px-3 py-2 border-t bg-background shrink-0 flex items-end gap-2"
+                style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)' }}
               >
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="h-8 w-8 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors shrink-0"
+                  className="h-9 w-9 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors shrink-0 mb-0.5"
                   disabled={uploading}
                 >
                   {uploading ? (
-                    <span className="animate-spin">⏳</span>
+                    <span className="animate-spin text-xs">⏳</span>
                   ) : (
-                    <Paperclip className="h-4 w-4" />
+                    <Paperclip className="h-5 w-5" />
                   )}
                 </button>
                 <input
@@ -1554,37 +1552,44 @@ function ChatPage() {
                   accept="image/*,.pdf,.doc,.docx,.txt"
                   onChange={handleFileSelect}
                 />
-                <Textarea
-                  ref={textareaRef}
-                  value={body}
-                  onChange={(e) => {
-                    setBody(e.target.value);
-                    const el = e.target;
-                    el.style.height = "auto";
-                    el.style.height = `${el.scrollHeight}px`;
-                    if (!activeChannelId) return;
-                    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-                    void realtimeRef.current?.track({ name: myMemberName, typing: true, channelId: activeChannelId });
-                    typingTimeoutRef.current = setTimeout(() => {
-                      void realtimeRef.current?.track({ name: myMemberName, typing: false, channelId: activeChannelId });
-                    }, 2000);
-                  }}
-                  placeholder="Type a message…"
-                  className="flex-1 min-h-[32px] max-h-[120px] overflow-y-auto resize-none py-1 text-sm"
-                  rows={1}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      void sendMessage();
-                    }
-                  }}
-                />
-                <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" disabled>
-                  <SmilePlus className="h-4 w-4" />
-                </Button>
+                <div className="flex-1 flex items-end bg-muted rounded-[22px] px-3 py-2 min-h-[40px] gap-1">
+                  <Textarea
+                    ref={textareaRef}
+                    value={body}
+                    onChange={(e) => {
+                      setBody(e.target.value);
+                      const el = e.target;
+                      el.style.height = "auto";
+                      el.style.height = `${el.scrollHeight}px`;
+                      if (!activeChannelId) return;
+                      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+                      void realtimeRef.current?.track({ name: myMemberName, typing: true, channelId: activeChannelId });
+                      typingTimeoutRef.current = setTimeout(() => {
+                        void realtimeRef.current?.track({ name: myMemberName, typing: false, channelId: activeChannelId });
+                      }, 2000);
+                    }}
+                    placeholder="Aa"
+                    className="flex-1 min-h-[20px] max-h-[100px] overflow-y-auto resize-none border-0 shadow-none bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm leading-5 self-center"
+                    rows={1}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        void sendMessage();
+                      }
+                    }}
+                  />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 shrink-0 text-muted-foreground self-end p-0 hover:bg-transparent"
+                    disabled
+                  >
+                    <SmilePlus className="h-4 w-4" />
+                  </Button>
+                </div>
                 <Button
                   size="icon"
-                  className="h-8 w-8 bg-[#FF6600] hover:bg-[#E65C00] shrink-0"
+                  className="h-9 w-9 rounded-full bg-[#FF6600] hover:bg-[#E65C00] shrink-0 mb-0.5"
                   onClick={() => void sendMessage()}
                   disabled={sending || !body.trim()}
                 >

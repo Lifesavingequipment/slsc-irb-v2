@@ -50,10 +50,12 @@ export function AppShell({
   title,
   action,
   children,
+  hideBottomNav,
 }: {
   title?: string;
   action?: ReactNode;
   children: ReactNode;
+  hideBottomNav?: boolean;
 }) {
   const { activeClub, memberships, setActiveClubId } = useClub();
   const { user } = useAuth();
@@ -265,8 +267,8 @@ export function AppShell({
           {children}
         </main>
 
-        {/* ── Mobile bottom tab bar (hidden on md+) ── */}
-        <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-[#1e293b] safe-bottom">
+        {/* ── Mobile bottom tab bar (hidden on md+, or when hideBottomNav is set) ── */}
+        <nav className={cn("md:hidden fixed bottom-0 inset-x-0 z-30 bg-[#1e293b] safe-bottom", hideBottomNav && "hidden")}>
           <div
             className={`grid ${navItems.length === 5 ? "grid-cols-5" : navItems.length === 3 ? "grid-cols-3" : "grid-cols-4"}`}
           >
