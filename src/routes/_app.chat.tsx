@@ -1533,12 +1533,12 @@ function ChatPage() {
 
               {/* Input */}
               <div
-                className="px-4 py-3 border-t bg-background shrink-0 flex gap-2 items-end"
-                style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)' }}
+                className="px-3 py-2 border-t bg-background shrink-0 flex gap-1.5 items-end"
+                style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)' }}
               >
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="h-10 w-10 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors shrink-0"
+                  className="h-8 w-8 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors shrink-0"
                   disabled={uploading}
                 >
                   {uploading ? (
@@ -1570,7 +1570,7 @@ function ChatPage() {
                     }, 2000);
                   }}
                   placeholder="Type a message…"
-                  className="flex-1 min-h-[44px] max-h-[120px] overflow-y-auto resize-none"
+                  className="flex-1 min-h-[36px] max-h-[120px] overflow-y-auto resize-none py-1.5 text-sm"
                   rows={1}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
@@ -1579,12 +1579,12 @@ function ChatPage() {
                     }
                   }}
                 />
-                <Button size="icon" variant="ghost" className="h-10 w-10 shrink-0" disabled>
+                <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" disabled>
                   <SmilePlus className="h-4 w-4" />
                 </Button>
                 <Button
                   size="icon"
-                  className="h-10 w-10 bg-[#FF6600] hover:bg-[#E65C00] shrink-0"
+                  className="h-8 w-8 bg-[#FF6600] hover:bg-[#E65C00] shrink-0"
                   onClick={() => void sendMessage()}
                   disabled={sending || !body.trim()}
                 >
