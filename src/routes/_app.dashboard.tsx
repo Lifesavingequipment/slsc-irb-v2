@@ -76,7 +76,8 @@ function Dashboard() {
         .eq("club_id", activeClub.club_id)
         .or(`ends_at.gte.${nowIso},and(ends_at.is.null,starts_at.gte.${nowIso})`),
     ]);
-    setUpcoming((sess.data ?? []) as Upcoming[]);
+    const uniqueSessions = Array.from(new Map((sess.data ?? []).map((s) => [s.id, s])).values());
+    setUpcoming(uniqueSessions as Upcoming[]);
 
     // RSVP summary (going/maybe/not_going counts) for the upcoming sessions shown on the dashboard.
     const upcomingIds = (sess.data ?? []).map((s) => s.id);
@@ -185,9 +186,7 @@ function Dashboard() {
   }
 
   const totalResponded = Object.values(rsvpSummary).reduce((acc, v) => acc + v.total, 0);
-  const rsvpRate = memberCount && upcoming.length
-    ? Math.round((totalResponded / (memberCount * upcoming.length)) * 100)
-    : null;
+  const totalExpected = memberCount && upcoming.length ? memberCount * upcoming.length : null;
 
   type QuickAction = { label: string; to: string; search?: Record<string, string>; icon: React.ReactNode };
   const quickActions: QuickAction[] = canManage
@@ -295,9 +294,12 @@ function Dashboard() {
           </Link>
           <Card className="p-4 rounded-xl bg-white border border-[#e5e7eb] border-l-4 border-l-primary shadow-none">
             <div className="flex items-center gap-2 text-muted-foreground text-xs uppercase tracking-wide">
-              <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> RSVP Rate
+              <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> RSVPs
             </div>
-            <div className="mt-1 text-3xl font-bold">{rsvpRate !== null ? `${rsvpRate}%` : "—"}</div>
+            <div className="mt-1 text-2xl font-bold leading-none">
+              {totalExpected !== null ? `${totalResponded} / ${totalExpected}` : "—"}
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5">responded</div>
           </Card>
           <Link to="/sessions" search={{ filter: "surveys-pending" }}>
             <Card className="p-4 rounded-xl bg-white border border-[#e5e7eb] border-l-4 border-l-primary shadow-none hover:border-accent hover:shadow-sm transition-all cursor-pointer">
