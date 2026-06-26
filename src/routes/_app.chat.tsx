@@ -1098,13 +1098,16 @@ function ChatPage() {
   return (
     <AppShell hideBottomNav={showThread}>
       <div
-        className="fixed md:relative inset-x-0 top-[60px] md:inset-auto md:h-[calc(100dvh-3.5rem-2rem)] md:-mx-6 md:-mt-6 md:-mb-8 overflow-hidden md:rounded-xl border bg-background flex z-10 md:z-auto"
-        style={{
-          paddingTop: 'env(safe-area-inset-top)',
-          bottom: showThread
-            ? `${keyboardHeight}px`
-            : `calc(72px + ${keyboardHeight}px + env(safe-area-inset-bottom, 0px))`,
-        }}
+        className={`overflow-hidden bg-background flex border md:relative md:inset-auto md:z-auto md:h-[calc(100dvh-3.5rem-2rem)] md:-mx-6 md:-mt-6 md:-mb-8 md:rounded-xl ${
+          showThread
+            ? "fixed inset-0 z-50"
+            : "fixed inset-x-0 top-[60px] z-10"
+        }`}
+        style={
+          showThread
+            ? { paddingTop: 'env(safe-area-inset-top)', bottom: `${keyboardHeight}px` }
+            : { bottom: `calc(72px + ${keyboardHeight}px + env(safe-area-inset-bottom, 0px))` }
+        }
       >
         {/* Left panel — channel list */}
         <div
