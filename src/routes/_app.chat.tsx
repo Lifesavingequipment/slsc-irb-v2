@@ -160,6 +160,7 @@ function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const unreadDividerRef = useRef<HTMLDivElement>(null);
   const realtimeRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const unreadSubRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFiredRef = useRef(false);
   const initialScrollDoneRef = useRef(false);
@@ -326,6 +327,41 @@ function ChatPage() {
   useEffect(() => {
     loadChannels();
   }, [loadChannels]);
+
+  // Subscribe to all channels for real-time unread badge updates.
+  // The per-channel subscription only covers the active channel; this one
+  // catches messages arriving in any other channel the user belongs to.
+  useEffect(() => {
+    if (!myMemberId || channels.length === 0) return;
+
+    if (unreadSubRef.current) {
+      void supabase.removeChannel(unreadSubRef.current);
+      unreadSubRef.current = null;
+    }
+
+    const sub = supabase
+      .channel(`unread-${myMemberId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "chat_messages" },
+        (payload) => {
+          const msg = payload.new as { channel_id: string };
+          // Active channel is handled by the per-channel subscription; skip it here.
+          if (msg.channel_id === activeChannelId) return;
+          void loadChannels();
+        },
+      )
+      .subscribe();
+
+    unreadSubRef.current = sub;
+
+    return () => {
+      if (unreadSubRef.current) {
+        void supabase.removeChannel(unreadSubRef.current);
+        unreadSubRef.current = null;
+      }
+    };
+  }, [myMemberId, channels.length, activeChannelId, loadChannels]);
 
   async function deleteChannel(channelId: string) {
     await supabase.from("chat_messages").delete().eq("channel_id", channelId);
@@ -668,6 +704,7 @@ function ChatPage() {
   useEffect(() => {
     return () => {
       if (realtimeRef.current) void supabase.removeChannel(realtimeRef.current);
+      if (unreadSubRef.current) void supabase.removeChannel(unreadSubRef.current);
       if (longPressTimer.current) clearTimeout(longPressTimer.current);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };

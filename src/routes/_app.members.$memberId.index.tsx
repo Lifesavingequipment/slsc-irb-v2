@@ -256,15 +256,11 @@ function MemberDetail() {
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-bold truncate">{dn(profile.id)}</h1>
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {allRoles.length === 0 ? (
-                <Badge variant="secondary" className="text-[10px] uppercase">Member</Badge>
-              ) : (
-                allRoles.map((r) => (
-                  <Badge key={r} className={`text-[10px] uppercase ${roleBadgeClass(r)}`}>
-                    {roleLabel(r)}
-                  </Badge>
-                ))
-              )}
+              {(allRoles.length > 0 ? allRoles : ["member"]).map((r) => (
+                <Badge key={r} className={`text-[10px] uppercase ${roleBadgeClass(r)}`}>
+                  {roleLabel(r)}
+                </Badge>
+              ))}
               {profile.age_division && (
                 <Badge variant="outline" className="text-[10px] uppercase">
                   {profile.age_division.replace("_", " ")}
