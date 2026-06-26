@@ -155,6 +155,7 @@ function ChatPage() {
   const [deletingChannelId, setDeletingChannelId] = useState<string | null>(null);
   const [membersChannelId, setMembersChannelId] = useState<string | null>(null);
   const [channelMembers, setChannelMembers] = useState<{ id: string; name: string }[]>([]);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const bottomRef = useRef<HTMLDivElement>(null);
   const unreadDividerRef = useRef<HTMLDivElement>(null);
@@ -656,6 +657,20 @@ function ChatPage() {
     };
   }, []);
 
+  // Track keyboard height via Visual Viewport API so the chat container
+  // stays above the software keyboard on Android PWA (where position:fixed
+  // elements are relative to the layout viewport, not the visual viewport).
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const handleResize = () => {
+      if (window.innerWidth >= 768) return; // keyboard handling only needed on mobile
+      setKeyboardHeight(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
+    };
+    vv.addEventListener('resize', handleResize);
+    return () => vv.removeEventListener('resize', handleResize);
+  }, []);
+
   const startLongPress = useCallback((e: React.PointerEvent, msg: Message) => {
     longPressFiredRef.current = false;
     const x = e.clientX;
@@ -1044,7 +1059,13 @@ function ChatPage() {
 
   return (
     <AppShell>
-      <div className="fixed md:relative inset-x-0 top-[60px] bottom-[72px] md:inset-auto md:h-[calc(100dvh-3.5rem-2rem)] md:-mx-6 md:-mt-6 md:-mb-8 overflow-hidden md:rounded-xl border bg-background flex" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <div
+        className="fixed md:relative inset-x-0 top-[60px] bottom-[72px] md:inset-auto md:h-[calc(100dvh-3.5rem-2rem)] md:-mx-6 md:-mt-6 md:-mb-8 overflow-hidden md:rounded-xl border bg-background flex"
+        style={{
+          paddingTop: 'env(safe-area-inset-top)',
+          ...(keyboardHeight > 0 ? { bottom: `calc(72px + ${keyboardHeight}px)` } : {}),
+        }}
+      >
         {/* Left panel — channel list */}
         <div
           className={`flex flex-col w-full md:w-72 border-r shrink-0 ${showThread ? "hidden md:flex" : "flex"}`}
@@ -1473,7 +1494,7 @@ function ChatPage() {
               {/* Input */}
               <div
                 className="px-4 py-3 border-t bg-background shrink-0 flex gap-2 items-end"
-                style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+                style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 12px)' }}
               >
                 <button
                   onClick={() => fileInputRef.current?.click()}
