@@ -522,6 +522,7 @@ function ChatPage() {
         void supabase.removeChannel(realtimeRef.current);
         realtimeRef.current = null;
       }
+      setTypingNames([]); // Clear stale typing names from previous channel
 
       const ch = supabase
         .channel(`chat-${channelId}`)
@@ -608,10 +609,10 @@ function ChatPage() {
           },
         )
         .on("presence", { event: "sync" }, () => {
-          const state = ch.presenceState<{ name: string; typing: boolean }>();
+          const state = ch.presenceState<{ name: string; typing: boolean; channelId?: string }>();
           const typing = Object.values(state)
             .flat()
-            .filter((p) => p.typing && p.name !== myMemberName)
+            .filter((p) => p.typing && p.name !== myMemberName && (!p.channelId || p.channelId === channelId))
             .map((p) => p.name);
           setTypingNames(typing);
         })
@@ -848,7 +849,7 @@ function ChatPage() {
     let attachmentSize: number | null = null;
     if (attachmentFile) {
       setUploading(true);
-      const ext = attachmentFile.name.split(".").pop();
+      const ext = attachmentFile.name.match(/\.([^.]+)$/)?.[1] ?? "bin";
       const path = `${activeChannelId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
       const { error: upErr } = await supabase.storage
         .from("chat-attachments")
@@ -1097,10 +1098,12 @@ function ChatPage() {
   return (
     <AppShell>
       <div
-        className="fixed md:relative inset-x-0 top-[60px] bottom-[72px] md:inset-auto md:h-[calc(100dvh-3.5rem-2rem)] md:-mx-6 md:-mt-6 md:-mb-8 overflow-hidden md:rounded-xl border bg-background flex"
+        className="fixed md:relative inset-x-0 top-[60px] md:inset-auto md:h-[calc(100dvh-3.5rem-2rem)] md:-mx-6 md:-mt-6 md:-mb-8 overflow-hidden md:rounded-xl border bg-background flex z-10 md:z-auto"
         style={{
           paddingTop: 'env(safe-area-inset-top)',
-          ...(keyboardHeight > 0 ? { bottom: `calc(72px + ${keyboardHeight}px)` } : {}),
+          bottom: keyboardHeight > 0
+            ? `calc(72px + ${keyboardHeight}px + env(safe-area-inset-bottom, 0px))`
+            : `calc(72px + env(safe-area-inset-bottom, 0px))`,
         }}
       >
         {/* Left panel — channel list */}
@@ -1561,9 +1564,9 @@ function ChatPage() {
                     el.style.height = `${el.scrollHeight}px`;
                     if (!activeChannelId) return;
                     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-                    void realtimeRef.current?.track({ name: myMemberName, typing: true });
+                    void realtimeRef.current?.track({ name: myMemberName, typing: true, channelId: activeChannelId });
                     typingTimeoutRef.current = setTimeout(() => {
-                      void realtimeRef.current?.track({ name: myMemberName, typing: false });
+                      void realtimeRef.current?.track({ name: myMemberName, typing: false, channelId: activeChannelId });
                     }, 2000);
                   }}
                   placeholder="Type a message…"
