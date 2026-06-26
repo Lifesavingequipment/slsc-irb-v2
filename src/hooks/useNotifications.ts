@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClub } from "@/lib/club-context";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export type AppNotification = {
   id: string;
@@ -17,6 +18,7 @@ export function useNotifications() {
   const { activeClub } = useClub();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [memberId, setMemberId] = useState<string | null>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   const load = useCallback(async () => {
     if (!activeClub) return;
@@ -49,7 +51,13 @@ export function useNotifications() {
 
   useEffect(() => {
     if (!memberId) return;
-    const channel = supabase
+
+    if (channelRef.current) {
+      void supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    channelRef.current = supabase
       .channel(`notifications:${memberId}`)
       .on(
         "postgres_changes",
@@ -64,8 +72,12 @@ export function useNotifications() {
         },
       )
       .subscribe();
+
     return () => {
-      void supabase.removeChannel(channel);
+      if (channelRef.current) {
+        void supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
   }, [memberId]);
 
