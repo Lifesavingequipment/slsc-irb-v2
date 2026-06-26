@@ -52,28 +52,42 @@ export function useNotifications() {
   useEffect(() => {
     if (!memberId) return;
 
-    if (channelRef.current) {
-      void supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
-    }
+    let cancelled = false;
 
-    channelRef.current = supabase
-      .channel(`notifications:${memberId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notifications",
-          filter: `member_id=eq.${memberId}`,
-        },
-        (payload) => {
-          setNotifications((prev) => [payload.new as AppNotification, ...prev]);
-        },
-      )
-      .subscribe();
+    // Nuclear clear: remove every channel from the client registry before
+    // creating a new one. This prevents "cannot add postgres_changes callbacks
+    // after subscribe()" when a multi-club user switches clubs and the old
+    // channel for the same member ID is still registered.
+    void supabase.removeAllChannels().then(() => {
+      channelRef.current = null;
+      if (cancelled) return;
+
+      // Brief pause so Supabase's internal registry finishes teardown.
+      setTimeout(() => {
+        if (cancelled) return;
+
+        // Unique suffix prevents name collision with any lingering registrations.
+        const channelName = `notifications:${memberId}:${Date.now()}`;
+        channelRef.current = supabase
+          .channel(channelName)
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "notifications",
+              filter: `member_id=eq.${memberId}`,
+            },
+            (payload) => {
+              setNotifications((prev) => [payload.new as AppNotification, ...prev]);
+            },
+          )
+          .subscribe();
+      }, 50);
+    });
 
     return () => {
+      cancelled = true;
       if (channelRef.current) {
         void supabase.removeChannel(channelRef.current);
         channelRef.current = null;
