@@ -263,7 +263,10 @@ export function AppShell({
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-x-hidden pb-24 md:pb-8 px-4 pt-4 md:px-6 md:pt-6 max-w-4xl mx-auto w-full">
+        <main className={cn(
+          "flex-1 overflow-x-hidden px-4 pt-4 md:px-6 md:pt-6 max-w-4xl mx-auto w-full md:pb-8",
+          hideBottomNav ? "pb-0 overflow-hidden" : "pb-24",
+        )}>
           {children}
         </main>
 

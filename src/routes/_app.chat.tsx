@@ -1101,7 +1101,9 @@ function ChatPage() {
         className="fixed md:relative inset-x-0 top-[60px] md:inset-auto md:h-[calc(100dvh-3.5rem-2rem)] md:-mx-6 md:-mt-6 md:-mb-8 overflow-hidden md:rounded-xl border bg-background flex z-10 md:z-auto"
         style={{
           paddingTop: 'env(safe-area-inset-top)',
-          bottom: `calc(${showThread ? 0 : 72}px + ${keyboardHeight}px + env(safe-area-inset-bottom, 0px))`,
+          bottom: showThread
+            ? `${keyboardHeight}px`
+            : `calc(72px + ${keyboardHeight}px + env(safe-area-inset-bottom, 0px))`,
         }}
       >
         {/* Left panel — channel list */}
