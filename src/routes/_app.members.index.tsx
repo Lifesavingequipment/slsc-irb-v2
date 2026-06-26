@@ -197,6 +197,18 @@ function MembersPage() {
         first_name: member.profile?.first_name ?? null,
         last_name: member.profile?.last_name ?? null,
       });
+      // Add member to club's main chat channel
+      const { data: mainChannel } = await supabase
+        .from("chat_channels")
+        .select("id")
+        .eq("club_id", clubId)
+        .eq("type", "main")
+        .maybeSingle();
+      if (mainChannel) {
+        await supabase
+          .from("chat_members")
+          .upsert({ channel_id: mainChannel.id, member_id: member.id }, { onConflict: "channel_id,member_id", ignoreDuplicates: true });
+      }
     }
     load();
   };
