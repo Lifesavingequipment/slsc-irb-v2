@@ -166,6 +166,7 @@ function ChatPage() {
   const messageIdsRef = useRef<string[]>([]);
   const messagesRef = useRef<Message[]>([]);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
@@ -759,11 +760,13 @@ function ChatPage() {
     if (messages.length === 0) return;
     if (!initialScrollDoneRef.current) {
       initialScrollDoneRef.current = true;
-      if (firstUnreadId) {
-        unreadDividerRef.current?.scrollIntoView({ block: "center" });
-      } else {
-        bottomRef.current?.scrollIntoView();
-      }
+      requestAnimationFrame(() => {
+        if (firstUnreadId) {
+          unreadDividerRef.current?.scrollIntoView({ block: "center" });
+        } else {
+          bottomRef.current?.scrollIntoView();
+        }
+      });
       return;
     }
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -804,6 +807,9 @@ function ChatPage() {
     const replyTo = replyingTo;
     setBody("");
     setReplyingTo(null);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
 
     let attachmentUrl: string | null = null;
     let attachmentName: string | null = null;
@@ -1515,9 +1521,13 @@ function ChatPage() {
                   onChange={handleFileSelect}
                 />
                 <Textarea
+                  ref={textareaRef}
                   value={body}
                   onChange={(e) => {
                     setBody(e.target.value);
+                    const el = e.target;
+                    el.style.height = "auto";
+                    el.style.height = `${el.scrollHeight}px`;
                     if (!activeChannelId) return;
                     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
                     void realtimeRef.current?.track({ name: myMemberName, typing: true });
