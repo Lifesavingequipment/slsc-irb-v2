@@ -16,6 +16,7 @@ import { useMemberFirstName } from "@/hooks/useMemberFirstName";
 import { useWeatherTidesData, useLocationWeatherData } from "@/components/session/WeatherTidesCard";
 import { cn } from "@/lib/utils";
 import { PushPromptBanner } from "@/components/PushPromptBanner";
+import { MemberDashboard } from "@/components/dashboard/MemberDashboard";
 
 export const Route = createFileRoute("/_app/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — IRB Coaching" }] }),
@@ -23,7 +24,7 @@ export const Route = createFileRoute("/_app/dashboard")({
 });
 
 type Upcoming = {
-  id: string; title: string; starts_at: string; location: string | null; session_type: string;
+  id: string; title: string; starts_at: string; location: string | null; session_type: string; carpool_enabled?: boolean;
 };
 
 type RsvpSummary = Record<string, { going: number; total: number }>;
@@ -56,7 +57,7 @@ function Dashboard() {
     const in7Iso = addDays(new Date(), 7).toISOString();
     const [sess, memberRows, clubMems, rsvps, next7Sess] = await Promise.all([
       supabase.from("sessions")
-        .select("id, title, starts_at, location, session_type, ends_at")
+        .select("id, title, starts_at, location, session_type, ends_at, carpool_enabled")
         .eq("club_id", activeClub.club_id)
         .or(`ends_at.gte.${nowIso},and(ends_at.is.null,starts_at.gte.${nowIso})`)
         .order("starts_at", { ascending: true })
@@ -162,6 +163,23 @@ function Dashboard() {
   useRefetchOnFocus(refreshAll);
 
   if (!activeClub) return null;
+
+  // Pure members (not coaches/admins, not guardians) get the redesigned,
+  // mobile-first member dashboard. All other roles keep their existing view.
+  if (!canManage && !isGuardian) {
+    return (
+      <AppShell>
+        <PushPromptBanner />
+        <MemberDashboard
+          firstName={firstName}
+          clubName={activeClub.club.name}
+          upcoming={upcoming}
+          myRsvps={myRsvps}
+          loaded={loaded}
+        />
+      </AppShell>
+    );
+  }
 
   const nextSessionForWeather = upcoming.find((s) => s.location);
   const nextSession = upcoming[0];
