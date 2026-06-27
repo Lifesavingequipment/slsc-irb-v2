@@ -27,8 +27,17 @@ import { useCoachPermissions } from "@/lib/coach-permissions";
 import { buildNameMap, memberFullName } from "@/lib/names";
 import { invalidateSessionsCache, removeSessionFromCache } from "./_app.sessions.index";
 
+const SESSION_TABS = ["rsvp", "plan", "survey", "waves", "gear", "carpool", "attendance"] as const;
+type SessionTab = (typeof SESSION_TABS)[number];
+
 export const Route = createFileRoute("/_app/sessions/$sessionId/")({
   head: () => ({ meta: [{ title: "Session — IRB Coaching" }] }),
+  validateSearch: (search: Record<string, unknown>): { tab?: SessionTab } => {
+    const tab = search.tab;
+    return typeof tab === "string" && (SESSION_TABS as readonly string[]).includes(tab)
+      ? { tab: tab as SessionTab }
+      : {};
+  },
   component: SessionDetail,
 });
 
@@ -71,6 +80,7 @@ const ATT_LABELS: Record<AttStatus, string> = {
 
 function SessionDetail() {
   const { sessionId } = Route.useParams();
+  const { tab: initialTab } = Route.useSearch();
   const { user } = useAuth();
   const { activeClub } = useClub();
   const canManage = useCanManage();
@@ -558,7 +568,7 @@ function SessionDetail() {
         </div>
       </Card>
 
-      <Tabs defaultValue="rsvp" className="mt-4">
+      <Tabs defaultValue={initialTab ?? "rsvp"} className="mt-4">
         <div className="relative">
           <TabsList className="flex overflow-x-auto scrollbar-hide w-full h-auto justify-start">
             <TabsTrigger value="rsvp" className="text-xs flex-shrink-0 min-h-[40px] px-3">RSVPs</TabsTrigger>

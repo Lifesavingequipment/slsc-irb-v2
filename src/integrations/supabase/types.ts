@@ -4393,6 +4393,7 @@ export type Database = {
         }
         Returns: Json
       }
+      get_coach_morning_brief: { Args: { p_club_id: string }; Returns: Json }
       get_my_club_id: { Args: never; Returns: string }
       get_platform_stats: { Args: never; Returns: Json }
       get_user_display_name: { Args: { p_user_id: string }; Returns: Json }

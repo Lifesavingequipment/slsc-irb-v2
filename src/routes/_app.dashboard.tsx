@@ -17,6 +17,7 @@ import { useWeatherTidesData, useLocationWeatherData } from "@/components/sessio
 import { cn } from "@/lib/utils";
 import { PushPromptBanner } from "@/components/PushPromptBanner";
 import { MemberDashboard } from "@/components/dashboard/MemberDashboard";
+import { CoachDashboard } from "@/components/dashboard/CoachDashboard";
 
 export const Route = createFileRoute("/_app/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — IRB Coaching" }] }),
@@ -175,6 +176,23 @@ function Dashboard() {
           clubName={activeClub.club.name}
           upcoming={upcoming}
           myRsvps={myRsvps}
+          loaded={loaded}
+        />
+      </AppShell>
+    );
+  }
+
+  // Coaches/admins (managers who aren't acting as a guardian) get the
+  // redesigned, mobile-first coach dashboard. Guardians keep the legacy view.
+  if (canManage && !isGuardian) {
+    return (
+      <AppShell>
+        <PushPromptBanner />
+        <CoachDashboard
+          firstName={firstName}
+          clubName={activeClub.club.name}
+          clubId={activeClub.club_id}
+          upcoming={upcoming}
           loaded={loaded}
         />
       </AppShell>
