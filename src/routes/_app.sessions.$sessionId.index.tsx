@@ -1197,9 +1197,10 @@ function AttendancePanel({
     } else {
       const tempId = `temp-${userId}`;
       setAttendance((prev) => [...prev, { id: tempId, user_id: userId, status, note: null }]);
-      const { error } = await supabase.from("session_attendance").insert({
-        session_id: sessionId, user_id: userId, status, marked_by: currentUserId,
-      });
+      const { error } = await supabase.from("session_attendance").upsert(
+        { session_id: sessionId, user_id: userId, status, marked_by: currentUserId },
+        { onConflict: "session_id,user_id" }
+      );
       if (error) {
         setAttendance((prev) => prev.filter((a) => a.id !== tempId));
         toast.error(error.message);
@@ -1214,10 +1215,10 @@ function AttendancePanel({
     const existing = attendance.find((a) => a.user_id === userId);
     if (!existing) {
       // Need a status to insert; default to present
-      const { error } = await supabase.from("session_attendance").insert({
-        session_id: sessionId, user_id: userId, status: "present" as AttStatus,
-        marked_by: currentUserId, note: trimmed,
-      });
+      const { error } = await supabase.from("session_attendance").upsert(
+        { session_id: sessionId, user_id: userId, status: "present" as AttStatus, marked_by: currentUserId, note: trimmed },
+        { onConflict: "session_id,user_id" }
+      );
       if (error) { toast.error(error.message); return; }
     } else if ((existing.note ?? null) !== trimmed) {
       const { error } = await supabase.from("session_attendance")
