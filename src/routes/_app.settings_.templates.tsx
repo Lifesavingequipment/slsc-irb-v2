@@ -89,10 +89,14 @@ function DrillsTab({ clubId }: { clubId: string }) {
       const { error } = await supabase.from("training_drills").update(payload).eq("id", editing.id);
       if (error) { toast.error(error.message); return; }
     } else {
-      const { error } = await supabase.from("training_drills").insert({ ...payload, created_by: user?.id ?? null });
+      const { data: newRow, error } = await supabase.from("training_drills")
+        .insert({ ...payload, created_by: user?.id ?? null })
+        .select("id, name, description, default_duration_minutes")
+        .single();
       if (error) { toast.error(error.message); return; }
+      if (newRow) setItems((prev) => [...prev, newRow as Drill].sort((a, b) => a.name.localeCompare(b.name)));
     }
-    setOpen(false); setEditing(null); toast.success("Saved"); load();
+    setOpen(false); setEditing(null); toast.success("Saved");
   };
 
   const remove = async (id: string) => {
@@ -126,7 +130,7 @@ function DrillsTab({ clubId }: { clubId: string }) {
           ))}
         </div>
       )}
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>{editing?.id ? "Edit drill" : "New drill"}</DialogTitle></DialogHeader>
           {editing && (
@@ -175,10 +179,14 @@ function PlansTab({ clubId }: { clubId: string }) {
       const { error } = await supabase.from("training_plan_templates").update(payload).eq("id", editing.id);
       if (error) { toast.error(error.message); return; }
     } else {
-      const { error } = await supabase.from("training_plan_templates").insert({ ...payload, created_by: user?.id ?? null });
+      const { data: newRow, error } = await supabase.from("training_plan_templates")
+        .insert({ ...payload, created_by: user?.id ?? null })
+        .select("id, name, description, blocks")
+        .single();
       if (error) { toast.error(error.message); return; }
+      if (newRow) setItems((prev) => [...prev, newRow as PlanTpl].sort((a, b) => a.name.localeCompare(b.name)));
     }
-    setOpen(false); setEditing(null); toast.success("Saved"); load();
+    setOpen(false); setEditing(null); toast.success("Saved");
   };
 
   const remove = async (id: string) => {
@@ -212,7 +220,7 @@ function PlansTab({ clubId }: { clubId: string }) {
           ))}
         </div>
       )}
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>{editing?.id ? "Edit plan template" : "New plan template"}</DialogTitle></DialogHeader>
           {editing && (
@@ -310,7 +318,7 @@ function SurveysTab({ clubId }: { clubId: string }) {
           ))}
         </div>
       )}
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editing?.id ? "Edit survey template" : "New survey template"}</DialogTitle></DialogHeader>
           {editing && (
@@ -427,7 +435,7 @@ function CarpoolTab({ clubId }: { clubId: string }) {
           ))}
         </div>
       )}
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editing?.id ? "Edit carpool template" : "New carpool template"}</DialogTitle></DialogHeader>
           {editing && (
