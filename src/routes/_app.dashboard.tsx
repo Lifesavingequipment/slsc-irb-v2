@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { PushPromptBanner } from "@/components/PushPromptBanner";
 import { MemberDashboard } from "@/components/dashboard/MemberDashboard";
 import { CoachDashboard } from "@/components/dashboard/CoachDashboard";
+import { AdminDashboard } from "@/components/dashboard/AdminDashboard";
 
 export const Route = createFileRoute("/_app/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — IRB Coaching" }] }),
@@ -34,6 +35,7 @@ function Dashboard() {
   const { user } = useAuth();
   const { activeClub } = useClub();
   const canManage = useCanManage();
+  const isAdmin = useIsAdmin();
   const isPlatformOwner = useIsPlatformOwner();
   const isGuardian = useIsGuardian();
   const firstName = useMemberFirstName();
@@ -182,8 +184,28 @@ function Dashboard() {
     );
   }
 
-  // Coaches/admins (managers who aren't acting as a guardian) get the
-  // redesigned, mobile-first coach dashboard. Guardians keep the legacy view.
+  // Club admins (owners/club_admins, not acting as a guardian) get the
+  // redesigned, mobile-first admin dashboard.
+  if (isAdmin && !isGuardian) {
+    return (
+      <AppShell>
+        <PushPromptBanner />
+        <AdminDashboard
+          firstName={firstName}
+          clubName={activeClub.club.name}
+          clubId={activeClub.club_id}
+          upcoming={upcoming}
+          rsvpSummary={rsvpSummary}
+          memberCount={memberCount}
+          pendingCount={pendingCount}
+          loaded={loaded}
+        />
+      </AppShell>
+    );
+  }
+
+  // Coaches (managers who aren't admins and aren't acting as a guardian) get
+  // the redesigned, mobile-first coach dashboard. Guardians keep the legacy view.
   if (canManage && !isGuardian) {
     return (
       <AppShell>
