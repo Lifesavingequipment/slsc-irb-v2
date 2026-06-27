@@ -113,7 +113,16 @@ function CarpoolPage() {
     }
   }, [sessionId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!sessionId) return;
+    load();
+    const channel = supabase
+      .channel(`carpool:${sessionId}:${Date.now()}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'carpools', filter: `session_id=eq.${sessionId}` }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'carpool_passengers', filter: `session_id=eq.${sessionId}` }, () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [sessionId, load]);
 
   const dn = useCallback((id: string) => nameMap[id] || "Member", [nameMap]);
 

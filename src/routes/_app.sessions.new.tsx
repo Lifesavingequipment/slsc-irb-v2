@@ -339,7 +339,7 @@ function NewSession() {
             <Input
               id="title"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => { setTitle(e.target.value); setErrors((prev) => ({ ...prev, title: '' })); }}
               placeholder="Saturday IRB training"
               aria-invalid={!!errors.title || undefined}
               className={errors.title ? "border-destructive" : undefined}
@@ -388,19 +388,19 @@ function NewSession() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="starts">Starts</Label>
-              <DateTimeFields id="starts" required value={startsAt} onChange={handleStartsAtChange} invalid={!!errors.starts_at} />
+              <DateTimeFields id="starts" required value={startsAt} onChange={(v) => { handleStartsAtChange(v); setErrors((prev) => ({ ...prev, starts_at: '' })); }} invalid={!!errors.starts_at} />
               {errors.starts_at && <p className="text-xs text-destructive">{errors.starts_at}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ends">Ends</Label>
-              <DateTimeFields id="ends" value={endsAt} onChange={setEndsAt} invalid={!!errors.ends_at} />
+              <DateTimeFields id="ends" value={endsAt} onChange={(v) => { setEndsAt(v); setErrors((prev) => ({ ...prev, ends_at: '' })); }} invalid={!!errors.ends_at} />
               {errors.ends_at && <p className="text-xs text-destructive">{errors.ends_at}</p>}
             </div>
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="rsvp">RSVP deadline</Label>
-            <DateTimeFields id="rsvp" value={rsvpDeadline} onChange={setRsvpDeadline} invalid={!!errors.rsvp_deadline} />
+            <DateTimeFields id="rsvp" value={rsvpDeadline} onChange={(v) => { setRsvpDeadline(v); setErrors((prev) => ({ ...prev, rsvp_deadline: '' })); }} invalid={!!errors.rsvp_deadline} />
             {errors.rsvp_deadline && <p className="text-xs text-destructive">{errors.rsvp_deadline}</p>}
             <p className="text-xs text-muted-foreground">After this time, members can't change their response. Times use 24-hour format.</p>
           </div>
