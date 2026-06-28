@@ -180,7 +180,7 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const { member_ids, title, body, url } = await req.json();
+  const { member_ids, sender_member_id, title, body, url } = await req.json();
   if (!Array.isArray(member_ids) || member_ids.length === 0 || !title || !body) {
     return new Response(JSON.stringify({ error: 'member_ids, title and body are required' }), {
       status: 400,
@@ -188,11 +188,23 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  // Never push to the sender — they sent the message, they don't need a notification for it.
+  const recipientIds = sender_member_id
+    ? member_ids.filter((id: string) => id !== sender_member_id)
+    : member_ids;
+
+  if (recipientIds.length === 0) {
+    return new Response(
+      JSON.stringify({ sent: false, reason: 'All recipients filtered (sender excluded)', recipients: 0 }),
+      { headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } }
+    );
+  }
+
   const supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
   const { data: subs, error } = await supabaseClient
     .from('push_subscriptions')
     .select('endpoint, p256dh, auth')
-    .in('member_id', member_ids);
+    .in('member_id', recipientIds);
 
   if (error) {
     console.error('[send-push] DB error:', error.message);
