@@ -26,7 +26,7 @@ function AppLayout() {
   useEffect(() => {
     if (!redirectReady) return;
     if (!user) { navigate({ to: "/login", replace: true }); return; }
-    const approved = memberships.some((m) => m.status === "approved");
+    const approved = memberships.some((m) => m.status === "approved" || m.status === "pending");
     const onOnboarding = location.pathname.startsWith("/onboarding");
     const onOwner = location.pathname.startsWith("/owner");
     if (!approved && !onOnboarding && !onOwner) {
@@ -41,7 +41,7 @@ function AppLayout() {
   // Check whether the user has at least one emergency contact across their approved clubs.
   useEffect(() => {
     if (!user || clubLoading) return;
-    const approvedIds = memberships.filter((m) => m.status === "approved").map((m) => m.club_id);
+    const approvedIds = memberships.filter((m) => m.status === "approved" || m.status === "pending").map((m) => m.club_id);
     if (approvedIds.length === 0) { setEcChecked(true); setNeedsEc(false); return; }
     supabase
       .from("member_emergency_contacts")

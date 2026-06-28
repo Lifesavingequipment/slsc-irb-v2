@@ -179,7 +179,7 @@ function SessionDetail() {
       const statusByUserId = new Map((memberships ?? []).map((x) => [x.user_id, x.status]));
       const activeMembers = (memData ?? []).filter((m) => {
         const status = (m.auth_user_id && statusByUserId.get(m.auth_user_id)) ?? m.membership_status;
-        return status === "approved" || status === "active";
+        return status === "approved" || status === "active" || status === "pending";
       });
       const list: Member[] = activeMembers.map((m) => ({
         id: m.id,

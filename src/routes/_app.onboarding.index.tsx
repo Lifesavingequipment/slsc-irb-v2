@@ -49,7 +49,7 @@ function Onboarding() {
 
   useEffect(() => {
     if (created || search.add) return;
-    if (memberships.some((m) => m.status === "approved")) {
+    if (memberships.some((m) => m.status === "approved" || m.status === "pending")) {
       navigate({ to: "/dashboard", replace: true });
     }
   }, [memberships, navigate, created, search.add]);

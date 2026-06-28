@@ -958,7 +958,7 @@ function ChatPage() {
       .from("members")
       .select("id, first_name, last_name, preferred_name")
       .eq("club_id", activeClub.club_id)
-      .eq("membership_status", "active");
+      .in("membership_status", ["active", "pending"]);
     setClubMembers(
       (data ?? [])
         .filter((m) => m.id !== myMemberId)

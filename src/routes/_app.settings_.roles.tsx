@@ -113,7 +113,7 @@ function RolesPageInner({ clubId }: { clubId: string }) {
     const statusByUserId = new Map((memberships ?? []).map((x) => [x.user_id, x.status]));
     const approvedMembers = (memberData ?? []).filter((m) => {
       const status = (m.auth_user_id && statusByUserId.get(m.auth_user_id)) ?? m.membership_status;
-      return status === "approved" || status === "active";
+      return status === "approved" || status === "active" || status === "pending";
     });
 
     const authIds = approvedMembers.map((m) => m.auth_user_id).filter(Boolean) as string[];

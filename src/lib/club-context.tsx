@@ -70,7 +70,7 @@ export function ClubProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  const approved = memberships.filter((m) => m.status === "approved");
+  const approved = memberships.filter((m) => m.status === "approved" || m.status === "pending");
   const activeClub =
     approved.find((m) => m.club_id === activeId) ?? approved[0] ?? null;
 
