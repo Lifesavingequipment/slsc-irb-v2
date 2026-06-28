@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClub, useCanManage } from "@/lib/club-context";
@@ -180,6 +181,16 @@ function ChatPage() {
   const prevMessageCountRef = useRef(0);
 
   const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
+
+  // Lock body scroll while lightbox is open so chat can't scroll behind it.
+  useEffect(() => {
+    if (lightboxUrl) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [lightboxUrl]);
 
   // Load self — fetch all member records so we can query across every club.
   useEffect(() => {
@@ -1789,15 +1800,25 @@ function ChatPage() {
         </>
       )}
 
-      {/* Lightbox */}
-      {lightboxUrl && (
+      {/* Lightbox — rendered via portal so it escapes any overflow:hidden ancestor */}
+      {lightboxUrl && createPortal(
         <div
-          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center"
+          className="fixed inset-0 bg-black z-[9999] flex items-center justify-center"
           onClick={() => setLightboxUrl(null)}
         >
-          <img src={lightboxUrl} className="max-w-full max-h-full object-contain" />
-          <button className="absolute top-4 right-4 text-white text-2xl">✕</button>
-        </div>
+          <img
+            src={lightboxUrl}
+            className="max-w-full max-h-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            className="absolute top-4 right-4 text-white text-2xl leading-none p-2"
+            onClick={() => setLightboxUrl(null)}
+          >
+            ✕
+          </button>
+        </div>,
+        document.body
       )}
 
       {/* Delete channel confirmation */}
