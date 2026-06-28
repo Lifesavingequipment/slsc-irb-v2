@@ -53,6 +53,8 @@ function Dashboard() {
     rsvpsPending: number;
     surveysPending: number;
   }>({ trainingCount: 0, rsvpsPending: 0, surveysPending: 0 });
+  // Past sessions (last 14 days only) with no attendance marked
+  const [pastNeedingAttendance, setPastNeedingAttendance] = useState(0);
 
   const refreshAll = async () => {
     if (!activeClub || !user) return;
@@ -130,6 +132,27 @@ function Dashboard() {
     const surveysPending = list.filter((s) => s.survey_enabled).length;
     setNext7({ trainingCount, rsvpsPending, surveysPending });
 
+    // Past sessions needing attendance — only last 14 days, coaches/admins only.
+    if (canManage) {
+      const ago14Iso = addDays(new Date(), -14).toISOString();
+      const { data: pastSess } = await supabase
+        .from("sessions")
+        .select("id")
+        .eq("club_id", activeClub.club_id)
+        .lt("starts_at", nowIso)
+        .gte("starts_at", ago14Iso);
+      const pastIds = (pastSess ?? []).map((s) => s.id);
+      let withAttendance = new Set<string>();
+      if (pastIds.length) {
+        const { data: attRows } = await supabase
+          .from("session_attendance")
+          .select("session_id")
+          .in("session_id", pastIds);
+        withAttendance = new Set((attRows ?? []).map((a) => a.session_id));
+      }
+      setPastNeedingAttendance(pastIds.filter((id) => !withAttendance.has(id)).length);
+    }
+
     if (isGuardian) {
       const { data: me } = await supabase
         .from("members")
@@ -159,6 +182,7 @@ function Dashboard() {
     setUpcoming([]); setMemberCount(null); setPendingCount(null);
     setMyRsvps({}); setRsvpSummary({}); setLoaded(false);
     setNext7({ trainingCount: 0, rsvpsPending: 0, surveysPending: 0 });
+    setPastNeedingAttendance(0);
     setGuardianChildren([]);
     refreshAll();
   }, [activeClub?.club_id, user?.id]);
@@ -322,6 +346,14 @@ function Dashboard() {
               count={next7.trainingCount}
               to="/sessions"
             />
+            {canManage && (
+              <ActionRow
+                icon={<ClipboardCheck className="h-4 w-4" />}
+                label="Past sessions needing attendance"
+                count={pastNeedingAttendance}
+                to="/attendance"
+              />
+            )}
           </div>
         </Card>
       </div>
