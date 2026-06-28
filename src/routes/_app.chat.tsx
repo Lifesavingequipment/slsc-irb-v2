@@ -834,7 +834,8 @@ function ChatPage() {
   }
 
   const sendMessage = async () => {
-    if (!body.trim() || !activeChannelId || !myMemberId) return;
+    if (!body.trim() && !attachmentFile) return;
+    if (!activeChannelId || !myMemberId) return;
     setSending(true);
     const trimmed = body.trim();
     const replyTo = replyingTo;
@@ -1494,7 +1495,7 @@ function ChatPage() {
                   }, 2000);
                 }}
                 placeholder="Aa"
-                className="flex-1 min-h-[20px] max-h-[100px] overflow-y-auto resize-none border-0 shadow-none bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm leading-5 self-center"
+                className="flex-1 min-h-[40px] max-h-[100px] overflow-y-auto resize-none border-0 shadow-none bg-transparent px-0 py-2.5 focus-visible:ring-0 focus-visible:ring-offset-0 text-sm leading-normal self-center"
                 rows={1}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
@@ -1516,7 +1517,7 @@ function ChatPage() {
               size="icon"
               className="h-9 w-9 rounded-full bg-[#FF6600] hover:bg-[#E65C00] shrink-0 mb-0.5"
               onClick={() => void sendMessage()}
-              disabled={sending || !body.trim()}
+              disabled={sending || (!body.trim() && !attachmentFile)}
             >
               <Send className="h-4 w-4" />
             </Button>
