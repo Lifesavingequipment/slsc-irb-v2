@@ -247,12 +247,13 @@ function ChatPage() {
       );
       const msgResults = await Promise.all(msgPromises);
 
-      // Unread counts
+      // Unread counts — exclude own messages (they're never "unread" for the sender)
       const unreadPromises = validCm.map((r) =>
         supabase
           .from("chat_messages")
           .select("id", { count: "exact", head: true })
           .eq("channel_id", r.channel_id)
+          .neq("sender_id", myMemberId)
           .gt("created_at", r.last_read_at ?? "1970-01-01"),
       );
       const unreadResults = await Promise.all(unreadPromises);
@@ -494,11 +495,13 @@ function ChatPage() {
     async (channelId: string) => {
       if (!myMemberId) return;
       const now = new Date().toISOString();
-      await supabase
+      const { error: mrErr } = await supabase
         .from("chat_members")
-        .update({ last_read_at: now })
-        .eq("channel_id", channelId)
-        .eq("member_id", myMemberId);
+        .upsert(
+          { channel_id: channelId, member_id: myMemberId, last_read_at: now },
+          { onConflict: "channel_id,member_id" },
+        );
+      if (mrErr) console.error("[chat] markRead upsert failed:", mrErr);
       setChannels((prev) => prev.map((c) => (c.id === channelId ? { ...c, unread: 0 } : c)));
       const msgs = messagesRef.current;
       if (msgs.length > 0) {
