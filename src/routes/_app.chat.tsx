@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClub, useCanManage } from "@/lib/club-context";
 import { cn } from "@/lib/utils";
@@ -50,6 +50,8 @@ type Channel = {
   lastTime?: string;
   unread: number;
   lastReadAt?: string | null;
+  clubId?: string;
+  clubName?: string;
 };
 
 type Message = {
@@ -116,10 +118,16 @@ function isLastInGroup(msgs: Message[], idx: number): boolean {
 }
 
 function ChatPage() {
-  const { activeClub } = useClub();
+  const { activeClub, memberships } = useClub();
   const canManage = useCanManage();
   const [myMemberId, setMyMemberId] = useState<string | null>(null);
   const [myMemberName, setMyMemberName] = useState<string>("");
+  // All member IDs for this user across all clubs (one per club).
+  const [allMemberIds, setAllMemberIds] = useState<string[]>([]);
+  // Active-channel member ID: the user's member ID for the channel currently open.
+  const [activeChannelMemberId, setActiveChannelMemberId] = useState<string | null>(null);
+  // Maps channelId → user's memberId for that channel (used by markRead, sendMessage, reactions).
+  const channelMemberIdRef = useRef<Record<string, string>>({});
   const [channels, setChannels] = useState<Channel[]>([]);
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -173,28 +181,34 @@ function ChatPage() {
 
   const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"];
 
-  // Load self
+  // Load self — fetch all member records so we can query across every club.
   useEffect(() => {
     if (!activeClub) return;
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return;
-      const { data: m } = await supabase
+      const { data: allMembers } = await supabase
         .from("members")
-        .select("id, first_name, last_name, preferred_name")
-        .eq("auth_user_id", data.user.id)
-        .eq("club_id", activeClub.club_id)
-        .maybeSingle();
-      if (!m) return;
-      setMyMemberId(m.id);
-      const name =
-        m.preferred_name || [m.first_name, m.last_name].filter(Boolean).join(" ") || "Me";
-      setMyMemberName(name);
+        .select("id, club_id, first_name, last_name, preferred_name")
+        .eq("auth_user_id", data.user.id);
+      if (!allMembers || allMembers.length === 0) return;
+      setAllMemberIds(allMembers.map((m) => m.id));
+      // Identify and store the active-club member record for send/react operations.
+      const active = allMembers.find((m) => m.club_id === activeClub.club_id);
+      if (active) {
+        setMyMemberId(active.id);
+        const name =
+          active.preferred_name ||
+          [active.first_name, active.last_name].filter(Boolean).join(" ") ||
+          "Me";
+        setMyMemberName(name);
+      }
     });
   }, [activeClub]);
 
   // Reset thread state when switching clubs so stale channels/messages don't show.
   useEffect(() => {
     setActiveChannelId(null);
+    setActiveChannelMemberId(null);
     setMessages([]);
     setShowThread(false);
     initialScrollDoneRef.current = false;
@@ -202,21 +216,26 @@ function ChatPage() {
   }, [activeClub?.club_id]);
 
   const loadChannels = useCallback(async () => {
-    if (!myMemberId || !activeClub) return;
+    if (!allMemberIds.length || !activeClub || !myMemberId) return;
     setLoading(true);
     try {
-      // Ensure main channel exists + self is a member (non-blocking — don't let errors stop the fetch)
+      // Ensure main channel exists for active club (non-blocking).
       try {
         await ensureMainChannel(activeClub.club_id, activeClub.club.name, myMemberId);
       } catch (e) {
         console.error("ensureMainChannel failed (non-fatal):", e);
       }
 
-      // Load channels I'm in that belong to the active club
+      // Build a clubId → clubName map from memberships for labelling.
+      const clubNameById: Record<string, string> = {};
+      memberships.forEach((m) => { clubNameById[m.club_id] = m.club.name; });
+      const multiClub = memberships.length > 1;
+
+      // Load channels across ALL clubs the user is a member of.
       const { data: cm, error: cmErr } = await supabase
         .from("chat_members")
-        .select("channel_id, last_read_at, channel:chat_channels(id, name, type, created_by, club_id)")
-        .eq("member_id", myMemberId);
+        .select("channel_id, last_read_at, member_id, channel:chat_channels(id, name, type, created_by, club_id)")
+        .in("member_id", allMemberIds);
 
       if (cmErr) {
         console.error("chat_members fetch error:", cmErr);
@@ -224,16 +243,21 @@ function ChatPage() {
       }
       if (!cm) return;
 
-      const validCm = cm.filter((r): r is typeof r & { channel_id: string } => {
-        if (r.channel_id == null) return false;
-        const ch = r.channel as { club_id?: string } | null;
-        return ch?.club_id === activeClub.club_id;
-      });
+      const validCm = cm.filter(
+        (r): r is typeof r & { channel_id: string } =>
+          r.channel_id != null && r.channel != null,
+      );
       const channelIds = validCm.map((r) => r.channel_id);
       if (channelIds.length === 0) {
         setChannels([]);
         return;
       }
+
+      // Record which of the user's member IDs is associated with each channel.
+      channelMemberIdRef.current = {};
+      validCm.forEach((r) => {
+        channelMemberIdRef.current[r.channel_id] = r.member_id;
+      });
 
       // Last message per channel
       const msgPromises = channelIds.map((cid) =>
@@ -247,13 +271,13 @@ function ChatPage() {
       );
       const msgResults = await Promise.all(msgPromises);
 
-      // Unread counts — exclude own messages (they're never "unread" for the sender)
+      // Unread counts — exclude messages sent by any of the user's member IDs.
       const unreadPromises = validCm.map((r) =>
         supabase
           .from("chat_messages")
           .select("id", { count: "exact", head: true })
           .eq("channel_id", r.channel_id)
-          .neq("sender_id", myMemberId)
+          .not("sender_id", "in", `(${allMemberIds.join(",")})`)
           .gt("created_at", r.last_read_at ?? "1970-01-01"),
       );
       const unreadResults = await Promise.all(unreadPromises);
@@ -264,6 +288,7 @@ function ChatPage() {
           name: string;
           type: string;
           created_by: string | null;
+          club_id: string | null;
         };
         return {
           id: ch.id,
@@ -274,11 +299,13 @@ function ChatPage() {
           lastTime: msgResults[i].data?.created_at ?? undefined,
           unread: unreadResults[i].count ?? 0,
           lastReadAt: r.last_read_at,
+          clubId: ch.club_id ?? undefined,
+          // Only attach a club label when the user is in multiple clubs.
+          clubName: multiClub && ch.club_id ? (clubNameById[ch.club_id] ?? undefined) : undefined,
         };
       });
 
-      // For DM channels, resolve the other participant's name so the current
-      // user doesn't see their own name as the conversation title.
+      // For DM channels, resolve the other participant's name.
       const directBuilt = built.filter((c) => c.type === "direct");
       if (directBuilt.length > 0) {
         const directIds = directBuilt.map((c) => c.id);
@@ -286,7 +313,7 @@ function ChatPage() {
           .from("chat_members")
           .select("channel_id, member:members(first_name, last_name, preferred_name)")
           .in("channel_id", directIds)
-          .neq("member_id", myMemberId);
+          .not("member_id", "in", `(${allMemberIds.join(",")})`);
         const nameByChannel: Record<string, string> = {};
         (otherCm ?? []).forEach((r) => {
           const m = r.member as {
@@ -308,10 +335,8 @@ function ChatPage() {
         });
       }
 
-      // Sort: main first, then by last message time desc
+      // Sort by most recent message across all clubs.
       built.sort((a, b) => {
-        if (a.type === "main") return -1;
-        if (b.type === "main") return 1;
         const ta = a.lastTime ?? "";
         const tb = b.lastTime ?? "";
         return tb.localeCompare(ta);
@@ -323,7 +348,7 @@ function ChatPage() {
     } finally {
       setLoading(false);
     }
-  }, [myMemberId, activeClub]);
+  }, [allMemberIds, activeClub, myMemberId, memberships]);
 
   useEffect(() => {
     loadChannels();
@@ -448,33 +473,35 @@ function ChatPage() {
 
   const toggleReaction = useCallback(
     async (messageId: string, emoji: string) => {
-      if (!myMemberId) return;
+      const reactorId = activeChannelMemberId ?? myMemberId;
+      if (!reactorId) return;
       const myReaction = reactions[messageId]?.find(
-        (r) => r.emoji === emoji && r.memberIds.includes(myMemberId),
+        (r) => r.emoji === emoji && r.memberIds.includes(reactorId),
       );
       if (myReaction) {
         await supabase
           .from("message_reactions")
           .delete()
           .eq("message_id", messageId)
-          .eq("member_id", myMemberId)
+          .eq("member_id", reactorId)
           .eq("emoji", emoji);
       } else {
         await supabase
           .from("message_reactions")
-          .insert({ message_id: messageId, member_id: myMemberId, emoji });
+          .insert({ message_id: messageId, member_id: reactorId, emoji });
       }
     },
-    [myMemberId, reactions],
+    [activeChannelMemberId, myMemberId, reactions],
   );
 
   const loadReadReceipts = useCallback(
     async (msgId: string) => {
+      const selfId = activeChannelMemberId ?? myMemberId;
       const { data } = await supabase
         .from("message_reads")
         .select("member_id, member:members(first_name, preferred_name)")
         .eq("message_id", msgId)
-        .neq("member_id", myMemberId ?? "");
+        .neq("member_id", selfId ?? "");
       setLastReadBy(
         (data ?? []).map((r) => {
           const m = r.member as { preferred_name?: string; first_name?: string } | null;
@@ -482,7 +509,7 @@ function ChatPage() {
         }),
       );
     },
-    [myMemberId],
+    [activeChannelMemberId, myMemberId],
   );
 
   // Keep messagesRef in sync so markRead can read the latest messages without
@@ -493,12 +520,14 @@ function ChatPage() {
 
   const markRead = useCallback(
     async (channelId: string) => {
-      if (!myMemberId) return;
+      // Use the member ID that belongs to this channel's club, not the active club.
+      const memberId = channelMemberIdRef.current[channelId] ?? myMemberId;
+      if (!memberId) return;
       const now = new Date().toISOString();
       const { error: mrErr } = await supabase
         .from("chat_members")
         .upsert(
-          { channel_id: channelId, member_id: myMemberId, last_read_at: now },
+          { channel_id: channelId, member_id: memberId, last_read_at: now },
           { onConflict: "channel_id,member_id" },
         );
       if (mrErr) console.error("[chat] markRead upsert failed:", mrErr);
@@ -509,7 +538,7 @@ function ChatPage() {
         await supabase
           .from("message_reads")
           .upsert(
-            { message_id: latestId, member_id: myMemberId, read_at: now },
+            { message_id: latestId, member_id: memberId, read_at: now },
             { onConflict: "message_id,member_id" },
           );
       }
@@ -635,11 +664,14 @@ function ChatPage() {
       setShowThread(true);
       initialScrollDoneRef.current = false;
       const ch = channels.find((c) => c.id === channelId);
+      // Track which of the user's member IDs belongs to this channel for send/react.
+      const memberId = channelMemberIdRef.current[channelId] ?? myMemberId;
+      setActiveChannelMemberId(memberId);
       await loadMessages(channelId, ch?.lastReadAt);
       await markRead(channelId);
       // Subscription is (re)established by the effect keyed on activeChannelId below.
     },
-    [loadMessages, markRead, channels],
+    [loadMessages, markRead, channels, myMemberId],
   );
 
   // (Re)subscribe to realtime whenever the selected channel changes.
@@ -813,14 +845,15 @@ function ChatPage() {
   }, [messages]);
 
   useEffect(() => {
-    if (!myMemberId || messages.length === 0) return;
-    const lastMine = [...messages].reverse().find((m) => m.sender_id === myMemberId);
+    const selfId = activeChannelMemberId ?? myMemberId;
+    if (!selfId || messages.length === 0) return;
+    const lastMine = [...messages].reverse().find((m) => m.sender_id === selfId);
     if (!lastMine) {
       setLastReadBy([]);
       return;
     }
     void loadReadReceipts(lastMine.id);
-  }, [messages, myMemberId, loadReadReceipts]);
+  }, [messages, activeChannelMemberId, myMemberId, loadReadReceipts]);
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -838,7 +871,9 @@ function ChatPage() {
 
   const sendMessage = async () => {
     if (!body.trim() && !attachmentFile) return;
-    if (!activeChannelId || !myMemberId) return;
+    // Use the member ID for the channel's club, not necessarily the active club.
+    const senderId = activeChannelMemberId ?? myMemberId;
+    if (!activeChannelId || !senderId) return;
     setSending(true);
     const trimmed = body.trim();
     const replyTo = replyingTo;
@@ -881,7 +916,7 @@ function ChatPage() {
       .from("chat_messages")
       .insert({
         channel_id: activeChannelId,
-        sender_id: myMemberId,
+        sender_id: senderId,
         body: trimmed,
         reply_to_id: replyTo?.id ?? null,
         attachment_url: attachmentUrl,
@@ -1045,8 +1080,24 @@ function ChatPage() {
     m.name.toLowerCase().includes(memberSearch.toLowerCase()),
   );
 
+  // DM names that appear more than once (across clubs) — show club label for those.
+  const duplicateDmNames = useMemo(() => {
+    const counts: Record<string, number> = {};
+    channels.forEach((c) => {
+      if (c.type === "direct") counts[c.name] = (counts[c.name] ?? 0) + 1;
+    });
+    return new Set(
+      Object.entries(counts)
+        .filter(([, n]) => n > 1)
+        .map(([name]) => name),
+    );
+  }, [channels]);
+
+  // The effective "self" member ID for the currently open channel.
+  const effectiveMemberId = activeChannelMemberId ?? myMemberId;
+
   const renderActionRows = (msg: Message, compact: boolean) => {
-    const isMe = msg.sender_id === myMemberId;
+    const isMe = msg.sender_id === effectiveMemberId;
     const rowClass = compact
       ? "w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-accent/60 transition-colors"
       : "w-full flex items-center gap-3 h-12 px-2 text-base text-left rounded-lg hover:bg-accent/60 transition-colors";
@@ -1204,9 +1255,9 @@ function ChatPage() {
                 </div>
               )}
               {messages.map((msg, idx, arr) => {
-                const isMe = msg.sender_id === myMemberId;
+                const isMe = msg.sender_id === effectiveMemberId;
                 const isLastMine =
-                  isMe && !arr.slice(idx + 1).some((m) => m.sender_id === myMemberId);
+                  isMe && !arr.slice(idx + 1).some((m) => m.sender_id === effectiveMemberId);
                 const grouped = isGrouped(messages, idx);
                 const lastInGroup = isLastInGroup(messages, idx);
                 const isDeleted = !!msg.deleted_at;
@@ -1347,7 +1398,7 @@ function ChatPage() {
                             className={`flex flex-wrap gap-1 mt-1 ${isMe ? "justify-end" : "justify-start"}`}
                           >
                             {reactions[msg.id].map((r) => {
-                              const iMine = r.memberIds.includes(myMemberId ?? "");
+                              const iMine = r.memberIds.includes(effectiveMemberId ?? "");
                               return (
                                 <button
                                   key={r.emoji}
@@ -1390,7 +1441,7 @@ function ChatPage() {
               <div className="min-w-0">
                 <div className="text-xs font-medium text-[#FF6600] flex items-center gap-1">
                   <Reply className="h-3 w-3" /> Replying to{" "}
-                  {replyingTo.sender_id === myMemberId ? "yourself" : replyingTo.senderName}
+                  {replyingTo.sender_id === effectiveMemberId ? "yourself" : replyingTo.senderName}
                 </div>
                 <div className="text-xs text-muted-foreground truncate">
                   {replyingTo.deleted_at ? "Message deleted" : replyingTo.body}
@@ -1584,6 +1635,18 @@ function ChatPage() {
                             </span>
                           )}
                         </div>
+                        {/* Club label: always for non-DM channels; for DMs only on name collision */}
+                        {ch.clubName && (
+                          ch.type !== "direct"
+                            ? <div className="text-[10px] text-muted-foreground truncate leading-tight">
+                                {ch.clubName}
+                              </div>
+                            : duplicateDmNames.has(ch.name)
+                              ? <div className="text-[10px] text-muted-foreground truncate leading-tight">
+                                  {ch.clubName}
+                                </div>
+                              : null
+                        )}
                         <div className="flex items-center justify-between gap-1 mt-0.5">
                           <span className="text-xs text-muted-foreground truncate">
                             {ch.lastMessage ?? "No messages yet"}

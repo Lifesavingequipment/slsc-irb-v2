@@ -1,8 +1,9 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Bell } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useClub } from "@/lib/club-context";
 
 /** Derive the in-app destination for a notification from its type + related entity id. */
 function linkFor(type: string, relatedId: string | null): string | null {
@@ -26,11 +27,21 @@ function linkFor(type: string, relatedId: string | null): string | null {
 
 export function NotificationBell() {
   const { notifications, unreadCount, markAllRead, markRead } = useNotifications();
+  const { memberships } = useClub();
   const [open, setOpen] = useState(false);
   const [panelPos, setPanelPos] = useState({ top: 0, right: 0 });
   const navigate = useNavigate();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  // Map club_id → club name for labelling notifications when multi-club.
+  const clubNameById = useMemo(() => {
+    const map: Record<string, string> = {};
+    memberships.forEach((m) => { map[m.club_id] = m.club.name; });
+    return map;
+  }, [memberships]);
+
+  const multiClub = memberships.length > 1;
 
   const handleToggle = () => {
     if (!open && buttonRef.current) {
@@ -108,6 +119,11 @@ export function NotificationBell() {
                         <div className="text-sm leading-snug text-gray-900">
                           {n.message || n.notification_type}
                         </div>
+                        {multiClub && n.club_id && clubNameById[n.club_id] && (
+                          <div className="text-[10px] text-gray-500 mt-0.5 font-medium">
+                            {clubNameById[n.club_id]}
+                          </div>
+                        )}
                         <div className="text-[10px] text-gray-500 mt-1">
                           {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
                         </div>

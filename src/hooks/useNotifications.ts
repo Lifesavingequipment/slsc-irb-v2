@@ -15,59 +15,58 @@ export type AppNotification = {
 };
 
 export function useNotifications() {
-  const { activeClub } = useClub();
+  const { memberships } = useClub();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [memberId, setMemberId] = useState<string | null>(null);
+  const [allMemberIds, setAllMemberIds] = useState<string[]>([]);
   const channelRef = useRef<RealtimeChannel | null>(null);
 
   const load = useCallback(async () => {
-    if (!activeClub) return;
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return;
-    const { data: m } = await supabase
+
+    // Load all member records across all clubs.
+    const { data: members } = await supabase
       .from("members")
       .select("id")
-      .eq("auth_user_id", user.id)
-      .eq("club_id", activeClub.club_id)
-      .maybeSingle();
-    if (!m) return;
-    setMemberId(m.id);
+      .eq("auth_user_id", user.id);
+
+    if (!members || members.length === 0) return;
+    const ids = members.map((m) => m.id);
+    setAllMemberIds(ids);
+
     const { data, error } = await supabase
       .from("notifications")
       .select("id, club_id, member_id, message, notification_type, related_id, is_read, created_at")
-      .eq("member_id", m.id)
+      .in("member_id", ids)
       .order("created_at", { ascending: false })
       .limit(50);
     if (error) console.error("[useNotifications] fetch error", error);
-    console.log("[useNotifications] fetched", { memberId: m.id, count: data?.length ?? 0, data });
     setNotifications((data ?? []) as AppNotification[]);
-  }, [activeClub]);
+  }, []);
+
+  // Reload when the number of club memberships changes (user joined/left a club).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [load, memberships.length]);
 
   useEffect(() => {
-    load();
-  }, [load]);
-
-  useEffect(() => {
-    if (!memberId) return;
+    if (!allMemberIds.length) return;
 
     let cancelled = false;
 
     // Nuclear clear: remove every channel from the client registry before
     // creating a new one. This prevents "cannot add postgres_changes callbacks
-    // after subscribe()" when a multi-club user switches clubs and the old
-    // channel for the same member ID is still registered.
+    // after subscribe()" when club membership changes and the old channel is
+    // still registered.
     void supabase.removeAllChannels().then(() => {
       channelRef.current = null;
       if (cancelled) return;
 
-      // Brief pause so Supabase's internal registry finishes teardown.
       setTimeout(() => {
         if (cancelled) return;
 
-        // Unique suffix prevents name collision with any lingering registrations.
-        const channelName = `notifications:${memberId}:${Date.now()}`;
+        const channelName = `notifications:all:${Date.now()}`;
         channelRef.current = supabase
           .channel(channelName)
           .on(
@@ -76,10 +75,14 @@ export function useNotifications() {
               event: "INSERT",
               schema: "public",
               table: "notifications",
-              filter: `member_id=eq.${memberId}`,
+              // No server-side filter — RLS governs access.
+              // We filter client-side to only add notifications for our member IDs.
             },
             (payload) => {
-              setNotifications((prev) => [payload.new as AppNotification, ...prev]);
+              const notif = payload.new as AppNotification;
+              if (allMemberIds.includes(notif.member_id ?? "")) {
+                setNotifications((prev) => [notif, ...prev]);
+              }
             },
           )
           .subscribe();
@@ -93,21 +96,21 @@ export function useNotifications() {
         channelRef.current = null;
       }
     };
-  }, [memberId]);
+  }, [allMemberIds]);
 
   const markAllRead = useCallback(async () => {
-    if (!memberId) return;
+    if (!allMemberIds.length) return;
     const { error } = await supabase
       .from("notifications")
       .update({ is_read: true })
-      .eq("member_id", memberId)
+      .in("member_id", allMemberIds)
       .eq("is_read", false);
     if (error) {
       console.error("[useNotifications] markAllRead error", error);
       return;
     }
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-  }, [memberId]);
+  }, [allMemberIds]);
 
   const markRead = useCallback(async (id: string) => {
     const { error } = await supabase.from("notifications").update({ is_read: true }).eq("id", id);
