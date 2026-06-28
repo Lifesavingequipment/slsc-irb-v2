@@ -258,7 +258,19 @@ function ChatPage() {
         (r): r is typeof r & { channel_id: string } =>
           r.channel_id != null && r.channel != null,
       );
-      const channelIds = validCm.map((r) => r.channel_id);
+
+      // Deduplicate by channel_id — a user in multiple clubs may appear in the
+      // same channel under different member_ids, producing one row per membership.
+      // Keep one row per channel, preferring the active-club member.
+      const channelMap = new Map<string, (typeof validCm)[0]>();
+      validCm.forEach((r) => {
+        if (!channelMap.has(r.channel_id) || r.member_id === myMemberId) {
+          channelMap.set(r.channel_id, r);
+        }
+      });
+      const dedupedCm = Array.from(channelMap.values());
+
+      const channelIds = dedupedCm.map((r) => r.channel_id);
       if (channelIds.length === 0) {
         setChannels([]);
         return;
@@ -266,7 +278,7 @@ function ChatPage() {
 
       // Record which of the user's member IDs is associated with each channel.
       channelMemberIdRef.current = {};
-      validCm.forEach((r) => {
+      dedupedCm.forEach((r) => {
         channelMemberIdRef.current[r.channel_id] = r.member_id;
       });
 
@@ -283,7 +295,7 @@ function ChatPage() {
       const msgResults = await Promise.all(msgPromises);
 
       // Unread counts — exclude messages sent by any of the user's member IDs.
-      const unreadPromises = validCm.map((r) =>
+      const unreadPromises = dedupedCm.map((r) =>
         supabase
           .from("chat_messages")
           .select("id", { count: "exact", head: true })
@@ -293,7 +305,7 @@ function ChatPage() {
       );
       const unreadResults = await Promise.all(unreadPromises);
 
-      const built: Channel[] = validCm.map((r, i) => {
+      const built: Channel[] = dedupedCm.map((r, i) => {
         const ch = r.channel as unknown as {
           id: string;
           name: string;
@@ -1646,17 +1658,11 @@ function ChatPage() {
                             </span>
                           )}
                         </div>
-                        {/* Club label: always for non-DM channels; for DMs only on name collision */}
-                        {ch.clubName && (
-                          ch.type !== "direct"
-                            ? <div className="text-[10px] text-muted-foreground truncate leading-tight">
-                                {ch.clubName}
-                              </div>
-                            : duplicateDmNames.has(ch.name)
-                              ? <div className="text-[10px] text-muted-foreground truncate leading-tight">
-                                  {ch.clubName}
-                                </div>
-                              : null
+                        {/* Club label: only on DMs where the same name appears for multiple clubs */}
+                        {ch.clubName && ch.type === "direct" && duplicateDmNames.has(ch.name) && (
+                          <div className="text-[10px] text-muted-foreground truncate leading-tight">
+                            {ch.clubName}
+                          </div>
                         )}
                         <div className="flex items-center justify-between gap-1 mt-0.5">
                           <span className="text-xs text-muted-foreground truncate">
