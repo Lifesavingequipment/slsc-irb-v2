@@ -419,6 +419,7 @@ function ChatPage() {
 
   async function markChannelUnread(channelId: string) {
     const memberId = channelMemberIdRef.current[channelId] ?? myMemberId;
+    console.log("[chat] markChannelUnread called", { channelId, memberId });
     if (!memberId) return;
     const { data: lastMsg } = await supabase
       .from("chat_messages")
@@ -428,14 +429,27 @@ function ChatPage() {
       .limit(1)
       .maybeSingle();
     setChannelActionId(null);
-    if (!lastMsg?.created_at) return;
-    const lastReadAt = new Date(new Date(lastMsg.created_at).getTime() - 1000).toISOString();
-    await supabase
+    // Empty channel — set to epoch so any future message shows as unread.
+    const lastReadAt = lastMsg?.created_at
+      ? new Date(new Date(lastMsg.created_at).getTime() - 1000).toISOString()
+      : "1970-01-01T00:00:00.000Z";
+    console.log("[chat] markChannelUnread writing last_read_at:", lastReadAt, "memberId:", memberId);
+    const { error } = await supabase
       .from("chat_members")
-      .upsert(
-        { channel_id: channelId, member_id: memberId, last_read_at: lastReadAt },
-        { onConflict: "channel_id,member_id" },
-      );
+      .update({ last_read_at: lastReadAt })
+      .eq("channel_id", channelId)
+      .eq("member_id", memberId);
+    if (error) {
+      console.error("[chat] markChannelUnread update failed:", error);
+      return;
+    }
+    // Optimistic update: mark channel as unread immediately so the blue dot
+    // appears without waiting for the full loadChannels() round-trip.
+    setChannels((prev) =>
+      prev.map((c) =>
+        c.id === channelId ? { ...c, lastReadAt, unread: Math.max(c.unread, 1) } : c,
+      ),
+    );
     void loadChannels();
   }
 
