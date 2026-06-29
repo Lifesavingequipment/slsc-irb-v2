@@ -177,6 +177,7 @@ function ChatPage() {
   const longPressFiredRef = useRef(false);
   const channelLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channelLongPressFiredRef = useRef(false);
+  const channelTouchStartPos = useRef<{ x: number; y: number } | null>(null);
   const initialScrollDoneRef = useRef(false);
   const messageIdsRef = useRef<string[]>([]);
   const messagesRef = useRef<Message[]>([]);
@@ -811,11 +812,14 @@ function ChatPage() {
     }
   }, []);
 
-  const startChannelLongPress = useCallback((channelId: string) => {
+  const startChannelLongPress = useCallback((e: React.TouchEvent, channelId: string) => {
     channelLongPressFiredRef.current = false;
+    const touch = e.touches[0];
+    channelTouchStartPos.current = { x: touch.clientX, y: touch.clientY };
     if (channelLongPressTimer.current) clearTimeout(channelLongPressTimer.current);
     channelLongPressTimer.current = setTimeout(() => {
       channelLongPressFiredRef.current = true;
+      channelTouchStartPos.current = null;
       setChannelActionId(channelId);
     }, 500);
   }, []);
@@ -825,7 +829,18 @@ function ChatPage() {
       clearTimeout(channelLongPressTimer.current);
       channelLongPressTimer.current = null;
     }
+    channelTouchStartPos.current = null;
   }, []);
+
+  const handleChannelTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!channelTouchStartPos.current) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - channelTouchStartPos.current.x;
+    const dy = touch.clientY - channelTouchStartPos.current.y;
+    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+      cancelChannelLongPress();
+    }
+  }, [cancelChannelLongPress]);
 
   const handleBubbleClick = useCallback((msg: Message) => {
     if (longPressFiredRef.current) {
@@ -1738,10 +1753,14 @@ function ChatPage() {
                   >
                     <button
                       type="button"
-                      onPointerDown={() => startChannelLongPress(ch.id)}
-                      onPointerUp={cancelChannelLongPress}
-                      onPointerLeave={cancelChannelLongPress}
-                      onPointerMove={cancelChannelLongPress}
+                      onTouchStart={(e) => startChannelLongPress(e, ch.id)}
+                      onTouchMove={handleChannelTouchMove}
+                      onTouchEnd={cancelChannelLongPress}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        channelLongPressFiredRef.current = true;
+                        setChannelActionId(ch.id);
+                      }}
                       onClick={() => {
                         if (channelLongPressFiredRef.current) {
                           channelLongPressFiredRef.current = false;
@@ -1750,6 +1769,7 @@ function ChatPage() {
                         void openChannel(ch.id);
                       }}
                       className="flex-1 min-w-0 text-left px-4 py-4 flex items-start gap-3"
+                      style={{ touchAction: "manipulation" }}
                     >
                       <div className="relative shrink-0">
                         <div className="h-10 w-10 rounded-full bg-[#FF6600]/10 flex items-center justify-center text-[#FF6600]">
