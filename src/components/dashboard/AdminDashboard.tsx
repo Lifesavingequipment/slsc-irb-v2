@@ -108,7 +108,7 @@ export function AdminDashboard({
       const now = new Date();
       const nowIso = now.toISOString();
       const in7Iso = addDays(now, 7).toISOString();
-      const thirtyAgoIso = addDays(now, -30).toISOString();
+      const ago14Iso = addDays(now, -14).toISOString();
 
       const [faults, pastSessions, upcoming7d] = await Promise.all([
         supabase
@@ -121,7 +121,7 @@ export function AdminDashboard({
           .select("id")
           .eq("club_id", clubId)
           .lte("starts_at", nowIso)
-          .gte("starts_at", thirtyAgoIso),
+          .gte("starts_at", ago14Iso),
         supabase
           .from("sessions")
           .select("id", { count: "exact", head: true })
