@@ -68,6 +68,19 @@ async function approvedMemberIds(clubId: string): Promise<string[]> {
   return membersForUsers(clubId, (mems ?? []).map((m) => m.user_id));
 }
 
+/** Coaches & club admins of a club -> member ids (club_roles joined to members). */
+async function coachAndAdminMemberIds(clubId: string): Promise<string[]> {
+  const { data: roles } = await supabase
+    .from("club_roles")
+    .select("user_id")
+    .eq("club_id", clubId)
+    .in("role", ["owner", "club_admin", "coach"]);
+  return membersForUsers(
+    clubId,
+    (roles ?? []).map((r) => r.user_id).filter((id): id is string => !!id),
+  );
+}
+
 /** Club admins/owners -> member ids (club_memberships role joined to members). */
 async function clubAdminMemberIds(clubId: string): Promise<string[]> {
   const { data: mems } = await supabase
@@ -164,4 +177,18 @@ export async function notifyAllClubMembers(input: NotifyInput) {
 /** Notify members RSVP'd 'going' to a session. */
 export async function notifyGoingMembers(sessionId: string, input: NotifyInput) {
   await notifyMembers(await goingMemberIds(sessionId, input.club_id), input);
+}
+
+/** Carpool full — notify coaches/admins that a member still needs a ride. */
+export async function notifyCoachesCarpoolFull(
+  clubId: string,
+  sessionId: string,
+  message: string,
+) {
+  await notifyMembers(await coachAndAdminMemberIds(clubId), {
+    club_id: clubId,
+    notification_type: "carpool_needs_ride",
+    message,
+    related_id: sessionId,
+  });
 }

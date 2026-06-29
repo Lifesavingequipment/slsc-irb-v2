@@ -29,6 +29,8 @@ type Props = {
   className?: string;
   onLocationIdChange?: (id: string | null) => void;
   valueId?: string | null;
+  /** Preset string options (e.g. coach-defined pickup stops) shown at the top of the dropdown. */
+  presets?: string[];
 };
 
 export function LocationPicker({
@@ -40,6 +42,7 @@ export function LocationPicker({
   className,
   onLocationIdChange,
   valueId,
+  presets = [],
 }: Props) {
   const { user } = useAuth();
   const [locations, setLocations] = useState<SavedLocation[]>([]);
@@ -123,6 +126,15 @@ export function LocationPicker({
     onLocationIdChange?.(l.id);
   };
 
+  const pickPreset = (p: string) => {
+    setAddingNew(false);
+    setSavePrompt(null);
+    setManualMode(false);
+    setDropdownOpen(false);
+    onChange(p);
+    onLocationIdChange?.(null);
+  };
+
   const pickAddNew = () => {
     setDropdownOpen(false);
     setAddingNew(true);
@@ -192,8 +204,11 @@ export function LocationPicker({
   };
 
   // Derive the label shown in the closed dropdown trigger
+  const presetMatch = !selected && presets.includes(value) ? value : null;
   const triggerLabel = selected
     ? selected.name
+    : presetMatch
+    ? presetMatch
     : addingNew
     ? "New address"
     : null;
@@ -235,7 +250,21 @@ export function LocationPicker({
                   style={dropdownStyle}
                   className="z-50 max-h-48 overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md p-1"
                 >
-                  {/* Add new location — always first */}
+                  {/* Coach-defined pickup stops first */}
+                  {presets.map((p) => (
+                    <button
+                      key={`preset-${p}`}
+                      type="button"
+                      onClick={() => pickPreset(p)}
+                      className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <span>{p}</span>
+                    </button>
+                  ))}
+
+                  {presets.length > 0 && <div className="my-1 h-px bg-border" />}
+
+                  {/* Add new location */}
                   <button
                     type="button"
                     onClick={pickAddNew}

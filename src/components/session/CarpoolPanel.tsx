@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { buildNameMap } from "@/lib/names";
-import { notifyGoingMembers } from "@/lib/notify";
+import { notifyGoingMembers, notifyCoachesCarpoolFull } from "@/lib/notify";
 
 const HOURS = Array.from({ length: 12 }, (_, i) => i + 1);
 const MINS = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
@@ -155,31 +155,10 @@ function OfferRideDialog({ open, onOpenChange, onSubmit, busy, defaultLocation, 
           </div>
           <div>
             <Label>Departure location</Label>
-            {pickups.length > 0 ? (
-              <div className="flex flex-wrap gap-1">
-                {pickups.map((p) => (
-                  <button key={p} type="button"
-                    onClick={() => setForm({ ...form, departure_location: p })}
-                    className={`rounded-md border px-2 py-1 text-xs transition ${
-                      form.departure_location === p
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "hover:bg-accent"
-                    }`}>{p}</button>
-                ))}
-                <button type="button"
-                  onClick={() => setForm({ ...form, departure_location: "" })}
-                  className={`rounded-md border px-2 py-1 text-xs transition ${
-                    !pickups.includes(form.departure_location)
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "hover:bg-accent"
-                  }`}>Other…</button>
-              </div>
-            ) : null}
-            {(pickups.length === 0 || !pickups.includes(form.departure_location)) && (
-              <LocationPicker className={pickups.length > 0 ? "mt-2" : ""} clubId={clubId}
-                value={form.departure_location}
-                onChange={(v) => setForm({ ...form, departure_location: v })} />
-            )}
+            <LocationPicker clubId={clubId} presets={pickups}
+              value={form.departure_location}
+              placeholder="Select a pickup stop or location..."
+              onChange={(v) => setForm({ ...form, departure_location: v })} />
           </div>
           <div>
             <Label>Departure time</Label>
@@ -209,89 +188,6 @@ function OfferRideDialog({ open, onOpenChange, onSubmit, busy, defaultLocation, 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={submit} disabled={busy}><Plus className="h-4 w-4" /> Offer ride</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-type RequestForm = {
-  pickup_location: string;
-  preferred_time: string;
-  notes: string;
-};
-
-function RequestRideDialog({ open, onOpenChange, onSubmit, busy, existing, pickups, clubId }: {
-  open: boolean; onOpenChange: (v: boolean) => void;
-  onSubmit: (f: RequestForm) => void; busy: boolean;
-  existing: RideRequest | null;
-  pickups: string[];
-  clubId: string;
-}) {
-  const initial = (): RequestForm => ({
-    pickup_location: existing?.pickup_location ?? pickups[0] ?? "",
-    preferred_time: existing?.preferred_time ? toLocalInput(existing.preferred_time) : "",
-    notes: existing?.notes ?? "",
-  });
-  const [form, setForm] = useState<RequestForm>(initial);
-  useEffect(() => { if (open) setForm(initial()); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [open]);
-
-  const submit = () => {
-    if (!form.pickup_location.trim()) return toast.error("Pickup location required");
-    onSubmit(form);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{existing ? "Edit ride request" : "Need a ride"}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div>
-            <Label>Pickup location</Label>
-            {pickups.length > 0 ? (
-              <div className="flex flex-wrap gap-1">
-                {pickups.map((p) => (
-                  <button key={p} type="button"
-                    onClick={() => setForm({ ...form, pickup_location: p })}
-                    className={`rounded-md border px-2 py-1 text-xs transition ${
-                      form.pickup_location === p
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "hover:bg-accent"
-                    }`}>{p}</button>
-                ))}
-                <button type="button"
-                  onClick={() => setForm({ ...form, pickup_location: "" })}
-                  className={`rounded-md border px-2 py-1 text-xs transition ${
-                    !pickups.includes(form.pickup_location)
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "hover:bg-accent"
-                  }`}>Other…</button>
-              </div>
-            ) : null}
-            {(pickups.length === 0 || !pickups.includes(form.pickup_location)) && (
-              <LocationPicker className={pickups.length > 0 ? "mt-2" : ""} clubId={clubId}
-                value={form.pickup_location}
-                placeholder="Where can a driver collect you?"
-                onChange={(v) => setForm({ ...form, pickup_location: v })} />
-            )}
-          </div>
-          <div>
-            <Label>Preferred departure time</Label>
-            <Input type="datetime-local" value={form.preferred_time}
-              onChange={(e) => setForm({ ...form, preferred_time: e.target.value })} />
-          </div>
-          <div>
-            <Label>Notes</Label>
-            <Textarea value={form.notes} maxLength={500} rows={3}
-              placeholder="Anything drivers should know"
-              onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={submit} disabled={busy}>{existing ? "Save" : "Post request"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -511,11 +407,12 @@ function CoachSetupDialog({
 
 type EditRidePatch = Partial<Pick<Carpool, "available_seats" | "can_tow_trailer" | "vehicle_name" | "departure_location" | "notes">>;
 
-function EditRideDialog({ carpool, onOpenChange, onSave, busy }: {
+function EditRideDialog({ carpool, onOpenChange, onSave, busy, pickups }: {
   carpool: Carpool | null;
   onOpenChange: (open: boolean) => void;
   onSave: (patch: EditRidePatch) => void;
   busy: boolean;
+  pickups: string[];
 }) {
   const [seats, setSeats] = useState(0);
   const [canTow, setCanTow] = useState(false);
@@ -557,7 +454,7 @@ function EditRideDialog({ carpool, onOpenChange, onSave, busy }: {
           </div>
           <div>
             <Label>Departure location</Label>
-            <LocationPicker clubId={carpool?.club_id} value={departureLocation} onChange={setDepartureLocation} />
+            <LocationPicker clubId={carpool?.club_id} presets={pickups} value={departureLocation} onChange={setDepartureLocation} />
           </div>
           <div>
             <Label>Available seats</Label>
@@ -606,7 +503,6 @@ export function CarpoolPanel({ sessionId }: { sessionId: string }) {
 
   const [offerOpen, setOfferOpen] = useState(false);
   const [editCarpool, setEditCarpool] = useState<Carpool | null>(null);
-  const [requestOpen, setRequestOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState<{ requestId: string; userId: string } | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
 
@@ -698,6 +594,44 @@ export function CarpoolPanel({ sessionId }: { sessionId: string }) {
     + clubVehicles.filter((v) => v.can_tow).length;
   const trailerShortfall = trailersRequired > towingCapable;
 
+  const isOwnTravel = myRequest?.status === "own_travel";
+  const vehicleCount = activeCarpools.length + clubVehicles.length;
+  const allVehiclesFull = vehicleCount > 0 && seatsLeft === 0;
+  // Implicitly "needs a ride": no assignment, not a driver, and not travelling on their own.
+  const needsRide = !!user && !myAssignment && !iAmDriver && !isOwnTravel;
+
+  // When every vehicle is full and a member still needs a ride, notify coaches/admins once.
+  const fullNotifyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!user || !session) return;
+    if (!needsRide || !allVehiclesFull) return;
+    // Already have a pending request on record → coaches already know.
+    if (requests.some((r) => r.user_id === user.id && r.status === "pending")) return;
+    const key = `${sessionId}:${user.id}`;
+    if (fullNotifyRef.current === key) return;
+    fullNotifyRef.current = key;
+    (async () => {
+      // Record the implicit request (doubles as the per-member dedupe marker) so coaches can assign.
+      const { error } = await supabase.from("carpool_requests").upsert({
+        session_id: sessionId,
+        club_id: session.club_id,
+        user_id: user.id,
+        pickup_location: null,
+        status: "pending",
+      }, { onConflict: "session_id,user_id" });
+      if (error) { fullNotifyRef.current = null; return; }
+      const { data: prof } = await supabase.from("profiles")
+        .select("full_name").eq("id", user.id).maybeSingle();
+      const myName = prof?.full_name?.trim() || "A member";
+      await notifyCoachesCarpoolFull(
+        session.club_id,
+        sessionId,
+        `${myName} needs a ride to ${session.title} but all vehicles are full.`,
+      );
+      load();
+    })();
+  }, [user, session, needsRide, allVehiclesFull, requests, sessionId, load]);
+
   const offerRide = async (form: OfferForm) => {
     if (!user || !session) return;
     setBusy(true);
@@ -714,6 +648,9 @@ export function CarpoolPanel({ sessionId }: { sessionId: string }) {
     });
     setBusy(false);
     if (error) return toast.error(error.message);
+    // Drivers don't need a ride — drop any auto-recorded pending request.
+    await supabase.from("carpool_requests").delete()
+      .eq("session_id", sessionId).eq("user_id", user.id).eq("status", "pending");
     toast.success("Ride offered");
     setOfferOpen(false);
     load();
@@ -755,25 +692,6 @@ export function CarpoolPanel({ sessionId }: { sessionId: string }) {
     });
   };
 
-  const submitRequest = async (form: RequestForm) => {
-    if (!user || !session) return;
-    setBusy(true);
-    const { error } = await supabase.from("carpool_requests").upsert({
-      session_id: sessionId,
-      club_id: session.club_id,
-      user_id: user.id,
-      pickup_location: form.pickup_location.trim(),
-      preferred_time: form.preferred_time ? new Date(form.preferred_time).toISOString() : null,
-      notes: form.notes.trim() || null,
-      status: "pending",
-    }, { onConflict: "session_id,user_id" });
-    setBusy(false);
-    if (error) return toast.error(error.message);
-    toast.success("Ride request posted");
-    setRequestOpen(false);
-    load();
-  };
-
   const setOwnTravel = async () => {
     if (!user || !session) return;
     setBusy(true);
@@ -799,19 +717,6 @@ export function CarpoolPanel({ sessionId }: { sessionId: string }) {
     }
     setBusy(false);
     toast.success("Marked as own travel");
-    load();
-  };
-
-  const cancelRequest = async (id: string) => {
-    const ok = await confirm({
-      title: "Cancel your ride request?",
-      description: "Drivers won't see your request anymore. You can post a new one later.",
-      confirmText: "Cancel request",
-    });
-    if (!ok) return;
-    const { error } = await supabase.from("carpool_requests").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success("Request cancelled");
     load();
   };
 
@@ -941,8 +846,6 @@ export function CarpoolPanel({ sessionId }: { sessionId: string }) {
     return <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>;
   }
 
-  const isOwnTravel = myRequest?.status === "own_travel";
-
   return (
     <div className="space-y-3">
       <Card className="p-4">
@@ -978,21 +881,13 @@ export function CarpoolPanel({ sessionId }: { sessionId: string }) {
       </Card>
 
       {/* Action buttons */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <Button
           variant={iAmDriver ? "default" : "outline"}
           onClick={() => { if (isOwnTravel) clearOwnTravel(); setOfferOpen(true); }}
           className="h-11"
         >
           <Car className="h-4 w-4" /> Offer ride
-        </Button>
-        <Button
-          variant={myRequest && !isOwnTravel ? "default" : "outline"}
-          onClick={() => { if (isOwnTravel) clearOwnTravel(); setRequestOpen(true); }}
-          className="h-11"
-        >
-          <HandHelping className="h-4 w-4" />
-          {myRequest && !isOwnTravel ? "Edit request" : "Need ride"}
         </Button>
         <Button
           variant={isOwnTravel ? "default" : "outline"}
@@ -1032,29 +927,27 @@ export function CarpoolPanel({ sessionId }: { sessionId: string }) {
       )}
 
       {/* My status */}
-      {(myAssignment || (myRequest && !isOwnTravel)) && (
-        <Card className="p-3 text-sm">
-          {myAssignment && (() => {
-            const c = carpools.find((x) => x.id === myAssignment.carpool_id);
-            return (
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-success" />
-                  <span>You're riding with <strong>{c ? dn(c.driver_user_id) : "—"}</strong>{c ? ` (${c.vehicle_name})` : ""}</span>
-                </div>
-                <Button size="sm" variant="ghost" onClick={() => leaveCarpool(myAssignment.id)}>Leave</Button>
-              </div>
-            );
-          })()}
-          {!myAssignment && myRequest && !isOwnTravel && (
+      {myAssignment && (() => {
+        const c = carpools.find((x) => x.id === myAssignment.carpool_id);
+        return (
+          <Card className="p-3 text-sm">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-warning" />
-                <span>Ride request pending — pickup at {myRequest.pickup_location}</span>
+                <CheckCircle2 className="h-4 w-4 text-success" />
+                <span>You're riding with <strong>{c ? dn(c.driver_user_id) : "—"}</strong>{c ? ` (${c.vehicle_name})` : ""}</span>
               </div>
-              <Button size="sm" variant="ghost" onClick={() => cancelRequest(myRequest.id)}>Cancel</Button>
+              <Button size="sm" variant="ghost" onClick={() => leaveCarpool(myAssignment.id)}>Leave</Button>
             </div>
-          )}
+          </Card>
+        );
+      })()}
+
+      {needsRide && (
+        <Card className="p-3 text-sm">
+          <div className="flex items-center gap-2">
+            <HandHelping className="h-4 w-4 text-warning shrink-0" />
+            <span>You don't have a ride yet. You'll be notified when a seat becomes available.</span>
+          </div>
         </Card>
       )}
 
@@ -1208,16 +1101,6 @@ export function CarpoolPanel({ sessionId }: { sessionId: string }) {
         clubId={session.club_id}
       />
 
-      <RequestRideDialog
-        open={requestOpen}
-        onOpenChange={setRequestOpen}
-        onSubmit={submitRequest}
-        busy={busy}
-        existing={myRequest && !isOwnTravel ? myRequest : null}
-        pickups={pickups}
-        clubId={session.club_id}
-      />
-
       {canManage && (
         <CoachSetupDialog
           open={setupOpen}
@@ -1237,6 +1120,7 @@ export function CarpoolPanel({ sessionId }: { sessionId: string }) {
         onOpenChange={(o) => !o && setEditCarpool(null)}
         onSave={(patch) => editCarpool && updateCarpool(editCarpool.id, patch)}
         busy={busy}
+        pickups={pickups}
       />
 
       {/* Coach assign dialog */}
