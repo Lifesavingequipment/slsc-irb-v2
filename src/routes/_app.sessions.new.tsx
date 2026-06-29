@@ -126,7 +126,7 @@ function NewSession() {
   const [carpools, setCarpools] = useState<CarpoolDraft[]>([]);
   const [pickups, setPickups] = useState<PickupStop[]>([]);
   const [trailers, setTrailers] = useState(0);
-  const [trailerLocation, setTrailerLocation] = useState("");
+  const [trailerLocations, setTrailerLocations] = useState<string[]>([]);
   const [pendingVehicles, setPendingVehicles] = useState<VehicleDraft[]>([]);
   const [newVehicle, setNewVehicle] = useState<VehicleDraft>({ name: "", seats: 8, pickup: "", can_tow: false });
   const [repeatUntil, setRepeatUntil] = useState("");
@@ -241,7 +241,7 @@ function NewSession() {
       carpool_enabled: parsed.data.carpool_enabled,
       carpool_pickups: cleanPickups.length > 0 ? cleanPickups : [],
       trailers_required: carpool ? (trailers ?? 0) : 0,
-      trailer_location: carpool && trailers > 0 ? (trailerLocation.trim() || null) : null,
+      trailer_location: carpool && trailers > 0 ? JSON.stringify(trailerLocations.slice(0, trailers)) : null,
       equipment_list_id: gearListId || null,
       created_by: user.id,
     }));
@@ -591,9 +591,15 @@ function NewSession() {
                 pickups={pickups}
                 onPickupsChange={setPickups}
                 trailers={trailers}
-                onTrailersChange={setTrailers}
-                trailerLocation={trailerLocation}
-                onTrailerLocationChange={setTrailerLocation}
+                onTrailersChange={(n) => {
+                  setTrailers(n);
+                  setTrailerLocations((prev) => {
+                    if (n > prev.length) return [...prev, ...Array(n - prev.length).fill("")];
+                    return prev.slice(0, n);
+                  });
+                }}
+                trailerLocations={trailerLocations}
+                onTrailerLocationsChange={setTrailerLocations}
                 clubId={activeClub?.club_id}
                 pendingVehicles={pendingVehicles}
                 onRemovePending={(i) => setPendingVehicles((v) => v.filter((_, idx) => idx !== i))}

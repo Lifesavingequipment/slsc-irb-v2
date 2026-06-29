@@ -982,7 +982,7 @@ function CoachSetupDialog({
   clubId: string;
 }) {
   const [pickups, setPickups] = useState<{ location: string; leaveTime: string }[]>([]);
-  const [trailerLocation, setTrailerLocation] = useState("");
+  const [trailerLocations, setTrailerLocations] = useState<string[]>([]);
   const [trailers, setTrailers] = useState<number>(0);
   const [newVehicle, setNewVehicle] = useState<{ name: string; seats: number; pickup: string; can_tow: boolean }>({
     name: "", seats: 8, pickup: "", can_tow: false,
@@ -992,7 +992,13 @@ function CoachSetupDialog({
     if (open) {
       setPickups(session.carpool_pickups ?? []);
       setTrailers(session.trailers_required ?? 0);
-      setTrailerLocation(session.trailer_location ?? "");
+      const rawTL = session.trailer_location ?? null;
+      if (rawTL) {
+        try {
+          const p = JSON.parse(rawTL);
+          setTrailerLocations(Array.isArray(p) ? p.map(String) : [rawTL]);
+        } catch { setTrailerLocations([rawTL]); }
+      } else { setTrailerLocations([]); }
       setNewVehicle({ name: "", seats: 8, pickup: "", can_tow: false });
     }
   }, [open, session.carpool_pickups, session.trailers_required]);
@@ -1079,7 +1085,14 @@ function CoachSetupDialog({
           <section className="space-y-2">
             <Label className="text-sm font-semibold">Trailers required</Label>
             <div className="flex gap-2 items-center">
-              <Select value={String(trailers)} onValueChange={(v) => setTrailers(Number(v))}>
+              <Select value={String(trailers)} onValueChange={(v) => {
+                const n = Number(v);
+                setTrailers(n);
+                setTrailerLocations((prev) => {
+                  if (n > prev.length) return [...prev, ...Array(n - prev.length).fill("")];
+                  return prev.slice(0, n);
+                });
+              }}>
                 <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {[0, 1, 2, 3, 4].map((n) => (
@@ -1090,20 +1103,30 @@ function CoachSetupDialog({
               <Button size="sm" onClick={async () => {
                 await onSaveTrailers(trailers);
                 if (trailers > 0) {
-                  await supabase.from("sessions").update({ trailer_location: trailerLocation.trim() || null }).eq("id", sessionId);
+                  await supabase.from("sessions").update({ trailer_location: JSON.stringify(trailerLocations.slice(0, trailers)) }).eq("id", sessionId);
                 }
                 toast.success("Trailers saved");
               }}>Save</Button>
             </div>
             {trailers > 0 && (
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Trailer storage / departure location</Label>
-                <LocationPicker
-                  clubId={clubId}
-                  value={trailerLocation}
-                  onChange={setTrailerLocation}
-                  placeholder="Where the trailer(s) are stored"
-                />
+              <div className="space-y-2">
+                {Array.from({ length: trailers }, (_, i) => (
+                  <div key={i} className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">
+                      {trailers === 1 ? "Trailer location" : `Trailer ${i + 1} location`}
+                    </Label>
+                    <LocationPicker
+                      clubId={clubId}
+                      value={trailerLocations[i] ?? ""}
+                      onChange={(v) => {
+                        const next = [...trailerLocations];
+                        next[i] = v;
+                        setTrailerLocations(next);
+                      }}
+                      placeholder="Where the trailer is stored"
+                    />
+                  </div>
+                ))}
               </div>
             )}
           </section>

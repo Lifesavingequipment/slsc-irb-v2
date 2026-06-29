@@ -109,7 +109,7 @@ function EditSession() {
   const [originalCarpoolIds, setOriginalCarpoolIds] = useState<string[]>([]);
   const [pickups, setPickups] = useState<PickupStop[]>([]);
   const [trailers, setTrailers] = useState(0);
-  const [trailerLocation, setTrailerLocation] = useState("");
+  const [trailerLocations, setTrailerLocations] = useState<string[]>([]);
   const [existingVehicles, setExistingVehicles] = useState<ExistingVehicle[]>([]);
   const [vehiclesToDelete, setVehiclesToDelete] = useState<string[]>([]);
   const [pendingVehicles, setPendingVehicles] = useState<VehicleDraft[]>([]);
@@ -143,7 +143,17 @@ function EditSession() {
           : { location: (p as PickupStop).location ?? "", leaveTime: (p as PickupStop).leaveTime ?? "17:00" }
       ));
       setTrailers(data.trailers_required ?? 0);
-      setTrailerLocation((data as { trailer_location?: string | null }).trailer_location ?? "");
+      const rawTrailerLoc = (data as { trailer_location?: string | null }).trailer_location ?? null;
+      if (rawTrailerLoc) {
+        try {
+          const parsed = JSON.parse(rawTrailerLoc);
+          setTrailerLocations(Array.isArray(parsed) ? parsed.map(String) : [rawTrailerLoc]);
+        } catch {
+          setTrailerLocations([rawTrailerLoc]);
+        }
+      } else {
+        setTrailerLocations([]);
+      }
 
       const [locsRes, carpoolTplRes, gearRes] = await Promise.all([
         supabase.from("locations").select("id, name, address").eq("club_id", data.club_id).order("name"),
@@ -264,7 +274,7 @@ function EditSession() {
       carpool_enabled: parsed.data.carpool_enabled,
       carpool_pickups: cleanPickups.length > 0 ? cleanPickups : [],
       trailers_required: carpool ? trailers : 0,
-      trailer_location: carpool && trailers > 0 ? (trailerLocation.trim() || null) : null,
+      trailer_location: carpool && trailers > 0 ? JSON.stringify(trailerLocations.slice(0, trailers)) : null,
       equipment_list_id: gearListId || null,
     }).eq("id", sessionId);
     if (error) { setBusy(false); toast.error(error.message); return; }
@@ -487,9 +497,15 @@ function EditSession() {
                 pickups={pickups}
                 onPickupsChange={setPickups}
                 trailers={trailers}
-                onTrailersChange={setTrailers}
-                trailerLocation={trailerLocation}
-                onTrailerLocationChange={setTrailerLocation}
+                onTrailersChange={(n) => {
+                  setTrailers(n);
+                  setTrailerLocations((prev) => {
+                    if (n > prev.length) return [...prev, ...Array(n - prev.length).fill("")];
+                    return prev.slice(0, n);
+                  });
+                }}
+                trailerLocations={trailerLocations}
+                onTrailerLocationsChange={setTrailerLocations}
                 clubId={clubId ?? activeClub?.club_id}
                 existingVehicles={existingVehicles.filter((v) => !vehiclesToDelete.includes(v.id))}
                 onRemoveExisting={(id) => setVehiclesToDelete((prev) => [...prev, id])}

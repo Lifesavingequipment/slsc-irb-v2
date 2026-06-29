@@ -75,7 +75,7 @@ function TimeSelect({ value, onChange }: { value: string; onChange: (v: string) 
 export function CoachSetupSection({
   pickups, onPickupsChange,
   trailers, onTrailersChange,
-  trailerLocation, onTrailerLocationChange,
+  trailerLocations, onTrailerLocationsChange,
   clubId,
   existingVehicles = [],
   onRemoveExisting,
@@ -88,8 +88,8 @@ export function CoachSetupSection({
   onPickupsChange: (v: PickupStop[]) => void;
   trailers: number;
   onTrailersChange: (n: number) => void;
-  trailerLocation: string;
-  onTrailerLocationChange: (v: string) => void;
+  trailerLocations: string[];
+  onTrailerLocationsChange: (v: string[]) => void;
   clubId: string | null | undefined;
   existingVehicles?: ExistingVehicle[];
   onRemoveExisting?: (id: string) => void;
@@ -153,14 +153,24 @@ export function CoachSetupSection({
           </SelectContent>
         </Select>
         {trailers > 0 && (
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Trailer storage / departure location</Label>
-            <LocationPicker
-              clubId={clubId}
-              value={trailerLocation}
-              onChange={onTrailerLocationChange}
-              placeholder="Where the trailer(s) are stored"
-            />
+          <div className="space-y-2">
+            {Array.from({ length: trailers }, (_, i) => (
+              <div key={i} className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">
+                  {trailers === 1 ? "Trailer location" : `Trailer ${i + 1} location`}
+                </Label>
+                <LocationPicker
+                  clubId={clubId}
+                  value={trailerLocations[i] ?? ""}
+                  onChange={(v) => {
+                    const next = [...trailerLocations];
+                    next[i] = v;
+                    onTrailerLocationsChange(next);
+                  }}
+                  placeholder="Where the trailer is stored"
+                />
+              </div>
+            ))}
           </div>
         )}
       </section>
