@@ -309,7 +309,7 @@ export function AdminDashboard({
       <DashboardCard>
         <div className="grid grid-cols-4 gap-2">
           <QuickAction icon={<Plus className="h-5 w-5" />} label="Create" to="/sessions/new" />
-          <QuickAction icon={<UserPlus className="h-5 w-5" />} label="Invite" to="/members" />
+          <QuickAction icon={<UserPlus className="h-5 w-5" />} label="Invite" to="/settings" search={{ section: "clubs" }} />
           <QuickAction icon={<Megaphone className="h-5 w-5" />} label="Announce" to="/chat" />
           <QuickAction icon={<Dumbbell className="h-5 w-5" />} label="Gear" to="/equipment" />
         </div>
@@ -379,7 +379,7 @@ function StatTile({
   );
 }
 
-function QuickAction({ icon, label, to }: { icon: React.ReactNode; label: string; to: string }) {
+function QuickAction({ icon, label, to, search }: { icon: React.ReactNode; label: string; to: string; search?: Record<string, string> }) {
   return (
     <Button
       asChild
@@ -387,7 +387,7 @@ function QuickAction({ icon, label, to }: { icon: React.ReactNode; label: string
       className="flex h-auto min-h-11 flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-xs font-medium"
     >
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      <Link to={to as any}>
+      <Link to={to as any} search={search as any}>
         {icon}
         {label}
       </Link>
