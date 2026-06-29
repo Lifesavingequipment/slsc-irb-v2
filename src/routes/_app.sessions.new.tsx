@@ -129,6 +129,8 @@ function NewSession() {
   const [pendingVehicles, setPendingVehicles] = useState<VehicleDraft[]>([]);
   const [newVehicle, setNewVehicle] = useState<VehicleDraft>({ name: "", seats: 8, pickup: "", can_tow: false });
   const [repeatUntil, setRepeatUntil] = useState("");
+  const [gearListId, setGearListId] = useState<string>("");
+  const [gearLists, setGearLists] = useState<{ id: string; name: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [surveyTemplates, setSurveyTemplates] = useState<{ id: string; name: string; questions: DraftQ[] }[]>([]);
@@ -149,12 +151,14 @@ function NewSession() {
   useEffect(() => {
     if (!activeClub) return;
     (async () => {
-      const [surveyRes, carpoolRes] = await Promise.all([
+      const [surveyRes, carpoolRes, gearRes] = await Promise.all([
         supabase.from("survey_templates").select("id, name, questions").eq("club_id", activeClub.club_id).order("name"),
         supabase.from("carpool_templates").select("id, name, vehicles").eq("club_id", activeClub.club_id).order("name"),
+        supabase.from("equipment_lists").select("id, name").eq("club_id", activeClub.club_id).is("archived_at", null).order("name"),
       ]);
       setSurveyTemplates((surveyRes.data ?? []) as typeof surveyTemplates);
       setCarpoolTemplates((carpoolRes.data ?? []) as typeof carpoolTemplates);
+      setGearLists((gearRes.data ?? []) as typeof gearLists);
     })();
   }, [activeClub?.club_id]);
 
@@ -236,6 +240,7 @@ function NewSession() {
       carpool_enabled: parsed.data.carpool_enabled,
       carpool_pickups: cleanPickups.length > 0 ? cleanPickups : [],
       trailers_required: carpool ? (trailers ?? 0) : 0,
+      equipment_list_id: gearListId || null,
       created_by: user.id,
     }));
 
@@ -610,6 +615,20 @@ function NewSession() {
                 defaultDeparture={startsAt}
               />
             )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Gear checklist</Label>
+            <Select value={gearListId || "__none"} onValueChange={(v) => setGearListId(v === "__none" ? "" : v)}>
+              <SelectTrigger><SelectValue placeholder="No gear list" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">No gear list</SelectItem>
+                {gearLists.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Members can check items off in the session's Gear tab. Optional.</p>
           </div>
 
           <div className="space-y-1.5">

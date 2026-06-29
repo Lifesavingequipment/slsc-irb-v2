@@ -34,6 +34,7 @@ import { Route as AppSessionsNewRouteImport } from './routes/_app.sessions.new'
 import { Route as AppOnboardingProfileRouteImport } from './routes/_app.onboarding.profile'
 import { Route as AppOnboardingCompleteRouteImport } from './routes/_app.onboarding.complete'
 import { Route as AppOnboardingCoachRouteImport } from './routes/_app.onboarding.coach'
+import { Route as AppMoreGearListsRouteImport } from './routes/_app.more_.gear-lists'
 import { Route as AppMembersMemberIdRouteImport } from './routes/_app.members.$memberId'
 import { Route as AppEquipmentFaultsRouteImport } from './routes/_app.equipment.faults'
 import { Route as AppEquipmentEquipmentIdRouteImport } from './routes/_app.equipment.$equipmentId'
@@ -172,6 +173,11 @@ const AppOnboardingCoachRoute = AppOnboardingCoachRouteImport.update({
   path: '/onboarding/coach',
   getParentRoute: () => AppRoute,
 } as any)
+const AppMoreGearListsRoute = AppMoreGearListsRouteImport.update({
+  id: '/more_/gear-lists',
+  path: '/more/gear-lists',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppMembersMemberIdRoute = AppMembersMemberIdRouteImport.update({
   id: '/members/$memberId',
   path: '/members/$memberId',
@@ -262,6 +268,7 @@ export interface FileRoutesByFullPath {
   '/equipment/$equipmentId': typeof AppEquipmentEquipmentIdRoute
   '/equipment/faults': typeof AppEquipmentFaultsRoute
   '/members/$memberId': typeof AppMembersMemberIdRouteWithChildren
+  '/more/gear-lists': typeof AppMoreGearListsRoute
   '/onboarding/coach': typeof AppOnboardingCoachRoute
   '/onboarding/complete': typeof AppOnboardingCompleteRoute
   '/onboarding/profile': typeof AppOnboardingProfileRoute
@@ -298,6 +305,7 @@ export interface FileRoutesByTo {
   '/admin/audit': typeof AppAdminAuditRoute
   '/equipment/$equipmentId': typeof AppEquipmentEquipmentIdRoute
   '/equipment/faults': typeof AppEquipmentFaultsRoute
+  '/more/gear-lists': typeof AppMoreGearListsRoute
   '/onboarding/coach': typeof AppOnboardingCoachRoute
   '/onboarding/complete': typeof AppOnboardingCompleteRoute
   '/onboarding/profile': typeof AppOnboardingProfileRoute
@@ -339,6 +347,7 @@ export interface FileRoutesById {
   '/_app/equipment/$equipmentId': typeof AppEquipmentEquipmentIdRoute
   '/_app/equipment/faults': typeof AppEquipmentFaultsRoute
   '/_app/members/$memberId': typeof AppMembersMemberIdRouteWithChildren
+  '/_app/more_/gear-lists': typeof AppMoreGearListsRoute
   '/_app/onboarding/coach': typeof AppOnboardingCoachRoute
   '/_app/onboarding/complete': typeof AppOnboardingCompleteRoute
   '/_app/onboarding/profile': typeof AppOnboardingProfileRoute
@@ -380,6 +389,7 @@ export interface FileRouteTypes {
     | '/equipment/$equipmentId'
     | '/equipment/faults'
     | '/members/$memberId'
+    | '/more/gear-lists'
     | '/onboarding/coach'
     | '/onboarding/complete'
     | '/onboarding/profile'
@@ -416,6 +426,7 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/equipment/$equipmentId'
     | '/equipment/faults'
+    | '/more/gear-lists'
     | '/onboarding/coach'
     | '/onboarding/complete'
     | '/onboarding/profile'
@@ -456,6 +467,7 @@ export interface FileRouteTypes {
     | '/_app/equipment/$equipmentId'
     | '/_app/equipment/faults'
     | '/_app/members/$memberId'
+    | '/_app/more_/gear-lists'
     | '/_app/onboarding/coach'
     | '/_app/onboarding/complete'
     | '/_app/onboarding/profile'
@@ -662,6 +674,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOnboardingCoachRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/more_/gear-lists': {
+      id: '/_app/more_/gear-lists'
+      path: '/more/gear-lists'
+      fullPath: '/more/gear-lists'
+      preLoaderRoute: typeof AppMoreGearListsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/members/$memberId': {
       id: '/_app/members/$memberId'
       path: '/members/$memberId'
@@ -826,6 +845,7 @@ interface AppRouteChildren {
   AppSettingsRoute: typeof AppSettingsRoute
   AppAdminAuditRoute: typeof AppAdminAuditRoute
   AppMembersMemberIdRoute: typeof AppMembersMemberIdRouteWithChildren
+  AppMoreGearListsRoute: typeof AppMoreGearListsRoute
   AppOnboardingCoachRoute: typeof AppOnboardingCoachRoute
   AppOnboardingCompleteRoute: typeof AppOnboardingCompleteRoute
   AppOnboardingProfileRoute: typeof AppOnboardingProfileRoute
@@ -848,6 +868,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSettingsRoute: AppSettingsRoute,
   AppAdminAuditRoute: AppAdminAuditRoute,
   AppMembersMemberIdRoute: AppMembersMemberIdRouteWithChildren,
+  AppMoreGearListsRoute: AppMoreGearListsRoute,
   AppOnboardingCoachRoute: AppOnboardingCoachRoute,
   AppOnboardingCompleteRoute: AppOnboardingCompleteRoute,
   AppOnboardingProfileRoute: AppOnboardingProfileRoute,
@@ -869,13 +890,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

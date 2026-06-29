@@ -100,6 +100,8 @@ function EditSession() {
   const [notes, setNotes] = useState("");
   const [survey, setSurvey] = useState(false);
   const [carpool, setCarpool] = useState(false);
+  const [gearListId, setGearListId] = useState<string>("");
+  const [gearLists, setGearLists] = useState<{ id: string; name: string }[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [clubId, setClubId] = useState<string | null>(null);
@@ -129,16 +131,19 @@ function EditSession() {
       setNotes(data.notes ?? "");
       setSurvey(!!data.survey_enabled);
       setCarpool(!!data.carpool_enabled);
+      setGearListId(data.equipment_list_id ?? "");
       setClubId(data.club_id);
       setLocationId(data.location_id ?? null);
       setLocation(data.location ?? "");
       setPickups([...(data.carpool_pickups ?? []), ""]);
       setTrailers(data.trailers_required ?? 0);
 
-      const [locsRes, carpoolTplRes] = await Promise.all([
+      const [locsRes, carpoolTplRes, gearRes] = await Promise.all([
         supabase.from("locations").select("id, name, address").eq("club_id", data.club_id).order("name"),
         supabase.from("carpool_templates").select("id, name, vehicles").eq("club_id", data.club_id).order("name"),
+        supabase.from("equipment_lists").select("id, name").eq("club_id", data.club_id).is("archived_at", null).order("name"),
       ]);
+      setGearLists((gearRes.data ?? []) as typeof gearLists);
       const locList = (locsRes.data ?? []) as Loc[];
       // If the session points at a saved location, show its composed "Name — Address".
       if (data.location_id) {
@@ -252,6 +257,7 @@ function EditSession() {
       carpool_enabled: parsed.data.carpool_enabled,
       carpool_pickups: cleanPickups.length > 0 ? cleanPickups : [],
       trailers_required: carpool ? trailers : 0,
+      equipment_list_id: gearListId || null,
     }).eq("id", sessionId);
     if (error) { setBusy(false); toast.error(error.message); return; }
 
@@ -501,6 +507,20 @@ function EditSession() {
                 defaultDeparture={startsAt}
               />
             )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Gear checklist</Label>
+            <Select value={gearListId || "__none"} onValueChange={(v) => setGearListId(v === "__none" ? "" : v)}>
+              <SelectTrigger><SelectValue placeholder="No gear list" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">No gear list</SelectItem>
+                {gearLists.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Members can check items off in the session's Gear tab. Optional.</p>
           </div>
 
           <div className="space-y-1.5">

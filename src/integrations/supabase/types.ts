@@ -3579,6 +3579,52 @@ export type Database = {
           },
         ]
       }
+      session_gear_checks: {
+        Row: {
+          checked_at: string
+          checked_by: string
+          id: string
+          list_item_id: string
+          session_id: string
+        }
+        Insert: {
+          checked_at?: string
+          checked_by: string
+          id?: string
+          list_item_id: string
+          session_id: string
+        }
+        Update: {
+          checked_at?: string
+          checked_by?: string
+          id?: string
+          list_item_id?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_gear_checks_checked_by_fkey"
+            columns: ["checked_by"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_gear_checks_list_item_id_fkey"
+            columns: ["list_item_id"]
+            isOneToOne: false
+            referencedRelation: "equipment_list_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_gear_checks_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       session_rsvps: {
         Row: {
           created_at: string
@@ -3977,6 +4023,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           ends_at: string | null
+          equipment_list_id: string | null
           format: Database["public"]["Enums"]["session_format"]
           id: string
           location: string | null
@@ -3999,6 +4046,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           ends_at?: string | null
+          equipment_list_id?: string | null
           format?: Database["public"]["Enums"]["session_format"]
           id?: string
           location?: string | null
@@ -4021,6 +4069,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           ends_at?: string | null
+          equipment_list_id?: string | null
           format?: Database["public"]["Enums"]["session_format"]
           id?: string
           location?: string | null
@@ -4036,6 +4085,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "sessions_equipment_list_id_fkey"
+            columns: ["equipment_list_id"]
+            isOneToOne: false
+            referencedRelation: "equipment_lists"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sessions_club_id_fkey"
             columns: ["club_id"]

@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { WavePanel } from "@/components/session/WavePanel";
 import { SurveyEditor, SurveyRunner, SurveyResults, usePretrainingSurveyStatus } from "@/components/session/SurveyPanel";
 import { TrainingPlanView, TrainingPlanEditor } from "@/components/session/TrainingPlanPanel";
+import { GearChecklistPanel } from "@/components/session/GearChecklistPanel";
 import { useWeatherTidesData, degreesToCompass } from "@/components/session/WeatherTidesCard";
 import { useCoachPermissions } from "@/lib/coach-permissions";
 import { buildNameMap, memberFullName } from "@/lib/names";
@@ -47,6 +48,7 @@ type Session = {
   rsvp_deadline: string | null;
   capacity: number | null; notes: string | null;
   survey_enabled: boolean; carpool_enabled: boolean;
+  equipment_list_id: string | null;
 };
 
 type RsvpStatus = "going" | "maybe" | "not_going";
@@ -705,10 +707,12 @@ function SessionDetail() {
 
 
         <TabsContent value="gear" className="space-y-4 mt-4">
-          <ChecklistPanel
+          <GearChecklistPanel
             sessionId={sessionId}
             clubId={session.club_id}
             canManage={canManage}
+            equipmentListId={session.equipment_list_id}
+            onListChange={(listId) => setSession((s) => (s ? { ...s, equipment_list_id: listId } : s))}
           />
         </TabsContent>
 
@@ -1314,157 +1318,3 @@ function AttendancePanel({
   );
 }
 
-
-/* --------------------------- Equipment checklist --------------------------- */
-
-type ChecklistRow = {
-  id: string;
-  equipment_id: string;
-  checked: boolean;
-  notes: string | null;
-  equipment: { id: string; name: string; category: string | null } | null;
-};
-
-function ChecklistPanel({ sessionId, clubId, canManage }: {
-  sessionId: string; clubId: string; canManage: boolean;
-}) {
-  const { user } = useAuth();
-  const confirm = useConfirm();
-  const [rows, setRows] = useState<ChecklistRow[]>([]);
-  const [available, setAvailable] = useState<{ id: string; name: string; category: string | null }[]>([]);
-  const [selected, setSelected] = useState<string>("");
-
-  const load = useCallback(async () => {
-    const { data } = await supabase
-      .from("session_equipment")
-      .select("id, equipment_id, checked, notes, equipment:equipment(id, name, category)")
-      .eq("session_id", sessionId);
-    setRows((data ?? []) as unknown as ChecklistRow[]);
-    const { data: eq } = await supabase
-      .from("equipment").select("id, name, category")
-      .eq("club_id", clubId).eq("status", "active").order("name");
-    setAvailable(eq ?? []);
-  }, [sessionId, clubId]);
-
-  useEffect(() => { load(); }, [load]);
-
-  const toggle = async (row: ChecklistRow) => {
-    const next = !row.checked;
-    const { error } = await supabase.from("session_equipment").update({
-      checked: next,
-      checked_by: next ? user?.id ?? null : null,
-      checked_at: next ? new Date().toISOString() : null,
-    }).eq("id", row.id);
-    if (error) { toast.error(error.message); return; }
-    load();
-  };
-
-  const addItem = async () => {
-    if (!selected) return;
-    const { error } = await supabase.from("session_equipment").insert({
-      session_id: sessionId, equipment_id: selected,
-    });
-    if (error) { toast.error(error.message); return; }
-    setSelected("");
-    load();
-  };
-
-  const remove = async (id: string) => {
-    const row = rows.find((r) => r.id === id);
-    const name = row?.equipment?.name ?? "this item";
-    const ok = await confirm({
-      title: `Remove ${name}?`,
-      description: "It will be taken off this session's checklist. The equipment itself isn't deleted.",
-      confirmText: "Remove",
-    });
-    if (!ok) return;
-    const { error } = await supabase.from("session_equipment").delete().eq("id", id);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Removed from checklist");
-    load();
-  };
-
-
-  const saveNote = async (id: string, notes: string) => {
-    const { error } = await supabase.from("session_equipment").update({ notes: notes || null }).eq("id", id);
-    if (error) toast.error(error.message); else load();
-  };
-
-  const existingIds = new Set(rows.map((r) => r.equipment_id));
-  const selectable = available.filter((e) => !existingIds.has(e.id));
-
-  return (
-    <div className="space-y-3">
-      {canManage && (
-        <Card className="p-3">
-          <div className="text-sm font-semibold mb-2">Add equipment</div>
-          {available.length === 0 ? (
-            <div className="text-xs text-muted-foreground">
-              No equipment in club yet. <Link to="/equipment" className="text-accent underline">Add gear</Link>.
-            </div>
-          ) : selectable.length === 0 ? (
-            <div className="text-xs text-muted-foreground">All active equipment already added.</div>
-          ) : (
-            <div className="flex gap-2">
-              <Select value={selected} onValueChange={setSelected}>
-                <SelectTrigger className="flex-1"><SelectValue placeholder="Select item…" /></SelectTrigger>
-                <SelectContent>
-                  {selectable.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      {e.name}{e.category ? ` · ${e.category}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button onClick={addItem} disabled={!selected}>Add</Button>
-            </div>
-          )}
-        </Card>
-      )}
-
-      {rows.length === 0 ? (
-        <Card className="p-4 text-center text-sm text-muted-foreground">
-          No checklist items yet.
-        </Card>
-      ) : rows.map((r) => (
-        <Card key={r.id} className="p-3">
-          <div className="flex items-start gap-3">
-            <button
-              type="button"
-              onClick={() => toggle(r)}
-              className={`mt-0.5 h-6 w-6 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
-                r.checked ? "bg-success border-success text-white" : "border-muted-foreground/40"
-              }`}
-              aria-label={r.checked ? "Uncheck" : "Check"}
-            >
-              {r.checked && <span className="text-xs">✓</span>}
-            </button>
-            <div className="flex-1 min-w-0">
-              <div className={`text-sm font-medium ${r.checked ? "line-through text-muted-foreground" : ""}`}>
-                {r.equipment?.name || "Item"}
-              </div>
-              {r.equipment?.category && (
-                <div className="text-[11px] text-muted-foreground">{r.equipment.category}</div>
-              )}
-              {canManage ? (
-                <Input
-                  className="mt-2 h-8 text-xs"
-                  placeholder="Notes (e.g. low fuel)"
-                  defaultValue={r.notes ?? ""}
-                  onBlur={(e) => { if ((e.target.value || null) !== r.notes) saveNote(r.id, e.target.value); }}
-                />
-              ) : r.notes ? (
-                <div className="mt-1 text-xs text-muted-foreground">{r.notes}</div>
-              ) : null}
-            </div>
-            {canManage && (
-              <Button size="icon" variant="ghost" onClick={() => remove(r.id)}>
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </Button>
-            )}
-          </div>
-        </Card>
-      ))}
-    </div>
-  );
-}

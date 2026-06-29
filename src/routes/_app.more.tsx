@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
   User, Mail, KeyRound, Bell, Building2, MapPin, ShieldAlert, MessageSquare,
-  PlusCircle, LogOut, Users, ChevronRight, RefreshCw, Copy, Check, MessageSquareText,
+  PlusCircle, LogOut, Users, ChevronRight, RefreshCw, Copy, Check, MessageSquareText, ListChecks,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
@@ -222,6 +222,7 @@ function MorePage() {
             <MoreRow icon={MapPin} iconBg="bg-teal-500" label="Saved Locations" to="/settings" search={{ section: "locations" }} />
             <MoreRow icon={ShieldAlert} iconBg="bg-red-500" label="Roles & Permissions" to="/settings/roles" />
             <MoreRow icon={RefreshCw} iconBg="bg-yellow-500" label="Templates" to="/settings/templates" />
+            <MoreRow icon={ListChecks} iconBg="bg-emerald-500" label="Gear Lists" to="/more/gear-lists" />
             {isAdmin && <InviteCodeRow />}
           </>
         )}

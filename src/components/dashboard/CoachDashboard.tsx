@@ -123,7 +123,7 @@ export function CoachDashboard({
     }
     let cancelled = false;
     (async () => {
-      const [plan, waves, gear, carpool] = await Promise.all([
+      const [plan, waves, gearSession, gearChecks, carpool] = await Promise.all([
         supabase
           .from("session_training_plans")
           .select("id")
@@ -134,7 +134,12 @@ export function CoachDashboard({
           .select("id", { count: "exact", head: true })
           .eq("session_id", nextSessionId),
         supabase
-          .from("session_equipment")
+          .from("sessions")
+          .select("equipment_list_id")
+          .eq("id", nextSessionId)
+          .maybeSingle(),
+        supabase
+          .from("session_gear_checks")
           .select("id", { count: "exact", head: true })
           .eq("session_id", nextSessionId),
         supabase
@@ -146,7 +151,8 @@ export function CoachDashboard({
       setChecklist({
         plan: !!plan.data,
         waves: (waves.count ?? 0) > 0,
-        gear: (gear.count ?? 0) > 0,
+        // Gear is "done" once a list is attached AND at least one item is checked off.
+        gear: !!gearSession.data?.equipment_list_id && (gearChecks.count ?? 0) > 0,
         attendance: brief?.attendance_started ?? false,
         // No carpool needed counts as done; otherwise needs at least one request.
         carpool: !carpoolEnabled || (carpool.count ?? 0) > 0,
