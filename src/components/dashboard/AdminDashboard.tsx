@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Link } from "@tanstack/react-router";
 import { addDays, format } from "date-fns";
 import {
@@ -25,6 +26,28 @@ import { useWeatherTidesData } from "@/components/session/WeatherTidesCard";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DashboardCard } from "@/components/dashboard/DashboardCard";
+
+const APP_URL = "https://slsc-irb-v2.vercel.app";
+
+function buildInviteMessage(code: string): string {
+  return `Welcome to IRB Training App
+Link: ${APP_URL}
+Invite code: ${code}
+
+Download to iPhone
+1. Open the link in Safari (must be Safari, not Chrome)
+2. Tap the Share button (box with arrow at bottom of screen)
+3. Tap "Add to Home Screen"
+4. Name it "IRB Training" → tap Add
+5. App icon appears on your home screen.
+
+Download to Android
+1. Open the link in Chrome
+2. Tap the three dots menu (top right)
+3. Tap "Add to Home Screen"
+4. Tap Add
+5. App icon appears on your home screen.`;
+}
 
 export type AdminSession = {
   id: string;
@@ -160,6 +183,39 @@ export function AdminDashboard({
       cancelled = true;
     };
   }, [clubId, memberCount]);
+
+  const handleInvite = async () => {
+    const { data } = await supabase
+      .from("club_invite_codes")
+      .select("code")
+      .eq("club_id", clubId)
+      .eq("active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!data?.code) {
+      toast.error("No invite code found. Generate one in Settings.");
+      return;
+    }
+
+    const message = buildInviteMessage(data.code);
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: "Join IRB Training", text: message });
+      } catch {
+        /* cancelled */
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(message);
+        toast.success("Invite message copied!");
+      } catch {
+        toast.error("Could not copy");
+      }
+    }
+  };
 
   const todaySession = upcoming.find((s) => isToday(s.starts_at)) ?? null;
 
@@ -309,7 +365,7 @@ export function AdminDashboard({
       <DashboardCard>
         <div className="grid grid-cols-4 gap-2">
           <QuickAction icon={<Plus className="h-5 w-5" />} label="Create" to="/sessions/new" />
-          <QuickAction icon={<UserPlus className="h-5 w-5" />} label="Invite" to="/settings" search={{ section: "clubs" }} />
+          <QuickAction icon={<UserPlus className="h-5 w-5" />} label="Invite" onClick={handleInvite} />
           <QuickAction icon={<Megaphone className="h-5 w-5" />} label="Announce" to="/chat" />
           <QuickAction icon={<Dumbbell className="h-5 w-5" />} label="Gear" to="/equipment" />
         </div>
@@ -379,7 +435,23 @@ function StatTile({
   );
 }
 
-function QuickAction({ icon, label, to, search }: { icon: React.ReactNode; label: string; to: string; search?: Record<string, string> }) {
+type QuickActionProps =
+  | { icon: React.ReactNode; label: string; to: string; search?: Record<string, string>; onClick?: never }
+  | { icon: React.ReactNode; label: string; onClick: () => void; to?: never; search?: never };
+
+function QuickAction({ icon, label, to, search, onClick }: QuickActionProps) {
+  if (onClick) {
+    return (
+      <Button
+        variant="outline"
+        className="flex h-auto min-h-11 flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-xs font-medium"
+        onClick={onClick}
+      >
+        {icon}
+        {label}
+      </Button>
+    );
+  }
   return (
     <Button
       asChild
