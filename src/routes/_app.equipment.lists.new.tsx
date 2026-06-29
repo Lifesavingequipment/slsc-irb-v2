@@ -1,3 +1,5 @@
+import { FormSkeleton } from "@/components/ui/page-skeleton";
+import { showToast } from "@/lib/toast";
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import { EquipmentTabs } from "@/components/equipment/EquipmentTabs";
@@ -15,7 +17,7 @@ function NewListPage() {
   const canManage = useCanManage();
   const { user } = useAuth();
   if (!activeClub || !user) {
-    return <AppShell><div className="py-12 text-center text-sm text-muted-foreground">Loading…</div></AppShell>;
+    return <AppShell><div className="p-4"><FormSkeleton fields={3} /></div></AppShell>;
   }
   if (!canManage) return <Navigate to="/equipment/lists" replace />;
   return (

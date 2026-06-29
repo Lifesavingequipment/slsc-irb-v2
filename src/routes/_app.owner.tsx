@@ -1,3 +1,5 @@
+import { CardSkeleton } from "@/components/ui/page-skeleton";
+import { showToast } from "@/lib/toast";
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,7 +25,7 @@ function OwnerPage() {
   if (isPlatformOwner === null) {
     return (
       <AppShell>
-        <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>
+        <div className="p-2 space-y-3"><CardSkeleton /><CardSkeleton /></div>
       </AppShell>
     );
   }
@@ -211,7 +213,7 @@ function OwnerDashboard() {
   if (loading) {
     return (
       <AppShell title="Owner Dashboard">
-        <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>
+        <div className="p-2 space-y-3"><CardSkeleton /><CardSkeleton /></div>
       </AppShell>
     );
   }

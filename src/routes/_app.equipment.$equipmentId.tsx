@@ -1,4 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { CardSkeleton } from "@/components/ui/page-skeleton";
+import { showToast } from "@/lib/toast";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -122,7 +124,7 @@ function EquipmentDetail() {
   useUnsavedChanges(dirty);
 
   if (!item || !draft) {
-    return <AppShell><div className="py-12 text-center text-sm text-muted-foreground">Loading…</div></AppShell>;
+    return <AppShell><div className="p-4 space-y-3"><CardSkeleton /><CardSkeleton /></div></AppShell>;
   }
 
   const setField = <K extends keyof Draft>(key: K, value: Draft[K]) => {

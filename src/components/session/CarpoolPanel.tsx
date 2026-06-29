@@ -23,6 +23,7 @@ import {
   AlertTriangle, UserPlus, HandHelping, CheckCircle2, Settings, Sparkles, Bus, Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
+import { CardSkeleton } from "@/components/ui/page-skeleton";
 import { buildNameMap } from "@/lib/names";
 import { notifyGoingMembers, notifyCoachesCarpoolFull } from "@/lib/notify";
 
@@ -843,7 +844,7 @@ export function CarpoolPanel({ sessionId }: { sessionId: string }) {
   };
 
   if (!session) {
-    return <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>;
+    return <CardSkeleton className="mt-4" />;
   }
 
   return (

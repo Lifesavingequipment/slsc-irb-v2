@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { FormSkeleton } from "@/components/ui/page-skeleton";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -299,7 +300,7 @@ function EditMember() {
   }
 
   if (loading) {
-    return <AppShell><div className="py-12 text-center text-sm text-muted-foreground">Loading…</div></AppShell>;
+    return <AppShell><div className="p-4"><FormSkeleton fields={5} /></div></AppShell>;
   }
 
   return (
@@ -470,8 +471,8 @@ function EditMember() {
         </Card>
 
         <div className="sticky bottom-4 z-10">
-          <Button type="submit" disabled={busy} className="w-full h-11 shadow-lg">
-            <Save className="h-4 w-4 mr-2" /> {busy ? "Saving…" : "Save member"}
+          <Button type="submit" loading={busy} className="w-full h-11 shadow-lg">
+            <Save className="h-4 w-4 mr-2" /> Save member
           </Button>
         </div>
       </form>

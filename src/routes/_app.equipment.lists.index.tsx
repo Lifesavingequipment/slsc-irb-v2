@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Plus, ListChecks, Package, Pencil, Trash2, MoreVertical, Copy, Archive, ArchiveRestore, Calendar, MapPin } from "lucide-react";
 import { toast } from "sonner";
+import { showToast } from "@/lib/toast";
 import { useRefetchOnFocus } from "@/hooks/use-refetch-on-focus";
 import { EmptyState } from "@/components/ui/empty-state";
 
@@ -36,6 +37,7 @@ type ListRow = {
   location: string | null;
   notes: string | null;
   archived_at: string | null;
+  club_id: string;
   items: { id: string; quantity: number }[];
 };
 
@@ -60,7 +62,7 @@ function ListsPage() {
     if (!activeClub) return;
     const { data } = await supabase
       .from("equipment_lists")
-      .select("id, name, description, event_name, event_date, location, notes, archived_at, items:equipment_list_items(id, quantity)")
+      .select("id, name, description, event_name, event_date, location, notes, archived_at, club_id, items:equipment_list_items(id, quantity)")
       .eq("club_id", activeClub.club_id)
       .order("event_date", { ascending: true, nullsFirst: false })
       .order("name");
@@ -90,10 +92,25 @@ function ListsPage() {
   const onDelete = async (id: string) => {
     setPendingDelete(null);
     const prev = lists;
+    const deletedList = lists.find((l) => l.id === id);
     setLists((cur) => cur.filter((l) => l.id !== id));
     const { error } = await supabase.from("equipment_lists").delete().eq("id", id);
     if (error) { toast.error(error.message); setLists(prev); return; }
-    toast.success("List deleted");
+    showToast.withUndo("List deleted", async () => {
+      if (deletedList) {
+        await supabase.from("equipment_lists").insert({
+          id: deletedList.id,
+          name: deletedList.name,
+          description: deletedList.description,
+          event_name: deletedList.event_name,
+          event_date: deletedList.event_date,
+          location: deletedList.location,
+          notes: deletedList.notes,
+          club_id: deletedList.club_id,
+        });
+        load();
+      }
+    });
   };
 
   const onArchiveToggle = async (l: ListRow) => {

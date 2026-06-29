@@ -1,3 +1,4 @@
+import { CardSkeleton } from "@/components/ui/page-skeleton";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "@tanstack/react-router";
@@ -223,7 +224,7 @@ export function ListEditor({ clubId, userId, listId }: {
     }
   };
 
-  if (loading) return <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>;
+  if (loading) return <div className="p-4 space-y-3"><CardSkeleton /><CardSkeleton /></div>;
 
   const linkedGearIds = new Set(items.map((i) => i.equipment_id).filter(Boolean) as string[]);
 

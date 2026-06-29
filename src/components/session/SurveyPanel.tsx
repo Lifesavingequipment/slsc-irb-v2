@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2, ClipboardList, ChevronDown, ChevronUp, BookmarkPlus, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
+import { CardSkeleton } from "@/components/ui/page-skeleton";
 
 type QType = "yes_no" | "text" | "single_choice" | "multiple_choice";
 
@@ -155,7 +156,7 @@ export function SurveyEditor({
     load();
   };
 
-  if (loading) return <Card className="p-4 text-sm text-muted-foreground">Loading…</Card>;
+  if (loading) return <CardSkeleton />;
 
   return (
     <Card className="p-4 space-y-3">
@@ -259,8 +260,8 @@ export function SurveyEditor({
             <BookmarkPlus className="h-4 w-4 mr-2" /> Save as template
           </Button>
         )}
-        <Button type="button" className="ml-auto min-h-11" disabled={busy} onClick={save}>
-          {busy ? "Saving…" : "Save questions"}
+        <Button type="button" className="ml-auto min-h-11" loading={busy} onClick={save}>
+          Save questions
         </Button>
       </div>
     </Card>
@@ -362,7 +363,7 @@ export function SurveyRunner({
     load();
   };
 
-  if (loading) return <Card className="p-4 text-sm text-muted-foreground">Loading survey…</Card>;
+  if (loading) return <CardSkeleton />;
   if (questions.length === 0) return null;
 
   const missingRequired = questions.some((q) => {
@@ -480,8 +481,8 @@ export function SurveyRunner({
             Cancel
           </Button>
         )}
-        <Button type="button" className="min-h-11 flex-1" disabled={busy || missingRequired} onClick={submit}>
-          {busy ? "Saving…" : missingRequired ? "Answer required questions" : submitted ? "Save changes" : "Submit answers"}
+        <Button type="button" className="min-h-11 flex-1" loading={busy} disabled={missingRequired} onClick={submit}>
+          {missingRequired ? "Answer required questions" : submitted ? "Save changes" : "Submit answers"}
         </Button>
       </div>
     </Card>
@@ -556,7 +557,7 @@ export function SurveyResults({ sessionId }: { sessionId: string }) {
     })();
   }, [sessionId]);
 
-  if (loading) return <Card className="p-4 text-sm text-muted-foreground">Loading responses…</Card>;
+  if (loading) return <CardSkeleton />;
   if (rows.length === 0) return <Card className="p-4 text-sm text-muted-foreground">No responses yet.</Card>;
 
   return (

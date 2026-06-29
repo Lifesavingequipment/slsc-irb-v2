@@ -1,3 +1,5 @@
+import { CardSkeleton } from "@/components/ui/page-skeleton";
+import { showToast } from "@/lib/toast";
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, History, Filter } from "lucide-react";
@@ -59,7 +61,7 @@ function AuditPage() {
   const { isPlatformOwner, loading } = useClub();
 
   if (loading) {
-    return <AppShell><div className="py-12 text-center text-sm text-muted-foreground">Loading…</div></AppShell>;
+    return <AppShell><div className="p-4 space-y-3"><CardSkeleton /><CardSkeleton /><CardSkeleton /></div></AppShell>;
   }
   if (!user || !isPlatformOwner) return <Navigate to="/dashboard" replace />;
   return <AuditInner />;
@@ -185,7 +187,7 @@ function AuditInner() {
         </div>
 
         {loadingEntries ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">Loading…</p>
+          <div className="py-2 space-y-3"><CardSkeleton /><CardSkeleton /></div>
         ) : filtered.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">No audit entries match.</p>
         ) : (

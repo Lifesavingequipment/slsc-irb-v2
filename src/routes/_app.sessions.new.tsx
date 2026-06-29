@@ -643,8 +643,8 @@ function NewSession() {
             <Textarea id="notes" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
 
-          <Button type="submit" disabled={busy} className="w-full h-12 text-base">
-            {busy ? "Creating..." : "Create session"}
+          <Button type="submit" loading={busy} className="w-full h-12 text-base">
+            {busy ? "Creating…" : "Create session"}
           </Button>
         </form>
       </Card>

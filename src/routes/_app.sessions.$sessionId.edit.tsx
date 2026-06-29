@@ -8,6 +8,8 @@ import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FormSkeleton } from "@/components/ui/page-skeleton";
+import { showToast } from "@/lib/toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -213,7 +215,7 @@ function EditSession() {
   }
 
   if (loading) {
-    return <AppShell><div className="py-12 text-center text-sm text-muted-foreground">Loading…</div></AppShell>;
+    return <AppShell><div className="px-4 py-4"><FormSkeleton fields={6} /></div></AppShell>;
   }
 
   const handleStartsAtChange = (next: string) => {
@@ -556,8 +558,8 @@ function EditSession() {
               onClick={() => navigate({ to: "/sessions/$sessionId", params: { sessionId } })}>
               Cancel
             </Button>
-            <Button type="submit" disabled={busy} className="flex-1 h-12 text-base">
-              {busy ? "Saving..." : "Save changes"}
+            <Button type="submit" loading={busy} className="flex-1 h-12 text-base">
+              Save changes
             </Button>
           </div>
         </form>

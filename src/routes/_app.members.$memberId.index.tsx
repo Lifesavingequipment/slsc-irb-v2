@@ -1,3 +1,4 @@
+import { CardSkeleton } from "@/components/ui/page-skeleton";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -210,7 +211,7 @@ function MemberDetail() {
   if (loading) {
     return (
       <AppShell>
-        <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>
+        <div className="p-4 space-y-3"><CardSkeleton /><CardSkeleton /></div>
       </AppShell>
     );
   }

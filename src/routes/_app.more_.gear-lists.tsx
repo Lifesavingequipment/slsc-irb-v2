@@ -1,3 +1,5 @@
+import { CardSkeleton } from "@/components/ui/page-skeleton";
+import { showToast } from "@/lib/toast";
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,7 +69,7 @@ function GearListsPage() {
   if (!activeClub || !user) {
     return (
       <AppShell>
-        <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>
+        <div className="p-2 space-y-3"><CardSkeleton /><CardSkeleton /></div>
       </AppShell>
     );
   }
@@ -268,8 +270,8 @@ function ListsTab({
             <Button variant="outline" onClick={() => setNewOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={createList} disabled={busy || !newName.trim()}>
-              {busy ? "Creating…" : "Create"}
+            <Button onClick={createList} loading={busy} disabled={!newName.trim()}>
+              Create
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -435,8 +437,8 @@ function ListDetail({
           </Label>
           <EquipmentCombobox equipment={equipment} value={equipmentId} onChange={setEquipmentId} />
         </div>
-        <Button onClick={addItem} disabled={busy} className="w-full">
-          <Plus className="h-4 w-4 mr-1" /> {busy ? "Adding…" : "Add item"}
+        <Button onClick={addItem} loading={busy} className="w-full">
+          <Plus className="h-4 w-4 mr-1" /> Add item
         </Button>
       </Card>
 
@@ -752,8 +754,8 @@ function EquipmentTab({ clubId, userId }: { clubId: string; userId: string }) {
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={add} disabled={busy || !name.trim()}>
-              {busy ? "Saving…" : "Add"}
+            <Button onClick={add} loading={busy} disabled={!name.trim()}>
+              Add
             </Button>
           </DialogFooter>
         </DialogContent>

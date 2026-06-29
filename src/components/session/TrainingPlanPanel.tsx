@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { TrainingPlanSkeleton } from "@/components/ui/page-skeleton";
+import { showToast } from "@/lib/toast";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -57,7 +59,7 @@ export function TrainingPlanView({ sessionId }: { sessionId: string }) {
     })();
   }, [sessionId]);
 
-  if (loading) return <Card className="p-4 text-sm text-muted-foreground">Loading…</Card>;
+  if (loading) return <TrainingPlanSkeleton />;
   if (!overview && blocks.length === 0) {
     return <Card className="p-4 text-sm text-muted-foreground">No training plan yet.</Card>;
   }
@@ -233,7 +235,7 @@ export function TrainingPlanEditor({
     load();
   };
 
-  if (loading) return <Card className="p-4 text-sm text-muted-foreground">Loading…</Card>;
+  if (loading) return <TrainingPlanSkeleton />;
 
   return (
     <Card className="p-4 space-y-3">
@@ -316,8 +318,8 @@ export function TrainingPlanEditor({
             <BookmarkPlus className="h-4 w-4 mr-2" /> Save as template
           </Button>
         )}
-        <Button type="button" className="ml-auto" disabled={busy} onClick={save}>
-          {busy ? "Saving…" : "Save plan"}
+        <Button type="button" className="ml-auto" loading={busy} onClick={save}>
+          Save plan
         </Button>
       </div>
     </Card>

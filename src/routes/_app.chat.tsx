@@ -1,3 +1,4 @@
+import { CardSkeleton } from "@/components/ui/page-skeleton";
 import { createFileRoute } from "@tanstack/react-router";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1765,7 +1766,7 @@ function ChatPage() {
 
           <ScrollArea className="flex-1 min-h-0">
             {loading ? (
-              <div className="p-4 text-sm text-muted-foreground text-center">Loading…</div>
+              <div className="p-4 space-y-2"><CardSkeleton /><CardSkeleton /><CardSkeleton /></div>
             ) : channels.length === 0 ? (
               <div className="p-4 text-sm text-muted-foreground text-center">
                 No conversations yet

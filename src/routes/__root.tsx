@@ -117,7 +117,7 @@ function RootComponent() {
         <ClubProvider>
           <ConfirmProvider>
             <Outlet />
-            <Toaster position="top-center" richColors />
+            <Toaster />
           </ConfirmProvider>
         </ClubProvider>
       </AuthProvider>

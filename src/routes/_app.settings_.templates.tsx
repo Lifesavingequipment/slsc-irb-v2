@@ -1,3 +1,5 @@
+import { FormSkeleton } from "@/components/ui/page-skeleton";
+import { showToast } from "@/lib/toast";
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,8 +29,8 @@ function TemplatesPage() {
   const { activeClub } = useClub();
   const isAdmin = useIsAdmin();
   const { perms, loading } = useCoachPermissions(activeClub?.club_id ?? null);
-  if (!activeClub) return <AppShell><div className="py-12 text-center text-sm text-muted-foreground">Loading…</div></AppShell>;
-  if (loading) return <AppShell><div className="py-12 text-center text-sm text-muted-foreground">Loading…</div></AppShell>;
+  if (!activeClub) return <AppShell><div className="p-4"><FormSkeleton fields={3} /></div></AppShell>;
+  if (loading) return <AppShell><div className="p-4"><FormSkeleton fields={3} /></div></AppShell>;
   const canEdit = isAdmin || perms.manage_templates;
   if (!canEdit) return <Navigate to="/more" replace />;
 

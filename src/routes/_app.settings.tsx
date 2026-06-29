@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { showToast } from "@/lib/toast";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -648,8 +649,8 @@ function SettingsPage() {
         ))}
       </div>
       {contacts.length > 0 && (
-        <Button className="mt-3" onClick={saveContacts} disabled={savingContacts}>
-          {savingContacts ? "Saving…" : "Save contacts"}
+        <Button className="mt-3" onClick={saveContacts} loading={savingContacts}>
+          Save contacts
         </Button>
       )}
     </div>
@@ -669,8 +670,8 @@ function SettingsPage() {
         <Label htmlFor="notes">Notes</Label>
         <Textarea id="notes" rows={3} value={medical.notes} onChange={(e) => setMedical({ ...medical, notes: e.target.value })} />
       </div>
-      <Button onClick={saveMedical} disabled={savingMedical}>
-        {savingMedical ? "Saving…" : "Save medical info"}
+      <Button onClick={saveMedical} loading={savingMedical}>
+        Save medical info
       </Button>
     </div>
   ) : (
@@ -744,7 +745,7 @@ function SettingsPage() {
                     ))}
                   </div>
                 </div>
-                <Button type="submit" disabled={savingProfile}>{savingProfile ? "Saving..." : "Save profile"}</Button>
+                <Button type="submit" loading={savingProfile}>Save profile</Button>
               </form>
             </section>
 

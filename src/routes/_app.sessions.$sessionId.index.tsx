@@ -28,6 +28,8 @@ import { useWeatherTidesData, degreesToCompass } from "@/components/session/Weat
 import { useCoachPermissions } from "@/lib/coach-permissions";
 import { buildNameMap, memberFullName } from "@/lib/names";
 import { invalidateSessionsCache, removeSessionFromCache } from "./_app.sessions.index";
+import { SessionDetailSkeleton } from "@/components/ui/page-skeleton";
+import { showToast } from "@/lib/toast";
 
 const SESSION_TABS = ["rsvp", "plan", "survey", "waves", "gear", "carpool", "attendance"] as const;
 type SessionTab = (typeof SESSION_TABS)[number];
@@ -256,6 +258,22 @@ function SessionDetail() {
             : r,
         ),
       );
+      const prevStatus = prev.find((r) => r.user_id === user.id)?.status ?? null;
+      showToast.withUndo(
+        `RSVP updated — ${STATUS_LABELS[status]}`,
+        async () => {
+          if (prevStatus) {
+            await supabase.from("session_rsvps").upsert(
+              { session_id: sessionId, user_id: user.id, status: prevStatus },
+              { onConflict: "session_id,user_id" },
+            );
+          } else {
+            await supabase.from("session_rsvps")
+              .delete().eq("session_id", sessionId).eq("user_id", user.id);
+          }
+          await load();
+        },
+      );
     }
   };
 
@@ -419,7 +437,7 @@ function SessionDetail() {
   );
 
   if (!session) {
-    return <AppShell><div className="py-12 text-center text-sm text-muted-foreground">Loading…</div></AppShell>;
+    return <AppShell><SessionDetailSkeleton /></AppShell>;
   }
 
   const byName = (a: { user_id: string }, b: { user_id: string }) =>
@@ -1206,6 +1224,11 @@ function AttendancePanel({
         .update({ status, marked_by: currentUserId, marked_at: new Date().toISOString() })
         .eq("id", existing.id);
       if (error) { toast.error(error.message); onChange(); return; }
+      const prevStatus2 = existing.status;
+      showToast.withUndo(`Attendance — ${ATT_LABELS[status]}`, async () => {
+        await supabase.from("session_attendance").update({ status: prevStatus2 }).eq("id", existing.id);
+        onChange();
+      });
     } else {
       const tempId = `temp-${userId}`;
       setAttendance((prev) => [...prev, { id: tempId, user_id: userId, status, note: null }]);

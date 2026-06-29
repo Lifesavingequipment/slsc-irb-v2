@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { MemberListSkeleton } from "@/components/ui/page-skeleton";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useClub, useIsAdmin, useCanManage } from "@/lib/club-context";
@@ -190,7 +191,7 @@ function MembersPage() {
       .update({ membership_status: membershipStatus })
       .eq("id", member.id);
     if (memberError) { toast.error(memberError.message); return; }
-    toast.success(status === "approved" ? "Member approved" : "Updated");
+    toast.success(status === "approved" ? "Member approved" : status === "rejected" ? "Membership declined" : "Updated");
     if (status === "approved") {
       void notifyMemberApproved(clubId, {
         id: member.id,

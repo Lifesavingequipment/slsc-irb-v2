@@ -1,3 +1,4 @@
+import { AttendanceSkeleton } from "@/components/ui/page-skeleton";
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -139,7 +140,7 @@ function AttendancePage() {
   }, [stats.rows, search]);
 
   if (!activeClub) {
-    return <AppShell title="Attendance"><div className="py-12 text-center text-sm text-muted-foreground">Loading…</div></AppShell>;
+    return <AppShell title="Attendance"><div className="p-4"><AttendanceSkeleton /></div></AppShell>;
   }
   if (!canManage) return <Navigate to="/members" replace />;
 
@@ -186,7 +187,7 @@ function AttendancePage() {
         </div>
 
         {loading ? (
-          <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>
+          <div className="p-2"><AttendanceSkeleton /></div>
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={<TrendingUp className="h-5 w-5" />}

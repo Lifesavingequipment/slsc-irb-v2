@@ -1,3 +1,4 @@
+import { CardSkeleton } from "@/components/ui/page-skeleton";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
@@ -187,7 +188,7 @@ export function LocationsSection() {
           <div className="text-sm font-semibold">Saved ({items.length})</div>
         </div>
         {loading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <div className="space-y-2"><CardSkeleton /></div>
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No saved locations yet. Add club venues and pickup spots above so they're a tap away when scheduling sessions or carpools.

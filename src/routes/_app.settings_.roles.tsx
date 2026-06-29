@@ -1,3 +1,4 @@
+import { MemberListSkeleton, CardSkeleton } from "@/components/ui/page-skeleton";
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -78,7 +79,7 @@ function RolesPage() {
   const { activeClub } = useClub();
 
   if (!activeClub) {
-    return <AppShell><div className="py-12 text-center text-sm text-muted-foreground">Loading…</div></AppShell>;
+    return <AppShell><div className="p-4"><MemberListSkeleton /></div></AppShell>;
   }
   if (!isAdmin) return <Navigate to="/more" replace />;
 
@@ -264,7 +265,7 @@ function RolesPageInner({ clubId }: { clubId: string }) {
         </div>
 
         {loading ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">Loading…</p>
+          <MemberListSkeleton />
         ) : filtered.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">No members match.</p>
         ) : (
@@ -411,7 +412,7 @@ function PermissionsCard({ clubId }: { clubId: string }) {
         Club admins always have full access. Configure what other roles can do.
       </p>
       {loading ? (
-        <p className="py-3 text-sm text-muted-foreground">Loading…</p>
+        <div className="space-y-2"><CardSkeleton /><CardSkeleton /></div>
       ) : (
         <Tabs defaultValue="coach">
           <TabsList className="w-full">

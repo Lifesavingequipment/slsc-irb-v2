@@ -1,3 +1,5 @@
+import { CardSkeleton } from "@/components/ui/page-skeleton";
+import { showToast } from "@/lib/toast";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -120,7 +122,7 @@ function PackPage() {
       <EquipmentTabs />
 
       {loading ? (
-        <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>
+        <div className="p-4 space-y-3"><CardSkeleton /><CardSkeleton /></div>
       ) : items.length === 0 ? (
         <Card className="p-8 text-center text-sm text-muted-foreground">No items in this list.</Card>
       ) : (
