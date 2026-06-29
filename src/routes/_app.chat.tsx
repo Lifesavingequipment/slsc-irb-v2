@@ -165,6 +165,9 @@ function ChatPage() {
   const [deletingChannelId, setDeletingChannelId] = useState<string | null>(null);
   const [membersChannelId, setMembersChannelId] = useState<string | null>(null);
   const [channelMembers, setChannelMembers] = useState<{ id: string; name: string }[]>([]);
+  const [channelSearch, setChannelSearch] = useState("");
+  const [channelActionId, setChannelActionId] = useState<string | null>(null);
+  const [deletingDmId, setDeletingDmId] = useState<string | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -172,6 +175,8 @@ function ChatPage() {
   const realtimeRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFiredRef = useRef(false);
+  const channelLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const channelLongPressFiredRef = useRef(false);
   const initialScrollDoneRef = useRef(false);
   const messageIdsRef = useRef<string[]>([]);
   const messagesRef = useRef<Message[]>([]);
@@ -409,6 +414,45 @@ function ChatPage() {
       }),
     );
     setMembersChannelId(channelId);
+  }
+
+  async function markChannelUnread(channelId: string) {
+    const memberId = channelMemberIdRef.current[channelId] ?? myMemberId;
+    if (!memberId) return;
+    const { data: lastMsg } = await supabase
+      .from("chat_messages")
+      .select("created_at")
+      .eq("channel_id", channelId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    setChannelActionId(null);
+    if (!lastMsg?.created_at) return;
+    const lastReadAt = new Date(new Date(lastMsg.created_at).getTime() - 1000).toISOString();
+    await supabase
+      .from("chat_members")
+      .upsert(
+        { channel_id: channelId, member_id: memberId, last_read_at: lastReadAt },
+        { onConflict: "channel_id,member_id" },
+      );
+    void loadChannels();
+  }
+
+  async function hideDmChannel(channelId: string) {
+    const memberId = channelMemberIdRef.current[channelId] ?? myMemberId;
+    if (!memberId) return;
+    await supabase
+      .from("chat_members")
+      .delete()
+      .eq("channel_id", channelId)
+      .eq("member_id", memberId);
+    if (activeChannelId === channelId) {
+      setActiveChannelId(null);
+      setShowThread(false);
+    }
+    setDeletingDmId(null);
+    setChannelActionId(null);
+    setChannels((prev) => prev.filter((c) => c.id !== channelId));
   }
 
   const loadReactionsForMessages = useCallback(async (msgIds: string[]) => {
@@ -729,6 +773,7 @@ function ChatPage() {
     return () => {
       if (realtimeRef.current) void supabase.removeChannel(realtimeRef.current);
       if (longPressTimer.current) clearTimeout(longPressTimer.current);
+      if (channelLongPressTimer.current) clearTimeout(channelLongPressTimer.current);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
   }, []);
@@ -763,6 +808,22 @@ function ChatPage() {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
+    }
+  }, []);
+
+  const startChannelLongPress = useCallback((channelId: string) => {
+    channelLongPressFiredRef.current = false;
+    if (channelLongPressTimer.current) clearTimeout(channelLongPressTimer.current);
+    channelLongPressTimer.current = setTimeout(() => {
+      channelLongPressFiredRef.current = true;
+      setChannelActionId(channelId);
+    }, 500);
+  }, []);
+
+  const cancelChannelLongPress = useCallback(() => {
+    if (channelLongPressTimer.current) {
+      clearTimeout(channelLongPressTimer.current);
+      channelLongPressTimer.current = null;
     }
   }, []);
 
@@ -1102,6 +1163,16 @@ function ChatPage() {
   const filteredMembers = clubMembers.filter((m) =>
     m.name.toLowerCase().includes(memberSearch.toLowerCase()),
   );
+
+  const filteredChannels = useMemo(() => {
+    if (!channelSearch.trim()) return channels;
+    const q = channelSearch.toLowerCase();
+    return channels.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.lastMessage?.toLowerCase().includes(q),
+    );
+  }, [channels, channelSearch]);
 
   // DM names that appear more than once (across clubs) — show club label for those.
   const duplicateDmNames = useMemo(() => {
@@ -1623,6 +1694,28 @@ function ChatPage() {
             </Button>
           </div>
 
+          {/* Channel search */}
+          <div className="px-3 py-2 border-b bg-muted/10 shrink-0">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+              <input
+                value={channelSearch}
+                onChange={(e) => setChannelSearch(e.target.value)}
+                placeholder="Search conversations…"
+                className="w-full pl-8 pr-7 py-1.5 text-sm bg-muted/60 rounded-lg outline-none focus:ring-1 focus:ring-[#FF6600]/30 placeholder:text-muted-foreground"
+              />
+              {channelSearch && (
+                <button
+                  type="button"
+                  onClick={() => setChannelSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
           <ScrollArea className="flex-1 min-h-0">
             {loading ? (
               <div className="p-4 text-sm text-muted-foreground text-center">Loading…</div>
@@ -1630,28 +1723,45 @@ function ChatPage() {
               <div className="p-4 text-sm text-muted-foreground text-center">
                 No conversations yet
               </div>
+            ) : filteredChannels.length === 0 ? (
+              <div className="p-4 text-sm text-muted-foreground text-center">No results</div>
             ) : (
-              channels.map((ch) => {
+              filteredChannels.map((ch) => {
                 const canDelete =
                   ch.type !== "main" && (canManage || ch.created_by === myMemberId);
                 return (
                   <div
                     key={ch.id}
-                    className={`flex items-center border-b hover:bg-muted/40 transition-colors ${
-                      activeChannelId === ch.id ? "bg-muted/60" : ""
+                    className={`flex items-center border-b transition-colors ${
+                      activeChannelId === ch.id ? "bg-muted/60" : "hover:bg-muted/40"
                     }`}
                   >
                     <button
                       type="button"
-                      onClick={() => openChannel(ch.id)}
+                      onPointerDown={() => startChannelLongPress(ch.id)}
+                      onPointerUp={cancelChannelLongPress}
+                      onPointerLeave={cancelChannelLongPress}
+                      onPointerMove={cancelChannelLongPress}
+                      onClick={() => {
+                        if (channelLongPressFiredRef.current) {
+                          channelLongPressFiredRef.current = false;
+                          return;
+                        }
+                        void openChannel(ch.id);
+                      }}
                       className="flex-1 min-w-0 text-left px-4 py-4 flex items-start gap-3"
                     >
-                      <div className="h-10 w-10 rounded-full bg-[#FF6600]/10 flex items-center justify-center shrink-0 text-[#FF6600]">
-                        <MessageSquare className="h-4 w-4" />
+                      <div className="relative shrink-0">
+                        <div className="h-10 w-10 rounded-full bg-[#FF6600]/10 flex items-center justify-center text-[#FF6600]">
+                          <MessageSquare className="h-4 w-4" />
+                        </div>
+                        {ch.unread > 0 && (
+                          <span className="absolute -top-0.5 -right-0.5 h-3 w-3 bg-blue-500 rounded-full border-2 border-background" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-1">
-                          <span className="text-sm font-semibold truncate">{ch.name}</span>
+                          <span className={`text-sm truncate ${ch.unread > 0 ? "font-bold" : "font-semibold"}`}>{ch.name}</span>
                           {ch.lastTime && (
                             <span className="text-[10px] text-muted-foreground shrink-0">
                               {fmtTime(ch.lastTime)}
@@ -1665,7 +1775,7 @@ function ChatPage() {
                           </div>
                         )}
                         <div className="flex items-center justify-between gap-1 mt-0.5">
-                          <span className="text-xs text-muted-foreground truncate">
+                          <span className={`text-xs truncate ${ch.unread > 0 ? "text-foreground font-medium" : "text-muted-foreground"}`}>
                             {ch.lastMessage ?? "No messages yet"}
                           </span>
                           {ch.unread > 0 && (
@@ -1850,6 +1960,76 @@ function ChatPage() {
               <Button
                 variant="destructive"
                 onClick={() => void deleteChannel(deletingChannelId)}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Channel action sheet (long-press on channel row) */}
+      {channelActionId && (() => {
+        const ch = channels.find((c) => c.id === channelActionId);
+        const isDm = ch?.type === "direct";
+        return (
+          <>
+            <div className="fixed inset-0 z-50" onClick={() => setChannelActionId(null)} />
+            <div
+              className="fixed bottom-0 left-0 w-full rounded-t-2xl bg-background shadow-xl p-4 z-50"
+              style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}
+            >
+              <div className="w-10 h-1 bg-muted-foreground/30 rounded-full mx-auto mb-4" />
+              {ch && <p className="text-sm font-semibold mb-3 px-1 truncate">{ch.name}</p>}
+              <button
+                type="button"
+                className="w-full flex items-center gap-3 h-12 px-2 text-base text-left rounded-lg hover:bg-accent/60 transition-colors"
+                onClick={() => void markChannelUnread(channelActionId)}
+              >
+                <span className="h-5 w-5 flex items-center justify-center">
+                  <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
+                </span>
+                Mark as unread
+              </button>
+              {isDm && (
+                <button
+                  type="button"
+                  className="w-full flex items-center gap-3 h-12 px-2 text-base text-left rounded-lg hover:bg-accent/60 transition-colors text-destructive"
+                  onClick={() => {
+                    setDeletingDmId(channelActionId);
+                    setChannelActionId(null);
+                  }}
+                >
+                  <Trash2 className="h-5 w-5" />
+                  Delete conversation
+                </button>
+              )}
+            </div>
+          </>
+        );
+      })()}
+
+      {/* DM delete confirmation (removes user from chat_members only) */}
+      {deletingDmId && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4"
+          onClick={() => setDeletingDmId(null)}
+        >
+          <div
+            className="bg-white dark:bg-background rounded-xl shadow-xl max-w-sm w-full p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-semibold text-base mb-1">Delete this conversation?</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              This will only remove it from your view. The other person&apos;s conversation is unaffected.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setDeletingDmId(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => void hideDmChannel(deletingDmId)}
               >
                 Delete
               </Button>
