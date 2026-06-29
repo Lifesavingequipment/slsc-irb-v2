@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { WavePanel } from "@/components/session/WavePanel";
+import { CarpoolPanel } from "@/components/session/CarpoolPanel";
 import { SurveyEditor, SurveyRunner, SurveyResults, usePretrainingSurveyStatus } from "@/components/session/SurveyPanel";
 import { TrainingPlanView, TrainingPlanEditor } from "@/components/session/TrainingPlanPanel";
 import { GearChecklistPanel } from "@/components/session/GearChecklistPanel";
@@ -659,16 +660,10 @@ function SessionDetail() {
 
         {(session.carpool_enabled || canManage) && (
           <TabsContent value="carpool" className="space-y-4 mt-4">
-            <Card className="p-4">
-              <Button asChild variant="outline" size="sm">
-                <Link to="/sessions/$sessionId/carpool" params={{ sessionId }}>
-                  <Users className="h-4 w-4 mr-2" /> Carpool & transport
-                  {!session.carpool_enabled && canManage && (
-                    <Badge variant="outline" className="ml-2 text-[10px]">Off</Badge>
-                  )}
-                </Link>
-              </Button>
-            </Card>
+            {!session.carpool_enabled && canManage && (
+              <Badge variant="outline" className="text-[10px]">Carpool off</Badge>
+            )}
+            <CarpoolPanel sessionId={sessionId} />
           </TabsContent>
         )}
 
