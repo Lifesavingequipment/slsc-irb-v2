@@ -50,6 +50,7 @@ type Channel = {
   lastMessage?: string;
   lastTime?: string;
   unread: number;
+  forceUnread?: boolean;
   lastReadAt?: string | null;
   clubId?: string;
   clubName?: string;
@@ -251,7 +252,7 @@ function ChatPage() {
       // Load channels across ALL clubs the user is a member of.
       const { data: cm, error: cmErr } = await supabase
         .from("chat_members")
-        .select("channel_id, last_read_at, member_id, channel:chat_channels(id, name, type, created_by, club_id)")
+        .select("channel_id, last_read_at, force_unread, member_id, channel:chat_channels(id, name, type, created_by, club_id)")
         .in("member_id", allMemberIds);
 
       if (cmErr) {
@@ -263,6 +264,11 @@ function ChatPage() {
       const validCm = cm.filter(
         (r): r is typeof r & { channel_id: string } =>
           r.channel_id != null && r.channel != null,
+      );
+
+      // Track which channel_ids have force_unread=true on any of the user's member rows.
+      const forceUnreadChannelIds = new Set(
+        validCm.filter((r) => r.force_unread).map((r) => r.channel_id),
       );
 
       // Deduplicate by channel_id — a user in multiple clubs may appear in the
@@ -326,7 +332,10 @@ function ChatPage() {
           created_by: ch.created_by,
           lastMessage: msgResults[i].data?.body ?? undefined,
           lastTime: msgResults[i].data?.created_at ?? undefined,
-          unread: unreadResults[i].count ?? 0,
+          unread: forceUnreadChannelIds.has(ch.id)
+            ? Math.max(unreadResults[i].count ?? 0, 1)
+            : (unreadResults[i].count ?? 0),
+          forceUnread: forceUnreadChannelIds.has(ch.id),
           lastReadAt: r.last_read_at,
           clubId: ch.club_id ?? undefined,
           // Only attach a club label when the user is in multiple clubs.
@@ -433,7 +442,7 @@ function ChatPage() {
       : "1970-01-01T00:00:00.000Z";
     const { error } = await supabase
       .from("chat_members")
-      .update({ last_read_at: lastReadAt })
+      .update({ last_read_at: lastReadAt, force_unread: true })
       .eq("channel_id", channelId)
       .in("member_id", allMemberIds);
     if (error) {
@@ -444,7 +453,9 @@ function ChatPage() {
     // appears without waiting for the full loadChannels() round-trip.
     setChannels((prev) =>
       prev.map((c) =>
-        c.id === channelId ? { ...c, lastReadAt, unread: Math.max(c.unread, 1) } : c,
+        c.id === channelId
+          ? { ...c, lastReadAt, unread: Math.max(c.unread, 1), forceUnread: true }
+          : c,
       ),
     );
     void loadChannels();
@@ -610,7 +621,17 @@ function ChatPage() {
           { onConflict: "channel_id,member_id" },
         );
       if (mrErr) console.error("[chat] markRead upsert failed:", mrErr);
-      setChannels((prev) => prev.map((c) => (c.id === channelId ? { ...c, unread: 0 } : c)));
+      // Clear force_unread for all of the user's member rows in this channel.
+      if (allMemberIds.length > 0) {
+        await supabase
+          .from("chat_members")
+          .update({ force_unread: false })
+          .eq("channel_id", channelId)
+          .in("member_id", allMemberIds);
+      }
+      setChannels((prev) =>
+        prev.map((c) => (c.id === channelId ? { ...c, unread: 0, forceUnread: false } : c)),
+      );
       const msgs = messagesRef.current;
       if (msgs.length > 0) {
         const latestId = msgs[msgs.length - 1].id;
@@ -622,7 +643,7 @@ function ChatPage() {
           );
       }
     },
-    [myMemberId],
+    [myMemberId, allMemberIds],
   );
 
   // Subscribe to realtime changes for a channel. Uses a wildcard event ('*') so
@@ -1786,13 +1807,13 @@ function ChatPage() {
                         <div className="h-10 w-10 rounded-full bg-[#FF6600]/10 flex items-center justify-center text-[#FF6600]">
                           <MessageSquare className="h-4 w-4" />
                         </div>
-                        {ch.unread > 0 && (
+                        {(ch.unread > 0 || ch.forceUnread) && (
                           <span className="absolute -top-0.5 -right-0.5 h-3 w-3 bg-blue-500 rounded-full border-2 border-background" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-1">
-                          <span className={`text-sm truncate ${ch.unread > 0 ? "font-bold" : "font-semibold"}`}>{ch.name}</span>
+                          <span className={`text-sm truncate ${ch.unread > 0 || ch.forceUnread ? "font-bold" : "font-semibold"}`}>{ch.name}</span>
                           {ch.lastTime && (
                             <span className="text-[10px] text-muted-foreground shrink-0">
                               {fmtTime(ch.lastTime)}
@@ -1806,12 +1827,12 @@ function ChatPage() {
                           </div>
                         )}
                         <div className="flex items-center justify-between gap-1 mt-0.5">
-                          <span className={`text-xs truncate ${ch.unread > 0 ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+                          <span className={`text-xs truncate ${ch.unread > 0 || ch.forceUnread ? "text-foreground font-medium" : "text-muted-foreground"}`}>
                             {ch.lastMessage ?? "No messages yet"}
                           </span>
-                          {ch.unread > 0 && (
+                          {(ch.unread > 0 || ch.forceUnread) && (
                             <Badge className="shrink-0 h-5 min-w-5 rounded-full text-[10px] px-2 bg-[#FF6600] text-white">
-                              {ch.unread}
+                              {ch.unread || 1}
                             </Badge>
                           )}
                         </div>
