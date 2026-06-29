@@ -418,9 +418,7 @@ function ChatPage() {
   }
 
   async function markChannelUnread(channelId: string) {
-    const memberId = channelMemberIdRef.current[channelId] ?? myMemberId;
-    console.log("[chat] markChannelUnread called", { channelId, memberId });
-    if (!memberId) return;
+    if (!allMemberIds.length) return;
     const { data: lastMsg } = await supabase
       .from("chat_messages")
       .select("created_at")
@@ -433,12 +431,11 @@ function ChatPage() {
     const lastReadAt = lastMsg?.created_at
       ? new Date(new Date(lastMsg.created_at).getTime() - 1000).toISOString()
       : "1970-01-01T00:00:00.000Z";
-    console.log("[chat] markChannelUnread writing last_read_at:", lastReadAt, "memberId:", memberId);
     const { error } = await supabase
       .from("chat_members")
       .update({ last_read_at: lastReadAt })
       .eq("channel_id", channelId)
-      .eq("member_id", memberId);
+      .in("member_id", allMemberIds);
     if (error) {
       console.error("[chat] markChannelUnread update failed:", error);
       return;
