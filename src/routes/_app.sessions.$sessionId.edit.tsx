@@ -18,7 +18,7 @@ import { ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 import { DateTimeFields } from "@/components/ui/date-time-fields";
 import { CarpoolEditor, validateCarpoolDrafts, emptyCarpoolDraft, type CarpoolDraft } from "@/components/session/CarpoolEditor";
-import { CoachSetupSection, type VehicleDraft, type ExistingVehicle } from "@/components/session/CoachSetupSection";
+import { CoachSetupSection, type VehicleDraft, type ExistingVehicle, type PickupStop } from "@/components/session/CoachSetupSection";
 import { LocationPicker, formatLocation } from "@/components/LocationPicker";
 import { notifySessionUpdated, currentMemberId } from "@/lib/notify";
 import { invalidateSessionsCache } from "./_app.sessions.index";
@@ -107,8 +107,9 @@ function EditSession() {
   const [clubId, setClubId] = useState<string | null>(null);
   const [carpools, setCarpools] = useState<CarpoolDraft[]>([]);
   const [originalCarpoolIds, setOriginalCarpoolIds] = useState<string[]>([]);
-  const [pickups, setPickups] = useState<string[]>([]);
+  const [pickups, setPickups] = useState<PickupStop[]>([]);
   const [trailers, setTrailers] = useState(0);
+  const [trailerLocation, setTrailerLocation] = useState("");
   const [existingVehicles, setExistingVehicles] = useState<ExistingVehicle[]>([]);
   const [vehiclesToDelete, setVehiclesToDelete] = useState<string[]>([]);
   const [pendingVehicles, setPendingVehicles] = useState<VehicleDraft[]>([]);
@@ -135,8 +136,14 @@ function EditSession() {
       setClubId(data.club_id);
       setLocationId(data.location_id ?? null);
       setLocation(data.location ?? "");
-      setPickups([...(data.carpool_pickups ?? []), ""]);
+      const rawPickups: unknown[] = Array.isArray(data.carpool_pickups) ? data.carpool_pickups : [];
+      setPickups(rawPickups.map((p) =>
+        typeof p === "string"
+          ? { location: p, leaveTime: "17:00" }
+          : { location: (p as PickupStop).location ?? "", leaveTime: (p as PickupStop).leaveTime ?? "17:00" }
+      ));
       setTrailers(data.trailers_required ?? 0);
+      setTrailerLocation((data as { trailer_location?: string | null }).trailer_location ?? "");
 
       const [locsRes, carpoolTplRes, gearRes] = await Promise.all([
         supabase.from("locations").select("id, name, address").eq("club_id", data.club_id).order("name"),
@@ -239,7 +246,7 @@ function EditSession() {
     }
 
     setBusy(true);
-    const cleanPickups = carpool ? pickups.map((p) => p.trim()).filter(Boolean) : [];
+    const cleanPickups = carpool ? pickups.filter((p) => p.location.trim()) : [];
 
     const { error } = await supabase.from("sessions").update({
       title: parsed.data.title,
@@ -257,6 +264,7 @@ function EditSession() {
       carpool_enabled: parsed.data.carpool_enabled,
       carpool_pickups: cleanPickups.length > 0 ? cleanPickups : [],
       trailers_required: carpool ? trailers : 0,
+      trailer_location: carpool && trailers > 0 ? (trailerLocation.trim() || null) : null,
       equipment_list_id: gearListId || null,
     }).eq("id", sessionId);
     if (error) { setBusy(false); toast.error(error.message); return; }
@@ -450,10 +458,7 @@ function EditSession() {
                 checked={carpool}
                 onCheckedChange={(v) => {
                   setCarpool(v);
-                  if (v && carpools.length === 0 && user) {
-                    setCarpools([emptyCarpoolDraft(user.id, startsAt)]);
-                  }
-                  if (v && pickups.length === 0) setPickups([""]);
+                  if (v && pickups.length === 0) setPickups([{ location: "", leaveTime: "17:00" }]);
                 }}
               />
             </div>
@@ -483,6 +488,8 @@ function EditSession() {
                 onPickupsChange={setPickups}
                 trailers={trailers}
                 onTrailersChange={setTrailers}
+                trailerLocation={trailerLocation}
+                onTrailerLocationChange={setTrailerLocation}
                 clubId={clubId ?? activeClub?.club_id}
                 existingVehicles={existingVehicles.filter((v) => !vehiclesToDelete.includes(v.id))}
                 onRemoveExisting={(id) => setVehiclesToDelete((prev) => [...prev, id])}

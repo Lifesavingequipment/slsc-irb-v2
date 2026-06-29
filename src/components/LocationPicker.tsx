@@ -271,7 +271,7 @@ export function LocationPicker({
 
       <AddressAutocomplete
         id={id}
-        value={value}
+        value={selected ? "" : value}
         onChange={handleTyped}
         onSelect={handleSelected}
         placeholder={placeholder}

@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { DateTimeFields } from "@/components/ui/date-time-fields";
 import { CarpoolEditor, validateCarpoolDrafts, emptyCarpoolDraft, type CarpoolDraft } from "@/components/session/CarpoolEditor";
 import { LocationPicker } from "@/components/LocationPicker";
-import { CoachSetupSection, type VehicleDraft } from "@/components/session/CoachSetupSection";
+import { CoachSetupSection, type VehicleDraft, type PickupStop } from "@/components/session/CoachSetupSection";
 import { invalidateSessionsCache } from "./_app.sessions.index";
 import { addDays, addMonths, addWeeks, format as fmt } from "date-fns";
 import { notifyNewSession, currentMemberId } from "@/lib/notify";
@@ -124,8 +124,9 @@ function NewSession() {
   const [questions, setQuestions] = useState<DraftQ[]>([]);
   const [carpool, setCarpool] = useState(false);
   const [carpools, setCarpools] = useState<CarpoolDraft[]>([]);
-  const [pickups, setPickups] = useState<string[]>([]);
+  const [pickups, setPickups] = useState<PickupStop[]>([]);
   const [trailers, setTrailers] = useState(0);
+  const [trailerLocation, setTrailerLocation] = useState("");
   const [pendingVehicles, setPendingVehicles] = useState<VehicleDraft[]>([]);
   const [newVehicle, setNewVehicle] = useState<VehicleDraft>({ name: "", seats: 8, pickup: "", can_tow: false });
   const [repeatUntil, setRepeatUntil] = useState("");
@@ -219,7 +220,7 @@ function NewSession() {
       ? parseLocalDateTime(parsed.data.starts_at).getTime() - parseLocalDateTime(parsed.data.rsvp_deadline).getTime()
       : null;
 
-    const cleanPickups = carpool ? pickups.map((p) => p.trim()).filter(Boolean) : [];
+    const cleanPickups = carpool ? pickups.filter((p) => p.location.trim()) : [];
 
     const rowsToInsert = occurrences.map((o) => ({
       club_id: activeClub.club_id,
@@ -240,6 +241,7 @@ function NewSession() {
       carpool_enabled: parsed.data.carpool_enabled,
       carpool_pickups: cleanPickups.length > 0 ? cleanPickups : [],
       trailers_required: carpool ? (trailers ?? 0) : 0,
+      trailer_location: carpool && trailers > 0 ? (trailerLocation.trim() || null) : null,
       equipment_list_id: gearListId || null,
       created_by: user.id,
     }));
@@ -560,10 +562,7 @@ function NewSession() {
                 checked={carpool}
                 onCheckedChange={(v) => {
                   setCarpool(v);
-                  if (v && carpools.length === 0 && user) {
-                    setCarpools([emptyCarpoolDraft(user.id, startsAt)]);
-                  }
-                  if (v && pickups.length === 0) setPickups([""]);
+                  if (v && pickups.length === 0) setPickups([{ location: "", leaveTime: "17:00" }]);
                 }}
               />
             </div>
@@ -593,6 +592,8 @@ function NewSession() {
                 onPickupsChange={setPickups}
                 trailers={trailers}
                 onTrailersChange={setTrailers}
+                trailerLocation={trailerLocation}
+                onTrailerLocationChange={setTrailerLocation}
                 clubId={activeClub?.club_id}
                 pendingVehicles={pendingVehicles}
                 onRemovePending={(i) => setPendingVehicles((v) => v.filter((_, idx) => idx !== i))}

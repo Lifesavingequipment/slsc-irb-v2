@@ -28,6 +28,36 @@ import { toast } from "sonner";
 import { buildNameMap } from "@/lib/names";
 import { notifyGoingMembers } from "@/lib/notify";
 
+const HOURS = Array.from({ length: 12 }, (_, i) => i + 1);
+const MINS = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
+function TimeSelectInline({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [hStr, mStr] = (value || "17:00").split(":");
+  const h24 = parseInt(hStr, 10) || 0;
+  const meridiem: "AM" | "PM" = h24 < 12 ? "AM" : "PM";
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  const minute = MINS.includes(mStr ?? "") ? (mStr ?? "00") : "00";
+  const commit = (nh12: number, nm: string, np: "AM" | "PM") => {
+    let nh24 = nh12 % 12; if (np === "PM") nh24 += 12;
+    onChange(`${String(nh24).padStart(2, "0")}:${nm}`);
+  };
+  return (
+    <div className="flex gap-1">
+      <select aria-label="Hour" value={h12} onChange={(e) => commit(parseInt(e.target.value, 10), minute, meridiem)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+        {HOURS.map((h) => <option key={h} value={h}>{h}</option>)}
+      </select>
+      <select aria-label="Minute" value={minute} onChange={(e) => commit(h12, e.target.value, meridiem)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+        {MINS.map((m) => <option key={m} value={m}>{m}</option>)}
+      </select>
+      <div className="flex h-9 overflow-hidden rounded-md border border-input">
+        {(["AM", "PM"] as const).map((p, i) => (
+          <button key={p} type="button" onClick={() => commit(h12, minute, p)}
+            className={`h-full px-2 text-xs font-medium transition-colors${i > 0 ? " border-l border-input" : ""} ${meridiem === p ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}>{p}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export const Route = createFileRoute("/_app/sessions/$sessionId/carpool")({
   head: () => ({ meta: [{ title: "Carpool — IRB Coaching" }] }),
   component: CarpoolPage,
@@ -36,8 +66,9 @@ export const Route = createFileRoute("/_app/sessions/$sessionId/carpool")({
 type Session = {
   id: string; club_id: string; title: string; starts_at: string;
   location: string | null;
-  carpool_pickups: string[] | null;
+  carpool_pickups: { location: string; leaveTime: string }[] | null;
   trailers_required: number | null;
+  trailer_location?: string | null;
 };
 type Carpool = {
   id: string; session_id: string; club_id: string; driver_user_id: string;
@@ -127,7 +158,7 @@ function CarpoolPage() {
   const dn = useCallback((id: string) => nameMap[id] || "Member", [nameMap]);
 
   const pickups = useMemo(
-    () => (session?.carpool_pickups ?? []).filter((p) => p.trim()),
+    () => (session?.carpool_pickups ?? []).map((p) => p.location).filter(Boolean),
     [session?.carpool_pickups],
   );
   const trailersRequired = session?.trailers_required ?? 0;
@@ -374,7 +405,7 @@ function CarpoolPage() {
   };
 
   // --- Coach setup writes ---
-  const saveSessionSetup = async (patch: { carpool_pickups?: string[]; trailers_required?: number }) => {
+  const saveSessionSetup = async (patch: { carpool_pickups?: { location: string; leaveTime: string }[]; trailers_required?: number }) => {
     const { error } = await supabase.from("sessions").update(patch).eq("id", sessionId);
     if (error) { toast.error(error.message); return; }
     load();
@@ -944,13 +975,14 @@ function CoachSetupDialog({
   open: boolean; onOpenChange: (v: boolean) => void;
   session: Session;
   clubVehicles: ClubVehicle[];
-  onSavePickups: (p: string[]) => Promise<void> | void;
+  onSavePickups: (p: { location: string; leaveTime: string }[]) => Promise<void> | void;
   onSaveTrailers: (n: number) => Promise<void> | void;
   onChange: () => void;
   sessionId: string;
   clubId: string;
 }) {
-  const [pickups, setPickups] = useState<string[]>([]);
+  const [pickups, setPickups] = useState<{ location: string; leaveTime: string }[]>([]);
+  const [trailerLocation, setTrailerLocation] = useState("");
   const [trailers, setTrailers] = useState<number>(0);
   const [newVehicle, setNewVehicle] = useState<{ name: string; seats: number; pickup: string; can_tow: boolean }>({
     name: "", seats: 8, pickup: "", can_tow: false,
@@ -958,14 +990,15 @@ function CoachSetupDialog({
 
   useEffect(() => {
     if (open) {
-      setPickups([...(session.carpool_pickups ?? []), ""]);
+      setPickups(session.carpool_pickups ?? []);
       setTrailers(session.trailers_required ?? 0);
+      setTrailerLocation(session.trailer_location ?? "");
       setNewVehicle({ name: "", seats: 8, pickup: "", can_tow: false });
     }
   }, [open, session.carpool_pickups, session.trailers_required]);
 
   const savePickups = async () => {
-    const clean = pickups.map((p) => p.trim()).filter(Boolean);
+    const clean = pickups.filter((p) => p.location.trim());
     await onSavePickups(clean);
     toast.success("Pickup stops saved");
   };
@@ -1012,21 +1045,30 @@ function CoachSetupDialog({
             <Label className="text-sm font-semibold">Pickup stops</Label>
             <p className="text-xs text-muted-foreground">Members pick from these when requesting a ride.</p>
             {pickups.map((stop, i) => (
-              <div key={i} className="flex gap-2">
-                <LocationPicker
-                  className="flex-1"
-                  clubId={clubId}
-                  value={stop}
-                  placeholder={`Stop ${i + 1} e.g. Kurrawa SLSC (5:00pm)`}
-                  onChange={(v) => setPickups(pickups.map((s, idx) => idx === i ? v : s))}
-                />
-                <Button variant="ghost" size="icon" onClick={() =>
-                  setPickups(pickups.filter((_, idx) => idx !== i))
-                }><Trash2 className="h-4 w-4" /></Button>
+              <div key={i} className="space-y-1.5 rounded-md border p-2.5">
+                <div className="flex gap-2">
+                  <LocationPicker
+                    className="flex-1"
+                    clubId={clubId}
+                    value={stop.location}
+                    placeholder={`Stop ${i + 1} e.g. Kurrawa SLSC`}
+                    onChange={(v) => setPickups(pickups.map((s, idx) => idx === i ? { ...s, location: v } : s))}
+                  />
+                  <Button variant="ghost" size="icon" onClick={() =>
+                    setPickups(pickups.filter((_, idx) => idx !== i))
+                  }><Trash2 className="h-4 w-4" /></Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">Leave time</span>
+                  <TimeSelectInline
+                    value={stop.leaveTime}
+                    onChange={(v) => setPickups(pickups.map((s, idx) => idx === i ? { ...s, leaveTime: v } : s))}
+                  />
+                </div>
               </div>
             ))}
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setPickups([...pickups, ""])}>
+              <Button variant="outline" size="sm" onClick={() => setPickups([...pickups, { location: "", leaveTime: "17:00" }])}>
                 <Plus className="h-3 w-3" /> Add stop
               </Button>
               <Button size="sm" onClick={savePickups}>Save stops</Button>
@@ -1047,9 +1089,23 @@ function CoachSetupDialog({
               </Select>
               <Button size="sm" onClick={async () => {
                 await onSaveTrailers(trailers);
+                if (trailers > 0) {
+                  await supabase.from("sessions").update({ trailer_location: trailerLocation.trim() || null }).eq("id", sessionId);
+                }
                 toast.success("Trailers saved");
               }}>Save</Button>
             </div>
+            {trailers > 0 && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Trailer storage / departure location</Label>
+                <LocationPicker
+                  clubId={clubId}
+                  value={trailerLocation}
+                  onChange={setTrailerLocation}
+                  placeholder="Where the trailer(s) are stored"
+                />
+              </div>
+            )}
           </section>
 
           {/* Club Vehicles */}

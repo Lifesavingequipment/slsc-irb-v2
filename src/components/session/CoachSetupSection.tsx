@@ -13,10 +13,69 @@ export type VehicleDraft = { name: string; seats: number; pickup: string; can_to
 export type ExistingVehicle = {
   id: string; name: string; seats: number; pickup_location: string | null; can_tow: boolean;
 };
+export type PickupStop = { location: string; leaveTime: string };
+
+const HOURS = Array.from({ length: 12 }, (_, i) => i + 1);
+const MINUTES = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
+
+function to12Hour(t: string): { h12: number; minute: string; meridiem: "AM" | "PM" } {
+  const [hStr, mStr] = (t || "17:00").split(":");
+  const h24 = parseInt(hStr, 10) || 0;
+  return {
+    h12: h24 % 12 === 0 ? 12 : h24 % 12,
+    minute: MINUTES.includes(mStr ?? "") ? (mStr ?? "00") : "00",
+    meridiem: h24 < 12 ? "AM" : "PM",
+  };
+}
+
+function to24Hour(h12: number, minute: string, meridiem: "AM" | "PM"): string {
+  let h24 = h12 % 12;
+  if (meridiem === "PM") h24 += 12;
+  return `${String(h24).padStart(2, "0")}:${minute}`;
+}
+
+function TimeSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { h12, minute, meridiem } = to12Hour(value);
+  const commit = (next: { h12?: number; minute?: string; meridiem?: "AM" | "PM" }) =>
+    onChange(to24Hour(next.h12 ?? h12, next.minute ?? minute, next.meridiem ?? meridiem));
+  return (
+    <div className="flex gap-1">
+      <select
+        aria-label="Hour"
+        value={h12}
+        onChange={(e) => commit({ h12: parseInt(e.target.value, 10) })}
+        className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+      >
+        {HOURS.map((h) => <option key={h} value={h}>{h}</option>)}
+      </select>
+      <select
+        aria-label="Minute"
+        value={minute}
+        onChange={(e) => commit({ minute: e.target.value })}
+        className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+      >
+        {MINUTES.map((m) => <option key={m} value={m}>{m}</option>)}
+      </select>
+      <div className="flex h-9 overflow-hidden rounded-md border border-input">
+        {(["AM", "PM"] as const).map((ampm, i) => (
+          <button
+            key={ampm}
+            type="button"
+            onClick={() => commit({ meridiem: ampm })}
+            className={`h-full px-2 text-xs font-medium transition-colors${i > 0 ? " border-l border-input" : ""} ${meridiem === ampm ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}
+          >
+            {ampm}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function CoachSetupSection({
   pickups, onPickupsChange,
   trailers, onTrailersChange,
+  trailerLocation, onTrailerLocationChange,
   clubId,
   existingVehicles = [],
   onRemoveExisting,
@@ -25,10 +84,12 @@ export function CoachSetupSection({
   newVehicle, onNewVehicleChange,
   onAddVehicle,
 }: {
-  pickups: string[];
-  onPickupsChange: (v: string[]) => void;
+  pickups: PickupStop[];
+  onPickupsChange: (v: PickupStop[]) => void;
   trailers: number;
   onTrailersChange: (n: number) => void;
+  trailerLocation: string;
+  onTrailerLocationChange: (v: string) => void;
   clubId: string | null | undefined;
   existingVehicles?: ExistingVehicle[];
   onRemoveExisting?: (id: string) => void;
@@ -47,25 +108,34 @@ export function CoachSetupSection({
         <Label className="text-sm font-semibold">Pickup stops</Label>
         <p className="text-xs text-muted-foreground">Members pick from these when requesting a ride.</p>
         {pickups.map((stop, i) => (
-          <div key={i} className="flex gap-2">
-            <LocationPicker
-              className="flex-1"
-              clubId={clubId}
-              value={stop}
-              placeholder={`Stop ${i + 1} e.g. Kurrawa SLSC (5:00pm)`}
-              onChange={(v) => onPickupsChange(pickups.map((s, idx) => idx === i ? v : s))}
-            />
-            <Button
-              type="button" variant="ghost" size="icon"
-              onClick={() => onPickupsChange(pickups.filter((_, idx) => idx !== i))}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+          <div key={i} className="space-y-1.5 rounded-md border p-2.5">
+            <div className="flex gap-2">
+              <LocationPicker
+                className="flex-1"
+                clubId={clubId}
+                value={stop.location}
+                placeholder={`Stop ${i + 1} e.g. Kurrawa SLSC`}
+                onChange={(v) => onPickupsChange(pickups.map((s, idx) => idx === i ? { ...s, location: v } : s))}
+              />
+              <Button
+                type="button" variant="ghost" size="icon"
+                onClick={() => onPickupsChange(pickups.filter((_, idx) => idx !== i))}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-muted-foreground whitespace-nowrap">Leave time</Label>
+              <TimeSelect
+                value={stop.leaveTime}
+                onChange={(v) => onPickupsChange(pickups.map((s, idx) => idx === i ? { ...s, leaveTime: v } : s))}
+              />
+            </div>
           </div>
         ))}
         <Button
           type="button" variant="outline" size="sm"
-          onClick={() => onPickupsChange([...pickups, ""])}
+          onClick={() => onPickupsChange([...pickups, { location: "", leaveTime: "17:00" }])}
         >
           <Plus className="h-3 w-3 mr-1" /> Add stop
         </Button>
@@ -82,6 +152,17 @@ export function CoachSetupSection({
             ))}
           </SelectContent>
         </Select>
+        {trailers > 0 && (
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Trailer storage / departure location</Label>
+            <LocationPicker
+              clubId={clubId}
+              value={trailerLocation}
+              onChange={onTrailerLocationChange}
+              placeholder="Where the trailer(s) are stored"
+            />
+          </div>
+        )}
       </section>
 
       {/* Club vehicles */}

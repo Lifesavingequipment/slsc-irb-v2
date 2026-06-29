@@ -4018,7 +4018,7 @@ export type Database = {
         Row: {
           capacity: number | null
           carpool_enabled: boolean
-          carpool_pickups: string[]
+          carpool_pickups: { location: string; leaveTime: string }[]
           club_id: string
           created_at: string
           created_by: string | null
@@ -4035,13 +4035,14 @@ export type Database = {
           starts_at: string
           survey_enabled: boolean
           title: string
+          trailer_location: string | null
           trailers_required: number
           updated_at: string
         }
         Insert: {
           capacity?: number | null
           carpool_enabled?: boolean
-          carpool_pickups?: string[]
+          carpool_pickups?: { location: string; leaveTime: string }[]
           club_id: string
           created_at?: string
           created_by?: string | null
@@ -4058,13 +4059,14 @@ export type Database = {
           starts_at: string
           survey_enabled?: boolean
           title: string
+          trailer_location?: string | null
           trailers_required?: number
           updated_at?: string
         }
         Update: {
           capacity?: number | null
           carpool_enabled?: boolean
-          carpool_pickups?: string[]
+          carpool_pickups?: { location: string; leaveTime: string }[]
           club_id?: string
           created_at?: string
           created_by?: string | null
@@ -4081,6 +4083,7 @@ export type Database = {
           starts_at?: string
           survey_enabled?: boolean
           title?: string
+          trailer_location?: string | null
           trailers_required?: number
           updated_at?: string
         }
