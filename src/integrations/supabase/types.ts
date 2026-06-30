@@ -4560,7 +4560,7 @@ export type Database = {
     Enums: {
       age_division: "u23" | "open" | "masters_35" | "masters_45"
       app_role: "owner" | "club_admin" | "coach" | "member"
-      attendance_status: "present" | "absent" | "excused" | "injured"
+      attendance_status: "present" | "absent" | "excused" | "injured" | "late"
       carpool_request_status: "pending" | "assigned" | "cancelled"
       carpool_status: "open" | "full" | "cancelled"
       equipment_status: "active" | "retired"
@@ -4699,7 +4699,7 @@ export const Constants = {
     Enums: {
       age_division: ["u23", "open", "masters_35", "masters_45"],
       app_role: ["owner", "club_admin", "coach", "member"],
-      attendance_status: ["present", "absent", "excused", "injured"],
+      attendance_status: ["present", "absent", "excused", "injured", "late"],
       carpool_request_status: ["pending", "assigned", "cancelled"],
       carpool_status: ["open", "full", "cancelled"],
       equipment_status: ["active", "retired"],
