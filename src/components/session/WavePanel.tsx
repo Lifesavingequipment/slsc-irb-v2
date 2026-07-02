@@ -11,7 +11,7 @@
  *  - Big sticky "Placing X" bar stays visible while selecting
  *  - Recommended layouts calculated from team count + max lanes cap
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useConfirm } from "@/lib/confirm";
 import { Card } from "@/components/ui/card";
@@ -99,6 +99,7 @@ export function WavePanel({
   const [newDriver, setNewDriver] = useState("");
   const [newCrew, setNewCrew] = useState("");
   const confirm = useConfirm();
+  const layoutLockedRef = useRef(false);
 
   const load = useCallback(async () => {
     const [{ data: t }, { data: p }, { data: s }, { data: profs }] = await Promise.all([
@@ -127,11 +128,14 @@ export function WavePanel({
       };
     });
     setMembers(map);
-    // Infer grid from existing placed teams
-    const placed = rows.filter(isPlaced);
-    if (placed.length > 0) {
-      setNumWaves(Math.max(...placed.map((x) => x.wave ?? 1)));
-      setNumLanes(Math.max(...placed.map((x) => x.lane ?? 1)));
+    // Only infer grid on the very first load — never reset after coach picks a layout
+    if (!layoutLockedRef.current) {
+      const placed = rows.filter(isPlaced);
+      if (placed.length > 0) {
+        setNumWaves(Math.max(...placed.map((x) => x.wave ?? 1)));
+        setNumLanes(Math.max(...placed.map((x) => x.lane ?? 1)));
+      }
+      layoutLockedRef.current = true;
     }
   }, [sessionId, clubId, goingIds]);
 
@@ -342,6 +346,7 @@ export function WavePanel({
   const applyLayout = (layout: Layout) => {
     setNumWaves(layout.waves);
     setNumLanes(layout.lanes);
+    layoutLockedRef.current = true;
   };
 
   const shareDraw = async () => {
