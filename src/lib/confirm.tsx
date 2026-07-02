@@ -43,8 +43,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 
   const handleConfirm = () => {
     setConfirming(true);
-    // Give a brief moment for the spinner to show, then resolve
-    setTimeout(() => finish(true), 120);
+    finish(true);
   };
 
   const isDestructive = opts.destructive !== false;
