@@ -22,7 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Lock, Share2, Shuffle, Trash2, Users, ChevronDown, ChevronUp, AlertTriangle,
-  Car, UserCheck, HeartPulse, Plus, Repeat2, Sparkles, X, ArrowLeftRight,
+  Car, UserCheck, HeartPulse, Plus, Repeat2, Sparkles, X, ArrowLeftRight, Pencil,
 } from "lucide-react";
 import { showToast } from "@/lib/toast";
 import { format } from "date-fns";
@@ -98,6 +98,9 @@ export function WavePanel({
   const [addTeamOpen, setAddTeamOpen] = useState(false);
   const [newDriver, setNewDriver] = useState("");
   const [newCrew, setNewCrew] = useState("");
+  const [editingTeam, setEditingTeam] = useState<string | null>(null);
+  const [editDriver, setEditDriver] = useState("");
+  const [editCrew, setEditCrew] = useState("");
   const confirm = useConfirm();
   const layoutLockedRef = useRef(false);
 
@@ -265,6 +268,20 @@ export function WavePanel({
     if (error) { showToast.error(error.message); return; }
     setNewDriver(""); setNewCrew(""); setAddTeamOpen(false);
     showToast.success("Team created");
+    load();
+  };
+
+  const saveEdit = async () => {
+    if (!editingTeam) return;
+    setBusy(true);
+    const { error } = await supabase.from("session_teams").update({
+      driver_id: editDriver && editDriver !== "__none" ? editDriver : null,
+      crew_id: editCrew && editCrew !== "__none" ? editCrew : null,
+    }).eq("id", editingTeam);
+    setBusy(false);
+    if (error) { showToast.error(error.message); return; }
+    setEditingTeam(null);
+    showToast.success("Team updated");
     load();
   };
 
@@ -649,11 +666,53 @@ export function WavePanel({
                       </div>
                       {(dGt || cGt) && <Badge variant="outline" className="text-[9px] text-red-600 border-red-200 shrink-0">×2</Badge>}
                     </button>
+                    <button type="button" onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingTeam(t.id);
+                      setEditDriver(t.driver_id ?? "__none");
+                      setEditCrew(t.crew_id ?? "__none");
+                    }} className="text-muted-foreground/50 hover:text-primary p-2 -m-1 shrink-0">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
                     <button type="button" onClick={() => removeTeam(t.id)} className="text-muted-foreground/50 hover:text-destructive p-2 -m-1 shrink-0">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                   {isSelected && <div className="text-[11px] text-primary/80 mt-1.5 font-medium">→ Tap a lane below to place</div>}
+                  {editingTeam === t.id && (
+                    <div className="mt-2 space-y-2 pt-2 border-t" onClick={(e) => e.stopPropagation()}>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground mb-1 block">Driver</Label>
+                          <Select value={editDriver} onValueChange={setEditDriver}>
+                            <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Driver…" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none">— None —</SelectItem>
+                              {goingIds.filter((id) => members[id]).sort((a, b) => dn(a).localeCompare(dn(b))).map((id) => (
+                                <SelectItem key={id} value={id}>{dn(id)}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground mb-1 block">Crew</Label>
+                          <Select value={editCrew} onValueChange={setEditCrew}>
+                            <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Crew…" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none">— None —</SelectItem>
+                              {goingIds.filter((id) => members[id]).sort((a, b) => dn(a).localeCompare(dn(b))).map((id) => (
+                                <SelectItem key={id} value={id}>{dn(id)}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => setEditingTeam(null)} className="flex-1 h-9">Cancel</Button>
+                        <Button size="sm" onClick={saveEdit} loading={busy} className="flex-1 h-9">Save</Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -753,12 +812,54 @@ export function WavePanel({
                           </div>
                           {t && !selected && (
                             <div className="flex gap-1 shrink-0">
+                              <button type="button" onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingTeam(t.id);
+                                setEditDriver(t.driver_id ?? "__none");
+                                setEditCrew(t.crew_id ?? "__none");
+                              }} className="p-1.5 text-muted-foreground/50 hover:text-primary rounded-lg hover:bg-muted">
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
                               <button type="button" onClick={() => moveToSlot(t.id, null, null)} className="p-1.5 text-muted-foreground/50 hover:text-muted-foreground rounded-lg hover:bg-muted">
                                 <ChevronDown className="h-3.5 w-3.5" />
                               </button>
                             </div>
                           )}
                         </div>
+                        {t && editingTeam === t.id && (
+                          <div className="px-3 pb-3 space-y-2 pt-2 border-t" onClick={(e) => e.stopPropagation()}>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <Label className="text-[10px] text-muted-foreground mb-1 block">Driver</Label>
+                                <Select value={editDriver} onValueChange={setEditDriver}>
+                                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Driver…" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none">— None —</SelectItem>
+                                    {goingIds.filter((id) => members[id]).sort((a, b) => dn(a).localeCompare(dn(b))).map((id) => (
+                                      <SelectItem key={id} value={id}>{dn(id)}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <Label className="text-[10px] text-muted-foreground mb-1 block">Crew</Label>
+                                <Select value={editCrew} onValueChange={setEditCrew}>
+                                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Crew…" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none">— None —</SelectItem>
+                                    {goingIds.filter((id) => members[id]).sort((a, b) => dn(a).localeCompare(dn(b))).map((id) => (
+                                      <SelectItem key={id} value={id}>{dn(id)}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="outline" onClick={() => setEditingTeam(null)} className="flex-1 h-9">Cancel</Button>
+                              <Button size="sm" onClick={saveEdit} loading={busy} className="flex-1 h-9">Save</Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
