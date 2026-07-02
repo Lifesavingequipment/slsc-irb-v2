@@ -294,6 +294,18 @@ export function WavePanel({
     const moving = teams.find((t) => t.id === teamId);
     if (!moving) return;
     if (moving.wave === wave && moving.lane === lane) { setSelected(null); return; }
+    // Block: a person can't appear twice in the same wave
+    if (wave != null) {
+      const sameWave = teams.filter((t) => t.wave === wave && t.id !== teamId);
+      const memberIds = [moving.driver_id, moving.crew_id].filter(Boolean) as string[];
+      const conflict = sameWave.some((t) =>
+        memberIds.includes(t.driver_id ?? "") || memberIds.includes(t.crew_id ?? "")
+      );
+      if (conflict) {
+        showToast.error("A person can't appear twice in the same wave.");
+        return;
+      }
+    }
     const occupant = wave != null && lane != null
       ? teams.find((t) => t.wave === wave && t.lane === lane && t.id !== teamId)
       : null;
@@ -743,9 +755,6 @@ export function WavePanel({
                             <div className="flex gap-1 shrink-0">
                               <button type="button" onClick={() => moveToSlot(t.id, null, null)} className="p-1.5 text-muted-foreground/50 hover:text-muted-foreground rounded-lg hover:bg-muted">
                                 <ChevronDown className="h-3.5 w-3.5" />
-                              </button>
-                              <button type="button" onClick={() => removeTeam(t.id)} className="p-1.5 text-muted-foreground/50 hover:text-destructive rounded-lg hover:bg-muted">
-                                <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </div>
                           )}
