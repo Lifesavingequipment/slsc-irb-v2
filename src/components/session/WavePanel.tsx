@@ -608,32 +608,36 @@ export function WavePanel({
               const dGt = !!t.driver_id && goingTwiceIds.has(t.driver_id);
               const cGt = !!t.crew_id && goingTwiceIds.has(t.crew_id);
               return (
-                <button
+                <div
                   key={t.id}
-                  type="button"
-                  onClick={() => setSelected((cur) => cur === t.id ? null : t.id)}
                   className={[
-                    "w-full rounded-xl border p-3 text-left transition-all active:scale-98",
-                    isSelected ? "border-primary ring-2 ring-primary/40 bg-primary/5" : "border-border bg-card hover:bg-muted/40",
+                    "w-full rounded-xl border p-3 transition-all",
+                    isSelected ? "border-primary ring-2 ring-primary/40 bg-primary/5" : "border-border bg-card",
                   ].join(" ")}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                      <Car className="h-4 w-4 text-blue-500 shrink-0" />
-                      <span className={`text-sm font-medium truncate ${dGt ? "text-red-600" : ""}`}>{dn(t.driver_id)}</span>
-                    </div>
-                    <span className="text-muted-foreground/40 shrink-0">+</span>
-                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                      <UserCheck className="h-4 w-4 text-green-500 shrink-0" />
-                      <span className={`text-sm font-medium truncate ${cGt ? "text-red-600" : ""}`}>{dn(t.crew_id)}</span>
-                    </div>
-                    {(dGt || cGt) && <Badge variant="outline" className="text-[9px] text-red-600 border-red-200 shrink-0">×2</Badge>}
-                    <button type="button" onClick={(e) => { e.stopPropagation(); removeTeam(t.id); }} className="text-muted-foreground/50 hover:text-destructive p-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelected((cur) => cur === t.id ? null : t.id)}
+                      className="flex items-center gap-3 flex-1 min-w-0 text-left active:scale-98"
+                    >
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                        <Car className="h-4 w-4 text-blue-500 shrink-0" />
+                        <span className={`text-sm font-medium truncate ${dGt ? "text-red-600" : ""}`}>{dn(t.driver_id)}</span>
+                      </div>
+                      <span className="text-muted-foreground/40 shrink-0">+</span>
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                        <UserCheck className="h-4 w-4 text-green-500 shrink-0" />
+                        <span className={`text-sm font-medium truncate ${cGt ? "text-red-600" : ""}`}>{dn(t.crew_id)}</span>
+                      </div>
+                      {(dGt || cGt) && <Badge variant="outline" className="text-[9px] text-red-600 border-red-200 shrink-0">×2</Badge>}
+                    </button>
+                    <button type="button" onClick={() => removeTeam(t.id)} className="text-muted-foreground/50 hover:text-destructive p-2 -m-1 shrink-0">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                   {isSelected && <div className="text-[11px] text-primary/80 mt-1.5 font-medium">→ Tap a lane below to place</div>}
-                </button>
+                </div>
               );
             })}
           </div>
@@ -678,9 +682,8 @@ export function WavePanel({
                     return (
                       <div
                         key={l}
-                        onClick={() => handleSlotTap(w, l)}
                         className={[
-                          "rounded-xl border transition-all cursor-pointer select-none",
+                          "rounded-xl border transition-all",
                           isSelected ? "border-primary ring-2 ring-primary/40 bg-primary/5" : "",
                           isDropTarget && t ? "border-primary/60 bg-primary/5" : "",
                           isDropTarget && !t ? "border-primary border-dashed bg-primary/10" : "",
@@ -688,46 +691,51 @@ export function WavePanel({
                         ].join(" ")}
                       >
                         <div className="flex items-center gap-2 p-3 min-h-[52px]">
-                          <span className="text-[10px] font-bold text-muted-foreground/60 w-7 shrink-0">L{l}</span>
-                          {t ? (
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <div className="flex items-center gap-1 min-w-0">
-                                  <Car className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                  <span className={`text-sm font-medium truncate ${dGt ? "text-red-600" : ""}`}>
-                                    {dn(t.driver_id)}{dGt && " ×2"}
-                                  </span>
+                          <div
+                            onClick={() => handleSlotTap(w, l)}
+                            className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer select-none"
+                          >
+                            <span className="text-[10px] font-bold text-muted-foreground/60 w-7 shrink-0">L{l}</span>
+                            {t ? (
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <div className="flex items-center gap-1 min-w-0">
+                                    <Car className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                    <span className={`text-sm font-medium truncate ${dGt ? "text-red-600" : ""}`}>
+                                      {dn(t.driver_id)}{dGt && " ×2"}
+                                    </span>
+                                  </div>
+                                  <span className="text-muted-foreground/40 text-xs">+</span>
+                                  <div className="flex items-center gap-1 min-w-0">
+                                    <UserCheck className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                                    <span className={`text-sm font-medium truncate ${cGt ? "text-red-600" : ""}`}>
+                                      {dn(t.crew_id)}{cGt && " ×2"}
+                                    </span>
+                                  </div>
                                 </div>
-                                <span className="text-muted-foreground/40 text-xs">+</span>
-                                <div className="flex items-center gap-1 min-w-0">
-                                  <UserCheck className="h-3.5 w-3.5 text-green-500 shrink-0" />
-                                  <span className={`text-sm font-medium truncate ${cGt ? "text-red-600" : ""}`}>
-                                    {dn(t.crew_id)}{cGt && " ×2"}
-                                  </span>
-                                </div>
+                                {patientsEnabled && (
+                                  <div className="flex items-center gap-1 mt-1" onClick={(e) => e.stopPropagation()}>
+                                    <HeartPulse className="h-3 w-3 text-purple-500 shrink-0" />
+                                    <Select value={t.patient_id ?? "__none"} onValueChange={(v) => setPatient(t.id, v === "__none" ? null : v)}>
+                                      <SelectTrigger className="h-7 text-xs border-0 p-0 bg-transparent focus:ring-0"><SelectValue placeholder="Patient…" /></SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="__none">— No patient —</SelectItem>
+                                        {goingIds.filter((id) => members[id]).map((id) => <SelectItem key={id} value={id}>{dn(id)}</SelectItem>)}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                )}
                               </div>
-                              {patientsEnabled && (
-                                <div className="flex items-center gap-1 mt-1" onClick={(e) => e.stopPropagation()}>
-                                  <HeartPulse className="h-3 w-3 text-purple-500 shrink-0" />
-                                  <Select value={t.patient_id ?? "__none"} onValueChange={(v) => setPatient(t.id, v === "__none" ? null : v)}>
-                                    <SelectTrigger className="h-7 text-xs border-0 p-0 bg-transparent focus:ring-0"><SelectValue placeholder="Patient…" /></SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="__none">— No patient —</SelectItem>
-                                      {goingIds.filter((id) => members[id]).map((id) => <SelectItem key={id} value={id}>{dn(id)}</SelectItem>)}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="flex-1">
-                              <span className={`text-sm ${isDropTarget ? "text-primary font-medium" : "text-muted-foreground/40"}`}>
-                                {isDropTarget ? "Tap to place here" : "Empty"}
-                              </span>
-                            </div>
-                          )}
+                            ) : (
+                              <div className="flex-1">
+                                <span className={`text-sm ${isDropTarget ? "text-primary font-medium" : "text-muted-foreground/40"}`}>
+                                  {isDropTarget ? "Tap to place here" : "Empty"}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                           {t && !selected && (
-                            <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex gap-1 shrink-0">
                               <button type="button" onClick={() => moveToSlot(t.id, null, null)} className="p-1.5 text-muted-foreground/50 hover:text-muted-foreground rounded-lg hover:bg-muted">
                                 <ChevronDown className="h-3.5 w-3.5" />
                               </button>
