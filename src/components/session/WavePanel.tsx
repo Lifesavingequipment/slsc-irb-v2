@@ -351,6 +351,23 @@ export function WavePanel({
   };
 
   const setPatient = async (teamId: string, patientId: string | null) => {
+    const team = teams.find((t) => t.id === teamId);
+    if (patientId) {
+      if (team && (patientId === team.driver_id || patientId === team.crew_id)) {
+        showToast.error("The patient can't be the driver or crew of the same team.");
+        return;
+      }
+      if (team && team.wave != null) {
+        const sameWave = teams.filter((t) => t.wave === team.wave && t.id !== teamId);
+        const alreadyInWave = sameWave.some(
+          (t) => t.driver_id === patientId || t.crew_id === patientId || t.patient_id === patientId
+        );
+        if (alreadyInWave) {
+          showToast.error("This person is already in another team in the same wave.");
+          return;
+        }
+      }
+    }
     const { error } = await supabase.from("session_teams").update({ patient_id: patientId }).eq("id", teamId);
     if (error) { showToast.error(error.message); return; }
     load();
