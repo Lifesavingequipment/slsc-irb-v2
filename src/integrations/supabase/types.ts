@@ -4048,6 +4048,7 @@ export type Database = {
           created_by?: string | null
           ends_at?: string | null
           equipment_list_id?: string | null
+          patients_enabled?: boolean | null
           format?: Database["public"]["Enums"]["session_format"]
           id?: string
           location?: string | null
@@ -4072,6 +4073,7 @@ export type Database = {
           created_by?: string | null
           ends_at?: string | null
           equipment_list_id?: string | null
+          patients_enabled?: boolean | null
           format?: Database["public"]["Enums"]["session_format"]
           id?: string
           location?: string | null

@@ -54,6 +54,7 @@ type Session = {
   capacity: number | null; notes: string | null;
   survey_enabled: boolean; carpool_enabled: boolean;
   equipment_list_id: string | null;
+  patients_enabled: boolean;
 };
 
 type RsvpStatus = "going" | "maybe" | "not_going";
